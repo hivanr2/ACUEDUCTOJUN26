@@ -1,0 +1,98 @@
+﻿@page "/Account/Manage"
+@page "/proceso/Actualizacion Datos Usuario"
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO2.Data
+
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IdentityUserAccessor UserAccessor
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Perfil</PageTitle>
+
+<h3>Perfil</h3>
+<StatusMessage />
+
+<div class="row">
+    <div class="col-xl-6">
+        <EditForm Model="Input" FormName="profile" OnValidSubmit="OnValidSubmitAsync" method="post">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert" />
+            <div class="form-floating mb-3">
+                <input type="text" value="@identificacion" id="identificacion" class="form-control" placeholder="Elija su Identificación de usuario." disabled />
+                <label for="username" class="form-label">Identificación</label>
+            </div>
+            <div class="form-floating mb-3">
+                <input type="text" value="@username" id="username" class="form-control" placeholder="Elija su nombre de usuario." disabled />
+                <label for="username" class="form-label">Usuario</label>
+            </div>
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.PhoneNumber" id="Input.PhoneNumber" class="form-control" placeholder="Ingrese su número de teléfono" />
+                <label for="Input.PhoneNumber" class="form-label">Teléfono</label>
+                <ValidationMessage For="() => Input.PhoneNumber" class="text-danger" />
+            </div>
+            <button type="submit" class="w-100 btn btn-lg btn-primary">Guardar</button>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private ApplicationUser user = default!;
+    private string? username;
+    private string? phoneNumber;
+    private string? identificacion;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private InputModel Input { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await UserAccessor.GetRequiredUserAsync(HttpContext);
+        username = user.UserName;
+        phoneNumber = user.PhoneNumber;
+        identificacion = user.Identificacion;
+        Input.PhoneNumber ??= phoneNumber;
+        
+    }
+
+    private async Task OnValidSubmitAsync()
+    {
+        if (Input.PhoneNumber != phoneNumber)
+        {
+            // If new phone is provided, ensure it's not already used by another account
+            if (!string.IsNullOrWhiteSpace(Input.PhoneNumber))
+            {
+                var existing = await UserManager.Users
+                    .Where(u => u.PhoneNumber != null && u.PhoneNumber == Input.PhoneNumber)
+                    .FirstOrDefaultAsync();
+                if (existing is not null && !string.Equals(existing.Id, user.Id, StringComparison.Ordinal))
+                {
+                    RedirectManager.RedirectToCurrentPageWithStatus("Error: El teléfono ya está registrado. Use otro.", HttpContext);
+                    return;
+                }
+            }
+
+            var setPhoneResult = await UserManager.SetPhoneNumberAsync(user, Input.PhoneNumber);
+            if (!setPhoneResult.Succeeded)
+            {
+                RedirectManager.RedirectToCurrentPageWithStatus("Error: No se pudo establecer el número de teléfono.", HttpContext);
+                return;
+            }
+        }
+
+        await SignInManager.RefreshSignInAsync(user);
+        RedirectManager.RedirectToCurrentPageWithStatus("Su perfil ha sido actualizado", HttpContext);
+    }
+
+    private sealed class InputModel
+    {
+        [Phone]
+        [Display(Name = "Phone number")]
+        public string? PhoneNumber { get; set; }
+    }
+}

@@ -1,0 +1,176 @@
+@page "/trabajos/details"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@rendermode InteractiveServer
+
+<PageTitle>Detalle de Trabajo</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+            <h3 class="h4 mb-1">Detalle de Trabajo</h3>
+            @if (trabajo is not null)
+            {
+                <div class="small text-muted d-flex align-items-center gap-2 flex-wrap">
+                    <span>Id: <strong>@trabajo.IdTrabajo</strong></span>
+                    @if (!string.IsNullOrWhiteSpace(estadoBadge()))
+                    {
+                        <span class="badge @estadoBadgeClass()">@trabajo.Estado</span>
+                    }
+                </div>
+            }
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary btn-sm" href="/trabajos" onclick="return cerrarVentana('/trabajos');"><i class="bi bi-arrow-left"></i> Cerrar</a>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(loadError))
+    {
+        <div class="alert alert-danger">@loadError</div>
+    }
+    else if (trabajo is null)
+    {
+        <div class="text-muted">Cargando...</div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-header bg-light d-flex align-items-center justify-content-between">
+                <strong>Información</strong>
+                <div class="d-flex align-items-center gap-2 small">
+                    @if (!string.IsNullOrWhiteSpace(tipoNombre))
+                    {
+                        <span class="badge bg-primary-subtle text-primary border">Tipo: <strong>@tipoNombre</strong></span>
+                    }
+                </div>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 col-lg-3">Fecha Inicio</dt>
+                    <dd class="col-sm-8 col-lg-9">@trabajo.FechaInicio</dd>
+
+                    <dt class="col-sm-4 col-lg-3">Fecha Finalización</dt>
+                    <dd class="col-sm-8 col-lg-9">@trabajo.FechaFinalizacion</dd>
+
+                    <dt class="col-sm-4 col-lg-3">Descripción</dt>
+                    <dd class="col-sm-8 col-lg-9">@trabajo.Descripcion</dd>
+
+                    <dt class="col-sm-4 col-lg-3">Tipo (Id)</dt>
+                    <dd class="col-sm-8 col-lg-9">@trabajo.TipoTrabajo</dd>
+
+                    <dt class="col-sm-4 col-lg-3">Tipo (Nombre)</dt>
+                    <dd class="col-sm-8 col-lg-9">@tipoNombre</dd>
+
+                    <dt class="col-sm-4 col-lg-3">Estado</dt>
+                    <dd class="col-sm-8 col-lg-9">@trabajo.Estado</dd>
+
+                    <dt class="col-sm-4 col-lg-3">Predio</dt>
+                    <dd class="col-sm-8 col-lg-9">@predioNombre</dd>
+
+                    <dt class="col-sm-4 col-lg-3">Inventario</dt>
+                    <dd class="col-sm-8 col-lg-9">@inventarioNombre</dd>
+
+                    <dt class="col-sm-4 col-lg-3">Planilla</dt>
+                    <dd class="col-sm-8 col-lg-9">
+                        @if (!string.IsNullOrWhiteSpace(planillaDescripcion))
+                        {
+                            @($"{planillaDescripcion}")
+                        }
+                        else
+                        {
+                            @trabajo.Idplanilla
+                        }
+                    </dd>
+
+                    <dt class="col-sm-4 col-lg-3">Materiales</dt>
+                    <dd class="col-sm-8 col-lg-9">@trabajo.Materiales</dd>
+
+                    <dt class="col-sm-4 col-lg-3">Personal</dt>
+                    <dd class="col-sm-8 col-lg-9">@trabajo.Personal</dd>
+
+                    <dt class="col-sm-4 col-lg-3">Observaciones</dt>
+                    <dd class="col-sm-8 col-lg-9">@trabajo.Observaciones</dd>
+                </dl>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "idtrabajo")]
+    public int IdTrabajo { get; set; }
+
+    private Trabajo? trabajo;
+    private string? loadError;
+    private string tipoNombre = string.Empty;
+    private string predioNombre = string.Empty;
+    private string inventarioNombre = string.Empty;
+    private string planillaDescripcion = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IdTrabajo <= 0)
+        {
+            loadError = "Parámetro idtrabajo inválido.";
+            return;
+        }
+
+        try
+        {
+            using var context = DbFactory.CreateDbContext();
+            trabajo = await context.Trabajos
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.IdTrabajo == IdTrabajo);
+
+            if (trabajo is null)
+            {
+                loadError = $"Trabajo {IdTrabajo} no encontrado.";
+                return;
+            }
+
+            var tipo = await context.TiposTrabajos.AsNoTracking().FirstOrDefaultAsync(t => t.IdTipoTrabajo == trabajo.TipoTrabajo);
+            tipoNombre = tipo?.Nombre ?? string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(trabajo.IdPredio))
+            {
+                var predio = await context.Predios.AsNoTracking().FirstOrDefaultAsync(p => p.Idpredio == trabajo.IdPredio);
+                predioNombre = predio?.ApellidosNombresUsuario ?? predio?.Direccion ?? trabajo.IdPredio;
+            }
+            if (!string.IsNullOrWhiteSpace(trabajo.IdInventario))
+            {
+                var inv = await context.Inventarios.AsNoTracking().FirstOrDefaultAsync(i => i.Idinventario == trabajo.IdInventario);
+                inventarioNombre = inv?.DescripcionCorta ?? inv?.Codigo ?? trabajo.IdInventario;
+            }
+            if (!string.IsNullOrWhiteSpace(trabajo.Idplanilla))
+            {
+                var planilla = await context.Planillas.AsNoTracking().FirstOrDefaultAsync(p => p.Idplanilla == trabajo.Idplanilla);
+                planillaDescripcion = planilla?.Descripcion ?? string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Error cargando trabajo: {ex.Message}";
+        }
+    }
+
+    private string estadoBadge()
+    {
+        return string.IsNullOrWhiteSpace(trabajo?.Estado) ? string.Empty : trabajo.Estado;
+    }
+
+    private string estadoBadgeClass()
+    {
+        var e = trabajo?.Estado?.ToLowerInvariant();
+        return e switch
+        {
+            "pendiente" => "badge bg-warning text-dark",
+            "en proceso" => "badge bg-info text-dark",
+            "completado" => "badge bg-success",
+            "cancelado" => "badge bg-danger",
+            _ => "badge bg-secondary"
+        };
+    }
+}

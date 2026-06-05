@@ -1,0 +1,151 @@
+﻿@page "/facturacion/create"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create</PageTitle>
+
+<h1>Create</h1>
+
+<h2>Facturacion</h2>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <EditForm method="post" Model="Facturacion" OnValidSubmit="AddFacturacion" FormName="create" Enhance>
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert"/>
+            <div class="mb-3">
+                <label for="idpredio" class="form-label">IdPlanilla:</label>
+                <InputText id="idpredio" @bind-Value="Facturacion.Idplanilla" class="form-control" />
+                <ValidationMessage For="() => Facturacion.Idplanilla" class="text-danger" />
+            </div>
+
+            <div class="mb-3">
+                <label for="idpredio" class="form-label">Idpredio:</label> 
+                <InputText id="idpredio" @bind-Value="Facturacion.Idpredio" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.Idpredio" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="codigousuario" class="form-label">CodigoUsuario:</label> 
+                <InputText id="codigousuario" @bind-Value="Facturacion.CodigoUsuario" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.CodigoUsuario" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="fechahoraregistro" class="form-label">FechaHoraRegistro:</label> 
+                <InputDate id="fechahoraregistro" @bind-Value="Facturacion.FechaHoraRegistro" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.FechaHoraRegistro" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="medicionanterior" class="form-label">MedicionAnterior:</label> 
+                <InputNumber id="medicionanterior" @bind-Value="Facturacion.MedicionAnterior" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.MedicionAnterior" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="medicionactual" class="form-label">MedicionActual:</label> 
+                <InputNumber id="medicionactual" @bind-Value="Facturacion.MedicionActual" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.MedicionActual" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="consumom3" class="form-label">ConsumoM3:</label> 
+                <InputNumber id="consumom3" @bind-Value="Facturacion.ConsumoM3" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.ConsumoM3" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="cargofijo" class="form-label">CargoFijo:</label> 
+                <InputNumber id="cargofijo" @bind-Value="Facturacion.CargoFijo" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.CargoFijo" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="valorconsumo" class="form-label">ValorConsumo:</label> 
+                <InputNumber id="valorconsumo" @bind-Value="Facturacion.ValorConsumo" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.ValorConsumo" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="porcentajesobretasa" class="form-label">PorcentajeSobreTasa:</label> 
+                <InputNumber id="porcentajesobretasa" @bind-Value="Facturacion.PorcentajeSobreTasa" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.PorcentajeSobreTasa" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="valorsobretasa" class="form-label">ValorSobreTasa:</label> 
+                <InputNumber id="valorsobretasa" @bind-Value="Facturacion.ValorSobreTasa" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.ValorSobreTasa" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="porcentajemora" class="form-label">PorcentajeMora:</label> 
+                <InputNumber id="porcentajemora" @bind-Value="Facturacion.PorcentajeMora" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.PorcentajeMora" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="valormora" class="form-label">ValorMora:</label> 
+                <InputNumber id="valormora" @bind-Value="Facturacion.ValorMora" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.ValorMora" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="porcentajesubsidio" class="form-label">PorcentajeSubsidio:</label> 
+                <InputNumber id="porcentajesubsidio" @bind-Value="Facturacion.PorcentajeSubsidio" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.PorcentajeSubsidio" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="valorsubsidio" class="form-label">ValorSubsidio:</label> 
+                <InputNumber id="valorsubsidio" @bind-Value="Facturacion.ValorSubsidio" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.ValorSubsidio" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="otrosvalores" class="form-label">OtrosValores:</label> 
+                <InputNumber id="otrosvalores" @bind-Value="Facturacion.OtrosValores" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.OtrosValores" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="valorperiodo" class="form-label">ValorPeriodo:</label> 
+                <InputNumber id="valorperiodo" @bind-Value="Facturacion.ValorPeriodo" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.ValorPeriodo" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="deudaanterior" class="form-label">DeudaAnterior:</label> 
+                <InputNumber id="deudaanterior" @bind-Value="Facturacion.DeudaAnterior" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.DeudaAnterior" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="recaudoperiodototal" class="form-label">RecaudoPeriodoTotal:</label> 
+                <InputNumber id="recaudoperiodototal" @bind-Value="Facturacion.RecaudoPeriodoTotal" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.RecaudoPeriodoTotal" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="deudapasa" class="form-label">DeudaPasa:</label> 
+                <InputNumber id="deudapasa" @bind-Value="Facturacion.DeudaPasa" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.DeudaPasa" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="notasfactura" class="form-label">NotasFactura:</label> 
+                <InputText id="notasfactura" @bind-Value="Facturacion.NotasFactura" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.NotasFactura" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="notasrecaudo" class="form-label">NotasRecaudo:</label> 
+                <InputText id="notasrecaudo" @bind-Value="Facturacion.NotasRecaudo" class="form-control" /> 
+                <ValidationMessage For="() => Facturacion.NotasRecaudo" class="text-danger" /> 
+            </div>        
+            <button type="submit" class="btn btn-primary">Create</button>
+        </EditForm>
+    </div>
+</div>
+
+<div>
+    <a href="/facturacions">Volve a la Lista</a>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private Facturacion Facturacion { get; set; } = new();
+
+    // To protect from overposting attacks, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task AddFacturacion()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Facturacion.Idfactura = Guid.NewGuid().ToString();
+        context.Facturacions.Add(Facturacion);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/facturacions");
+    }
+}

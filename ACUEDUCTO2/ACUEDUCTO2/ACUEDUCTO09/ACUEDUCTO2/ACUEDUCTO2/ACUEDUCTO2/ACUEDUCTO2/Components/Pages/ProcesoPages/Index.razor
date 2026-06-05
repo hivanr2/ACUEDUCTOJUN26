@@ -1,0 +1,57 @@
+@page "/procesos"
+@using ACUEDUCTO2.Share.Models
+@inject ACUEDUCTO2.Services.ProcesoService ProcesoService
+@inject NavigationManager Navigation
+
+<PageTitle>Procesos</PageTitle>
+
+<h1>Procesos</h1>
+
+<p>
+    <a class="btn btn-primary" href="procesos/create">Nuevo proceso</a>
+</p>
+
+@if (procesos is null)
+{
+    <p>Cargando...</p>
+}
+else if (!procesos.Any())
+{
+    <p>No hay procesos.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Objeto</th>
+                <th>Tipo</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+@foreach (var p in procesos)
+{
+    <tr>
+        <td>@p.Nombre</td>
+        <td>@p.Objeto</td>
+        <td>@p.IdTipoProceso</td>
+        <td>
+            <a href="@($"procesos/edit/{p.Id}")">Editar</a> |
+            <a href="@($"procesos/delete/{p.Id}")">Eliminar</a>
+        </td>
+    </tr>
+}
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Proceso>? procesos;
+
+    protected override async Task OnInitializedAsync()
+    {
+        procesos = await ProcesoService.GetAllAsync();
+    }
+}

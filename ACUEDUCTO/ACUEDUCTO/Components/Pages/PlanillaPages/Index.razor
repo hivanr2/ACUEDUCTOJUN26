@@ -1,0 +1,128 @@
+﻿@page "/planillas"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@rendermode InteractiveServer
+
+<PageTitle>Planillas</PageTitle>
+
+<div class="container-fluid py-2 py-md-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Planillas</h1>
+            <small class="text-muted">PUFRA - Facturación y Recaudo</small>
+        </div>
+        <!-- Acciones superiores reemplazadas por FAB -->
+    </div>
+
+    <div class="row g-2 align-items-center mb-2">
+        <div class="col-12 col-md-6">
+            <input type="search" class="form-control" @bind=filterText @bind:event="oninput" placeholder="Buscar por descripción o periodo..." />
+        </div>
+        <div class="col-12 col-md-6 text-md-end text-muted">
+            <span>Items: <span class="badge bg-secondary">@filterPlanillas.Count()</span></span>
+            <a class="btn btn-outline-secondary btn-sm ms-2" href="/facturacion" target="_blank">Registros de facturación</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <QuickGrid Class="table table-hover table-sm align-middle mb-0" Items="filterPlanillas" Pagination="@pagination">
+                <PropertyColumn Property="planilla => planilla.Descripcion" Sortable="true" Title="Descripción" />
+                <PropertyColumn Property="planilla => planilla.IdperiodoNavigation!.DescripcionCorta" Title="Periodo" />
+                <TemplateColumn Context="planilla" Title="Estado">
+                    @if (planilla.Abierta)
+                    {
+                        <span class="badge bg-success">Abierta</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">Cerrada</span>
+                    }
+                </TemplateColumn>
+                <PropertyColumn Property="planilla => planilla.Facturacions.Count" Title="Facturados" />
+                <TemplateColumn Context="planilla" Title="Accesos">
+                    <div class="d-flex flex-wrap gap-1 align-items-center">
+                        <a class="btn btn-outline-primary btn-sm" href="@($"/planillas/consumoscomponent?id={planilla.Idplanilla}")" target="_blank">Consumo</a>
+                        <a class="btn btn-outline-success btn-sm" href="@($"/planillas/recaudocomponent?id={planilla.Idplanilla}")" target="_blank">Recaudo</a>
+                        <a class="btn btn-outline-warning btn-sm" href="@($"/planillas/facturacioncomponent?id={planilla.Idplanilla}")" target="_blank">Facturación</a>
+                        <a class="btn btn-outline-secondary btn-sm" href="@($"/planillas/mantenimientocomponent?id={planilla.Idplanilla}")" target="_blank">Mantenimiento</a>
+                    </div>
+                </TemplateColumn>
+                <TemplateColumn Context="planilla" Title="Acciones">
+                    <div class="text-end">
+                        <a class="btn btn-link btn-sm" href="@($"/planillas/edit?idplanilla={planilla.Idplanilla}")" target="_blank">Editar</a>
+                        <span class="text-muted">|</span>
+                        <a class="btn btn-link btn-sm" href="@($"/planillas/details?idplanilla={planilla.Idplanilla}")" target="_blank">Detalles</a>
+                        @if (planilla.Facturacions.Count == 0)
+                        {
+                            <span class="text-muted">|</span>
+                            <a class="btn btn-link btn-sm text-danger" href="@($"/planillas/delete?idplanilla={planilla.Idplanilla}")" target="_blank">Borrar</a>
+                        }
+                    </div>
+                </TemplateColumn>
+            </QuickGrid>
+        </div>
+    </div>
+
+    <Paginator State="@pagination" />
+</div>
+
+<!-- Botón flotante Crear Planilla -->
+<a href="/planillas/create" class="fab-create" title="Crear planilla" aria-label="Crear planilla" target="_blank">
+    <img src="/img/plus.svg" alt="Crear" onerror="this.onerror=null;this.outerHTML='+';" />
+</a>
+
+@code {
+    private AcueductoContext context = default!;
+    private string? filterText = string.Empty;
+
+    PaginationState pagination = new PaginationState { ItemsPerPage = 20 };
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+
+    IQueryable<Planilla> filterPlanillas => context.Planillas
+        .Where(x => (x.Descripcion ?? string.Empty).Contains(filterText!)
+                 || (x.IdperiodoNavigation!.DescripcionCorta ?? string.Empty).Contains(filterText!))
+        .OrderBy(u => u.FechaHoraRegistroConsumo)
+        .Include(c => c.IdperiodoNavigation)
+        .Include(c => c.Facturacions);
+
+    private async Task RecalcularTotales(string idplanilla)
+    {
+        var planilla = await context.Planillas
+            .Include(p => p.Facturacions)
+            .FirstOrDefaultAsync(p => p.Idplanilla == idplanilla);
+        if (planilla is null) return;
+
+        var fact = planilla.Facturacions;
+        planilla.TotalPredios = fact.Count;
+        planilla.CantidadConsumoM3total = fact.Sum(f => f.ConsumoM3 ?? 0);
+        planilla.ValorTotalConsumoM3 = fact.Sum(f => f.ValorConsumo ?? 0);
+        planilla.ValorTotalMora = fact.Sum(f => f.ValorMora ?? 0);
+        planilla.ValorTotalSobreTasa = fact.Sum(f => f.ValorSobreTasa ?? 0);
+        planilla.ValorTotalSubsidio = fact.Sum(f => f.ValorSubsidio ?? 0);
+        planilla.ValorTotalOtros = fact.Sum(f => f.OtrosValores ?? 0);
+        planilla.ValorTotalPlanilla = fact.Sum(f => f.ValorPeriodo ?? 0);
+        planilla.ValorTotalRecaudo = fact.Sum(f => f.RecaudoPeriodoTotal ?? 0);
+
+        await context.SaveChangesAsync();
+        StateHasChanged();
+    }
+
+    private async Task RecalcularTotalesTodas()
+    {
+        var ids = await context.Planillas.Select(p => p.Idplanilla).ToListAsync();
+        foreach (var id in ids)
+        {
+            await RecalcularTotales(id);
+        }
+    }
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}

@@ -1,0 +1,93 @@
+﻿@using ACUEDUCTO.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@inject IMenuPermissionService Perms
+@inject AuthenticationStateProvider Auth
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">
+            <i class="bi bi-droplet-half me-2" aria-hidden="true"></i>
+            ACUEDUCTO <VersionComponent />
+        </a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link align-items-stretch" href="usuarios">
+                <i class="bi bi-people me-2" aria-hidden="true"></i> Usuarios
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link align-items-stretch" href="predios">
+                <i class="bi bi-house-door me-2" aria-hidden="true"></i> Predios
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link align-items-stretch" href="planillas">
+                <i class="bi bi-clipboard2 me-2" aria-hidden="true"></i> PLANILLAS
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link  align-items-stretch" href="autoconsumocomponent">
+                <span class="bi bi-droplet" aria-hidden="true"></span> AUTOCONSUMO
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link align-items-stretch" href="inventarios">
+                <i class="bi bi-box-seam me-2" aria-hidden="true"></i> INVENTARIO
+            </NavLink>
+        </div>
+@*         <div class="nav-item px-3">
+            <NavLink class="nav-link align-items-stretch" href="indicadors">
+                <i class="bi bi-graph-up-arrow me-2" aria-hidden="true"></i> INDICADORES
+            </NavLink>
+        </div>
+ *@        <div class="nav-item px-3">
+            <NavLink class="nav-link align-items-stretch" href="documentacions">
+                <i class="bi bi-file-earmark-text me-2" aria-hidden="true"></i> DOCUMENTOS
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link align-items-stretch" href="trabajos">
+                <i class="bi bi-hammer me-2" aria-hidden="true"></i> TRABAJOS
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link align-items-stretch" href="solicitudes">
+                <i class="bi bi-clipboard-check me-2" aria-hidden="true"></i> SGS
+            </NavLink>
+        </div>
+        <hr />
+    <div class="nav-item px-3">
+        <NavLink class="nav-link align-items-stretch" href="movimientocajas">
+            <i class="bi bi-cash-coin me-2" aria-hidden="true"></i> CAJA
+        </NavLink>
+    </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link align-items-stretch" href="auditoria">
+                <i class="bi bi-clipboard-check me-2" aria-hidden="true"></i> Auditoria
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+<!-- Footer bajo el menú -->
+<div class="px-3 py-2 small text-muted">
+    <div>Powered By: Xcursor.Org - <VersionComponent /></div>
+</div>
+
+@code {
+    // Restricciones removidas: ahora el menú muestra todas las opciones sin validar permisos ni roles.
+}

@@ -1,0 +1,60 @@
+﻿@page "/estados/delete"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Delete</PageTitle>
+
+<h1>Delete</h1>
+
+<p>Are you sure you want to delete this?</p>
+<div>
+    <h2>Estado</h2>
+    <hr />
+    @if (estado is null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Nombre</dt>
+            <dd class="col-sm-10">@estado.Nombre</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Descripcion</dt>
+            <dd class="col-sm-10">@estado.Descripcion</dd>
+        </dl>
+        <EditForm method="post" Model="estado" OnValidSubmit="DeleteEstado" FormName="delete" Enhance>
+            <button type="submit" class="btn btn-danger" disabled="@(estado is null)">Delete</button> |
+            <a href="/estados">Back to List</a>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private Estado? estado;
+
+    [SupplyParameterFromQuery]
+    private int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        estado = await context.Estados.FirstOrDefaultAsync(m => m.Id == Id);
+
+        if (estado is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    private async Task DeleteEstado()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Estados.Remove(estado!);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/estados");
+    }
+}

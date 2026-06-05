@@ -1,0 +1,273 @@
+@page "/usuarios"
+@page "/proceso/Listado de Usuarios"
+@page "/proceso/Listado Residentes"
+@page "/proceso/Cedula Ciudadania o similar de Propietarios"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO2.Data
+@using ACUEDUCTO2.Share.Models
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AuthenticationStateProvider AuthStateProvider
+@inject UserManager<ApplicationUser> UserManager
+
+<PageTitle>Usuarios - Sistema de Recaudo</PageTitle>
+
+<div class="container-fluid py-2 py-md-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Usuarios</h1>
+            <small class="text-muted">Sistema de Recaudo y Consumos</small>
+        </div>
+    </div>
+
+    @if (!cargado)
+    {
+        <div class="text-center text-muted py-5">Cargando...</div>
+    }
+    else
+    {
+        <div class="row g-2 align-items-center mb-2">
+            <div class="col-12 col-md-6">
+                <input type="search" class="form-control" autofocus @bind="filterText" @bind:event="oninput" placeholder="Buscar por nombre, identificación, correo..." />
+            </div>
+            <div class="col-12 col-md-6 text-md-end small text-muted">
+                <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+                    @if (esAdmin)
+                    {
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="filtroSinCedula" @bind="filtroSinCedula" />
+                            <label class="form-check-label" for="filtroSinCedula">Sin Cédula</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="filtroSinTelefono" @bind="filtroSinTelefono" />
+                            <label class="form-check-label" for="filtroSinTelefono">Sin Teléfono</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="filtroSinCorreo" @bind="filtroSinCorreo" />
+                            <label class="form-check-label" for="filtroSinCorreo">Sin Correo</label>
+                        </div>
+                    }
+                    <span>Items: <span class="badge bg-secondary">@totalFiltrados</span></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <table class="table table-hover table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Apellidos y Nombres</th>
+                            <th>Identificación</th>
+                            <th>Teléfono</th>
+                            <th>Correo Electrónico</th>
+                            <th>Confirmado</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var usuario in UsuariosPaginados)
+                        {
+                            <tr>
+                                <td>@usuario.ApellidosNombres</td>
+                                <td>@usuario.Identificacion</td>
+                                <td>@usuario.PhoneNumber</td>
+                                <td>@usuario.Email</td>
+                                <td>@(usuario.EmailConfirmed ? "Sí" : "No")</td>
+                                <td class="text-end">
+                                    @if (esAdmin)
+                                    {
+                                        <a class="btn btn-link btn-sm" href="@($"usuarios/edit?id={usuario.Id}")" target="_blank">Editar</a>
+                                        <span class="text-muted">|</span>
+                                    }
+                                    <a class="btn btn-link btn-sm" href="@($"usuarios/details?id={usuario.Id}")" target="_blank">Detalles</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="d-flex flex-wrap justify-content-between align-items-center mt-2 gap-2">
+            <div class="d-flex align-items-center gap-2 small">
+                <label class="mb-0">Por página:</label>
+                <select class="form-select form-select-sm" style="width:auto" @bind="tamañoPagina">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(paginaActual <= 1 ? "disabled" : "")">
+                        <button class="page-link" @onclick="() => IrAPagina(1)" disabled="@(paginaActual <= 1)">«</button>
+                    </li>
+                    <li class="page-item @(paginaActual <= 1 ? "disabled" : "")">
+                        <button class="page-link" @onclick="() => IrAPagina(paginaActual - 1)" disabled="@(paginaActual <= 1)">‹</button>
+                    </li>
+                    @foreach (var p in PaginasVisibles)
+                    {
+                        <li class="page-item @(p == paginaActual ? "active" : "")">
+                            <button class="page-link" @onclick="() => IrAPagina(p)">@p</button>
+                        </li>
+                    }
+                    <li class="page-item @(paginaActual >= totalPaginas ? "disabled" : "")">
+                        <button class="page-link" @onclick="() => IrAPagina(paginaActual + 1)" disabled="@(paginaActual >= totalPaginas)">›</button>
+                    </li>
+                    <li class="page-item @(paginaActual >= totalPaginas ? "disabled" : "")">
+                        <button class="page-link" @onclick="() => IrAPagina(totalPaginas)" disabled="@(paginaActual >= totalPaginas)">»</button>
+                    </li>
+                </ul>
+            </nav>
+            <small class="text-muted">Página @paginaActual de @totalPaginas</small>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ApplicationUser> usuarios = [];
+    private string? _filterText = string.Empty;
+    private bool _filtroSinCedula;
+    private bool _filtroSinTelefono;
+    private bool _filtroSinCorreo;
+    private bool esAdmin;
+    private bool cargado;
+    private int paginaActual = 1;
+    private int _tamañoPagina = 25;
+
+    private string? filterText
+    {
+        get => _filterText;
+        set { _filterText = value; paginaActual = 1; }
+    }
+
+    private bool filtroSinCedula
+    {
+        get => _filtroSinCedula;
+        set { _filtroSinCedula = value; paginaActual = 1; }
+    }
+
+    private bool filtroSinTelefono
+    {
+        get => _filtroSinTelefono;
+        set { _filtroSinTelefono = value; paginaActual = 1; }
+    }
+
+    private bool filtroSinCorreo
+    {
+        get => _filtroSinCorreo;
+        set { _filtroSinCorreo = value; paginaActual = 1; }
+    }
+
+    private int tamañoPagina
+    {
+        get => _tamañoPagina;
+        set { _tamañoPagina = value; paginaActual = 1; }
+    }
+
+    private int totalFiltrados => UsuariosFiltrados.Count();
+    private int totalPaginas => Math.Max(1, (int)Math.Ceiling(totalFiltrados / (double)tamañoPagina));
+
+    private IEnumerable<ApplicationUser> UsuariosPaginados =>
+        UsuariosFiltrados.Skip((paginaActual - 1) * tamañoPagina).Take(tamañoPagina);
+
+    private IEnumerable<int> PaginasVisibles
+    {
+        get
+        {
+            var inicio = Math.Max(1, paginaActual - 2);
+            var fin = Math.Min(totalPaginas, inicio + 4);
+            inicio = Math.Max(1, fin - 4);
+            return Enumerable.Range(inicio, fin - inicio + 1);
+        }
+    }
+
+    private void IrAPagina(int pagina)
+    {
+        paginaActual = Math.Clamp(pagina, 1, totalPaginas);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var claimsPrincipal = authState.User;
+        esAdmin = claimsPrincipal.IsInRole("Administradores");
+
+        await using var context = await DbFactory.CreateDbContextAsync();
+
+        if (esAdmin)
+        {
+            usuarios = await context.Users
+                .AsNoTracking()
+                .OrderBy(u => u.ApellidosNombres)
+                .ToListAsync();
+        }
+        else
+        {
+            var userId = UserManager.GetUserId(claimsPrincipal);
+            var usuarioActual = await context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (usuarioActual is not null && !string.IsNullOrWhiteSpace(usuarioActual.Identificacion))
+            {
+                var identificacion = usuarioActual.Identificacion;
+
+                // Identificaciones de quienes me autorizaron + a quienes yo autoricé
+                var autorizaciones = await context.Set<Autorizado>()
+                    .AsNoTracking()
+                    .Where(a => a.AQueAutoriza == identificacion || a.QuienAutoriza == identificacion)
+                    .Select(a => new { a.QuienAutoriza, a.AQueAutoriza })
+                    .ToListAsync();
+
+                var idsPermitidos = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { identificacion };
+                foreach (var a in autorizaciones)
+                {
+                    if (!string.IsNullOrWhiteSpace(a.QuienAutoriza)) idsPermitidos.Add(a.QuienAutoriza);
+                    if (!string.IsNullOrWhiteSpace(a.AQueAutoriza)) idsPermitidos.Add(a.AQueAutoriza);
+                }
+
+                usuarios = await context.Users
+                    .AsNoTracking()
+                    .Where(u => idsPermitidos.Contains(u.Identificacion))
+                    .OrderBy(u => u.ApellidosNombres)
+                    .ToListAsync();
+            }
+        }
+
+        cargado = true;
+    }
+
+    private IEnumerable<ApplicationUser> UsuariosFiltrados
+    {
+        get
+        {
+            IEnumerable<ApplicationUser> result = usuarios;
+
+            if (!string.IsNullOrWhiteSpace(filterText))
+            {
+                var ft = filterText!;
+                result = result.Where(x =>
+                    (x.ApellidosNombres ?? "").Contains(ft, StringComparison.OrdinalIgnoreCase) ||
+                    (x.Identificacion ?? "").Contains(ft, StringComparison.OrdinalIgnoreCase) ||
+                    (x.Email ?? "").Contains(ft, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (filtroSinCedula)
+                result = result.Where(u => string.IsNullOrWhiteSpace(u.Identificacion) || u.Identificacion.Length < 6);
+
+            if (filtroSinTelefono)
+                result = result.Where(u => string.IsNullOrWhiteSpace(u.PhoneNumber) || u.PhoneNumber == "0");
+
+            if (filtroSinCorreo)
+                result = result.Where(u => string.IsNullOrWhiteSpace(u.Email));
+
+            return result;
+        }
+    }
+}

@@ -1,0 +1,149 @@
+@page "/proceso/Registrar Consumo"
+@using ACUEDUCTO2.Services.PredioServices
+@using ACUEDUCTO2.Services.ConsumoServices
+@using Microsoft.AspNetCore.Components.Authorization
+@inject PredioService PredioService
+@inject ConsumoService ConsumoService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<h3>Registrar consumo por factura</h3>
+
+<div class="card shadow-sm p-3">
+    @if (isLoading)
+    {
+        <div>Cargando...</div>
+    }
+    else
+    {
+        <div class="mb-3">
+            <label class="form-label">Predio</label>
+            <select class="form-select" @onchange="OnPredioSelected">
+                <option value="">-- Seleccione predio --</option>
+                @foreach (var p in predios)
+                {
+                    <option value="@p.IdPredio" selected="@(p.IdPredio == selectedPredioId)">@p.IdPredio - @p.ApellidosNombresUsuario</option>
+                }
+            </select>
+        </div>
+
+        <div class="row g-2">
+            <div class="col-6">
+                <label class="form-label">Medición anterior (m³)</label>
+                <input class="form-control" type="number" @bind="medicionAnterior" />
+            </div>
+            <div class="col-6">
+                <label class="form-label">Medición actual (m³)</label>
+                <input class="form-control" type="number" @bind="medicionActual" />
+            </div>
+        </div>
+
+        <div class="mb-3 mt-3">
+            <label class="form-label">Observaciones</label>
+            <input class="form-control" @bind="observaciones" />
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" @onclick="GuardarConsumo">Guardar consumo</button>
+            <button class="btn btn-secondary" @onclick="Cancelar">Cancelar</button>
+        </div>
+    }
+</div>
+
+@code {
+    private List<PredioListItem> predios = new();
+    private string? selectedPredioId;
+    private int medicionAnterior;
+    private int medicionActual;
+    private string observaciones = string.Empty;
+    private bool isLoading = true;
+    private bool esAdmin = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = auth.User;
+        esAdmin = user.IsInRole("Administradores");
+
+        if (esAdmin)
+        {
+            // admin: load all predios
+            predios = await PredioService.GetListingAsync(null);
+        }
+        else
+        {
+            var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                predios = await PredioService.GetListingForAuthorizedUserAsync(userId);
+            }
+        }
+
+        if (predios.Count == 1)
+        {
+            selectedPredioId = predios[0].IdPredio;
+            await PrefillMeasurementsForPredio(selectedPredioId);
+        }
+
+        isLoading = false;
+    }
+
+    private async Task OnPredioSelected(ChangeEventArgs e)
+    {
+        selectedPredioId = Convert.ToString(e.Value);
+        await PrefillMeasurementsForPredio(selectedPredioId);
+    }
+
+    private async Task PrefillMeasurementsForPredio(string? predioId)
+    {
+        medicionAnterior = 0;
+        medicionActual = 0;
+        if (string.IsNullOrWhiteSpace(predioId)) return;
+
+        try
+        {
+            // Try to get recent consumptions and match by predio name
+            var all = await ConsumoService.GetListingAsync(null);
+            var pred = predios.FirstOrDefault(p => p.IdPredio == predioId);
+            ConsumoListItem? found = null;
+            if (pred != null)
+            {
+                found = all.FirstOrDefault(c => string.Equals(c.NombrePredio, pred.ApellidosNombresUsuario, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (found == null)
+            {
+                found = all.FirstOrDefault(c => c.NombrePredio != null && c.NombrePredio.Contains(predioId, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (found != null)
+            {
+                medicionAnterior = found.MedicionAnteriorM3;
+                medicionActual = found.MedicionActualM3;
+            }
+        }
+        catch
+        {
+            // ignore errors prefilling
+        }
+    }
+
+    private async Task GuardarConsumo()
+    {
+        if (string.IsNullOrWhiteSpace(selectedPredioId))
+        {
+            await JS.InvokeVoidAsync("alert", "Seleccione un predio antes de guardar.");
+            return;
+        }
+
+        // TODO: Llamar al servicio para persistir el consumo.
+        await JS.InvokeVoidAsync("alert", $"Consumo guardado para predio {selectedPredioId}: {medicionAnterior} -> {medicionActual}");
+        Nav.NavigateTo("/proceso/Listado de Consumos");
+    }
+
+    private void Cancelar()
+    {
+        Nav.NavigateTo("/proceso/Listado de Consumos");
+    }
+}

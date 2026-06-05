@@ -1,0 +1,38 @@
+﻿@page "/personals"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Models
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+<PageTitle>Personal</PageTitle>
+
+<h1>Personal Acueducto Comunitario</h1>
+
+<p>
+    <a href="personals/create" target="_blank">Create New</a>
+</p>
+
+<QuickGrid Class="table" Items="context.Personals">
+    <PropertyColumn Property="personal => personal.Nombre" />
+    <PropertyColumn Property="personal => personal.Cargo" />
+    <PropertyColumn Property="personal => personal.Usuario" />
+
+    <TemplateColumn Context="personal">
+        <a href="@($"personals/edit?idpersonal={personal.IdPersonal}")" target="_blank">Edit</a> |
+        <a href="@($"personals/details?idpersonal={personal.IdPersonal}")" target="_blank">Details</a> |
+        <a href="@($"personals/delete?idpersonal={personal.IdPersonal}")" target="_blank">Delete</a>
+    </TemplateColumn>
+</QuickGrid>
+
+@code {
+    private AcueductoContext context = default!;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}

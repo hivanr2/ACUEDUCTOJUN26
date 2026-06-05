@@ -1,0 +1,247 @@
+@page "/proceso/Listado de Accesos"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using ACUEDUCTO2.Data
+@using Microsoft.AspNetCore.WebUtilities
+@attribute [Authorize(Roles = "Administradores")]
+
+@inject ACUEDUCTO2.Data.SeguridadService SeguridadService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+@inject ACUEDUCTO2.Services.IMenuPermissionService Perms
+
+<h3>Listado de Accesos por Rol</h3>
+<p class="text-muted">Seleccione un rol para ver y configurar los procesos a los que tiene acceso.</p>
+
+@if (!string.IsNullOrEmpty(mensaje))
+{
+    <div class="alert @(esError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+        @mensaje
+        <button type="button" class="btn-close" @onclick="() => mensaje = null"></button>
+    </div>
+}
+
+<div class="row mb-3">
+    <div class="col-md-3">
+        <label class="form-label"><strong>Rol:</strong></label>
+        <select class="form-select" @onchange="OnRolSeleccionado">
+            <option value="">-- Seleccionar rol --</option>
+            @if (roles != null)
+            {
+                @foreach (var role in roles)
+                {
+                    var roleName = role.Name!;
+                    if (roleName == "Administradores") continue;
+                    <option value="@roleName" selected="@(roleName == rolSeleccionado)">@roleName</option>
+                }
+            }
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label"><strong>Grupo de acceso:</strong></label>
+        <select class="form-select" @bind="objetoFiltro">
+            <option value="">Todos</option>
+            @if (procesosPorObjeto != null)
+            {
+                @foreach (var objeto in procesosPorObjeto.Keys.OrderBy(k => k))
+                {
+                    <option value="@objeto">@objeto</option>
+                }
+            }
+        </select>
+    </div>
+    <div class="col-md-6 d-flex align-items-end">
+        @if (!string.IsNullOrEmpty(rolSeleccionado))
+        {
+            <button class="btn btn-success me-2" @onclick="GuardarCambios" disabled="@guardando">
+                @(guardando ? "Guardando..." : "Guardar Cambios")
+            </button>
+            <button class="btn btn-outline-secondary me-2" @onclick="SeleccionarTodos">Seleccionar Todos</button>
+            <button class="btn btn-outline-secondary" @onclick="DeseleccionarTodos">Deseleccionar Todos</button>
+        }
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(rolSeleccionado) && procesosPorObjeto != null)
+{
+    @foreach (var grupo in procesosPorObjeto.Where(g => string.IsNullOrEmpty(objetoFiltro) || g.Key == objetoFiltro))
+    {
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>@grupo.Key</strong>
+                <span class="badge bg-primary">@grupo.Value.Count(p => procesosSeleccionados.Contains(p.Nombre)) / @grupo.Value.Count</span>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    @foreach (var proceso in grupo.Value)
+                    {
+                        <div class="col-md-6 col-lg-4 mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="@proceso.Nombre"
+                                       checked="@procesosSeleccionados.Contains(proceso.Nombre)"
+                                       @onchange="e => ToggleProceso(proceso.Nombre, (bool)e.Value!)" />
+                                <label class="form-check-label" for="@proceso.Nombre">
+                                    <span class="badge @(proceso.Tipo == 1 ? "bg-info text-dark" : "bg-secondary") me-1">
+                                        @(proceso.Tipo == 1 ? "Info" : "Editar")
+                                    </span>
+                                    @proceso.Nombre
+                                </label>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+}
+else if (string.IsNullOrEmpty(rolSeleccionado))
+{
+    <div class="alert alert-info">Seleccione un rol para configurar sus accesos.</div>
+}
+
+@code {
+    private List<ApplicationRole>? roles;
+    private string? rolSeleccionado;
+    private string? objetoFiltro;
+    private Dictionary<string, List<DefinicionProceso>>? procesosPorObjeto;
+    private HashSet<string> procesosSeleccionados = new();
+    private string? mensaje;
+    private bool esError;
+    private bool guardando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        roles = await SeguridadService.ObtenerRolesAsync();
+
+        procesosPorObjeto = ProcesosCatalogo.Todos
+            .GroupBy(p => p.Objeto)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        // Check for ?rol= query parameter
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("rol", out var rolQuery))
+        {
+            var rolParam = rolQuery.ToString();
+            if (roles.Any(r => r.Name == rolParam))
+            {
+                rolSeleccionado = rolParam;
+                await CargarAccesosRol();
+            }
+        }
+    }
+
+    private async Task OnRolSeleccionado(ChangeEventArgs e)
+    {
+        rolSeleccionado = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(rolSeleccionado))
+        {
+            await CargarAccesosRol();
+        }
+        else
+        {
+            procesosSeleccionados.Clear();
+        }
+        mensaje = null;
+    }
+
+    private async Task CargarAccesosRol()
+    {
+        var nombres = await SeguridadService.ObtenerNombresProcesosDeRolAsync(rolSeleccionado!);
+        procesosSeleccionados = new HashSet<string>(nombres);
+    }
+
+    private void ToggleProceso(string nombre, bool seleccionado)
+    {
+        if (seleccionado)
+            procesosSeleccionados.Add(nombre);
+        else
+            procesosSeleccionados.Remove(nombre);
+    }
+
+    private void SeleccionarTodos()
+    {
+        procesosSeleccionados = new HashSet<string>(ProcesosCatalogo.Todos.Select(p => p.Nombre));
+    }
+
+    private void DeseleccionarTodos()
+    {
+        procesosSeleccionados.Clear();
+    }
+
+    private async Task GuardarCambios()
+    {
+        if (string.IsNullOrEmpty(rolSeleccionado)) return;
+
+        guardando = true;
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var adminUser = authState.User.Identity?.Name ?? "SYSTEM";
+
+            await SeguridadService.ActualizarAccesosDeRolAsync(
+                rolSeleccionado,
+                procesosSeleccionados.ToList(),
+                adminUser);
+
+            // Sync menu footer permissions according to selected procesos
+            await SyncFooterMenuPermissionsForRoleAsync(rolSeleccionado, procesosSeleccionados);
+
+            mensaje = $"Configuración de accesos para el rol '{rolSeleccionado}' guardada correctamente.";
+            esError = false;
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Error guardando: {ex.Message}";
+            esError = true;
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private async Task SyncFooterMenuPermissionsForRoleAsync(string role, HashSet<string> procesosSeleccionados)
+    {
+        // Map object names to footer menu keys
+        var mapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "Factura", "Footer-Facturacion" },
+            { "Recaudo", "Footer-Recaudo" },
+            { "Consumo", "Footer-Consumos" },
+            { "Inventario", "Footer-Mantenimiento" }
+        };
+
+        foreach (var kv in mapping)
+        {
+            var objeto = kv.Key;
+            var menuKey = kv.Value;
+
+            // Determine if any proceso for this objeto is selected
+            var anySelected = ProcesosCatalogo.Todos
+                .Where(p => string.Equals(p.Objeto, objeto, StringComparison.OrdinalIgnoreCase))
+                .Any(p => procesosSeleccionados.Contains(p.Nombre));
+
+            var permission = new ACUEDUCTO2.Share.Models.MenuPermission
+            {
+                Id = Guid.NewGuid().ToString(),
+                MenuKey = menuKey,
+                CanView = anySelected,
+                CanCreate = false,
+                CanEdit = false,
+                CanDelete = false,
+                Role = role,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            try
+            {
+                await Perms.UpsertAsync(permission);
+            }
+            catch
+            {
+                // ignore permission sync errors but do not fail the whole operation
+            }
+        }
+    }
+}

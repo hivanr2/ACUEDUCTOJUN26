@@ -1,0 +1,29 @@
+@page "/archivosdocumentos"
+@layout SimpleLayout
+@using ACUEDUCTO2.Components.Layout
+@using ACUEDUCTO2.Components.Shared
+@rendermode InteractiveServer
+
+<PageTitle>Archivos</PageTitle>
+
+<h3 class="mb-3">Galería de archivos</h3>
+
+<ArchivosGaleria Show="true"
+                  CodigoUsuario="@CodigoUsuario"
+                  CodigoInventario="@CodigoInventario"
+                  OnClosed="CerrarVentana" />
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? CodigoUsuario { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? CodigoInventario { get; set; }
+
+    [Inject] IJSRuntime JS { get; set; } = default!;
+
+    private async Task CerrarVentana()
+    {
+        await JS.InvokeVoidAsync("close");
+    }
+}

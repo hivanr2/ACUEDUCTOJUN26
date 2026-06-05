@@ -1,0 +1,51 @@
+﻿@page "/estratos/details"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Details</PageTitle>
+
+<h1>Details</h1>
+
+<div>
+    <h2>Estrato</h2>
+    <hr />
+    @if (estrato is null)
+    {
+        <p><em>Llamando...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Descripcion</dt>
+            <dd class="col-sm-10">@estrato.Descripcion</dd>
+            <dt class="col-sm-2">SobreTasa</dt>
+            <dd class="col-sm-10">@estrato.SobreTasa</dd>
+            <dt class="col-sm-2">CargoFijo</dt>
+            <dd class="col-sm-10">@estrato.CargoFijo</dd>
+        </dl>
+        <div>
+            <a href="@($"/estratos/edit?idestrato={estrato.Idestrato}")">Edit</a> |
+            <a class="btn btn-outline-secondary btn-sm" href="" onclick="return cerrarVentana('');">Cerrar</a>
+        </div>
+    }
+</div>
+
+@code {
+    private Estrato? estrato;
+
+    [SupplyParameterFromQuery]
+    private int Idestrato { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        estrato = await context.Estratos.FirstOrDefaultAsync(m => m.Idestrato == Idestrato);
+
+        if (estrato is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+}

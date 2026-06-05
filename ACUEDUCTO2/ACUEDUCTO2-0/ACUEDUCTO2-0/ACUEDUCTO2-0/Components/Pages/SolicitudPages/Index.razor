@@ -1,0 +1,167 @@
+@page "/solicitud"
+@page "/proceso/Actualizar Solicitud"
+@page "/proceso/Eliminar Solicitud"
+@page "/proceso/Busqueda por Datos Solicitud"
+@page "/proceso/Listado de Solicitudes Por Tipo"
+
+@using ACUEDUCTO2-0_0.Data
+@using ACUEDUCTO2-0_0.Compartir.MODELS
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Solicitudes</PageTitle>
+
+<h3>Solicitudes</h3>
+
+<button class="btn btn-primary mb-3" @onclick="NuevaSolicitud">Nueva Solicitud</button>
+<button class="btn btn-secondary mb-3 ms-2" @onclick="VerTipos">Tipos de solicitud</button>
+<button class="btn btn-secondary mb-3 ms-2" @onclick="VerEstados">Estados de solicitud</button>
+<div class="mb-3 d-flex gap-2 flex-wrap align-items-end">
+    <div>
+        <label class="form-label small">Código</label>
+        <InputNumber @bind-Value="filtroCodigo" TValue="int?" class="form-control form-control-sm"></InputNumber>
+    </div>
+    <div>
+        <label class="form-label small">Tipo</label>
+        <select class="form-select form-select-sm" @bind="filtroTipo">
+            <option value="">(todos)</option>
+            @foreach (var t in Tipos)
+            {
+                <option value="@t.Guid">@t.NombreTipoSolicitud</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label class="form-label small">Estado</label>
+        <select class="form-select form-select-sm" @bind="filtroEstado">
+            <option value="">(todos)</option>
+            @foreach (var e in Estados)
+            {
+                <option value="@e.Guid">@e.NombreEstadoSolicitud</option>
+            }
+        </select>
+    </div>
+    <div>
+        <button class="btn btn-sm btn-primary" @onclick="Filtrar">Filtrar</button>
+        <button class="btn btn-sm btn-secondary ms-1" @onclick="Limpiar">Limpiar</button>
+    </div>
+</div>
+
+@if (solicitudes == null)
+{
+    <p>Cargando...</p>
+}
+else if (!solicitudes.Any())
+{
+    <p>No hay solicitudes registradas.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Código</th>
+                <th>Descripción</th>
+                <th>Tipo</th>
+                <th>Estado</th>
+                <th>Fecha Recepción</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var s in solicitudes)
+            {
+                <tr>
+                    <td>@s.CodigoSolicitud</td>
+                    <td>@s.DescripcionSolicitud</td>
+                    <td>@(Tipos.FirstOrDefault(t => t.Guid == s.IdTipo)?.NombreTipoSolicitud ?? "(sin tipo)")</td>
+                    <td>@(Estados.FirstOrDefault(e => e.Guid == s.IdEstado)?.NombreEstadoSolicitud ?? "(sin estado)")</td>
+                    <td>@(s.FechaHoraCreacionRegistro.ToString("dd/MM/yyyy HH:mm"))</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning me-1" @onclick="() => EditarSolicitud(s.Guid)">Editar</button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => EliminarSolicitud(s.Guid)">Eliminar</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Solicitud>? solicitudes;
+    private List<TipoSolicitud> Tipos { get; set; } = new();
+    private List<EstadoSolicitud> Estados { get; set; } = new();
+
+    // filtros
+    private int? filtroCodigo;
+    private string filtroTipo = string.Empty;
+    private string filtroEstado = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = DbFactory.CreateDbContext();
+        Tipos = await db.TipoSolicitud.AsNoTracking().ToListAsync();
+        Estados = await db.EstadoSolicitud.AsNoTracking().ToListAsync();
+        await FiltrarSolicitudesAsync();
+    }
+
+    void NuevaSolicitud() => Navigation.NavigateTo("/solicitud/crear");
+    void EditarSolicitud(string guid) => Navigation.NavigateTo($"/solicitud/editar/{guid}");
+    void EliminarSolicitud(string guid) => Navigation.NavigateTo($"/solicitud/eliminar/{guid}");
+    void VerTipos() => Navigation.NavigateTo("/tipo-solicitud");
+    void VerEstados() => Navigation.NavigateTo("/estado-solicitud");
+
+    private async Task FiltrarSolicitudesAsync()
+    {
+        using var db = DbFactory.CreateDbContext();
+        var q = db.Set<Solicitud>().AsQueryable();
+
+        if (filtroCodigo.HasValue)
+            q = q.Where(s => s.CodigoSolicitud == filtroCodigo.Value);
+
+        if (!string.IsNullOrWhiteSpace(filtroTipo))
+            q = q.Where(s => s.IdTipo == filtroTipo);
+
+        if (!string.IsNullOrWhiteSpace(filtroEstado))
+            q = q.Where(s => s.IdEstado == filtroEstado);
+
+        solicitudes = await q.OrderByDescending(s => s.CodigoSolicitud).ToListAsync();
+        StateHasChanged();
+    }
+
+    private async Task UpdateTipoAsync(Solicitud s, string? newTipoGuid)
+    {
+        if (s == null) return;
+        using var db = DbFactory.CreateDbContext();
+        var dbItem = await db.Solicitud.FirstOrDefaultAsync(x => x.Guid == s.Guid);
+        if (dbItem == null) return;
+        dbItem.IdTipo = newTipoGuid ?? string.Empty;
+        await db.SaveChangesAsync();
+        s.IdTipo = dbItem.IdTipo;
+        StateHasChanged();
+    }
+
+    private async Task UpdateEstadoAsync(Solicitud s, string? newEstadoGuid)
+    {
+        if (s == null) return;
+        using var db = DbFactory.CreateDbContext();
+        var dbItem = await db.Solicitud.FirstOrDefaultAsync(x => x.Guid == s.Guid);
+        if (dbItem == null) return;
+        dbItem.IdEstado = newEstadoGuid ?? string.Empty;
+        await db.SaveChangesAsync();
+        s.IdEstado = dbItem.IdEstado;
+        StateHasChanged();
+    }
+
+    private async Task Filtrar() => await FiltrarSolicitudesAsync();
+
+    private async Task Limpiar()
+    {
+        filtroCodigo = null;
+        filtroTipo = string.Empty;
+        filtroEstado = string.Empty;
+        await FiltrarSolicitudesAsync();
+    }
+}

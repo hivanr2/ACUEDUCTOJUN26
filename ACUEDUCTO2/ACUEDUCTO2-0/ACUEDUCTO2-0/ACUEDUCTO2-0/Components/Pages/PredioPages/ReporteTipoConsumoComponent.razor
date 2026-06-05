@@ -1,0 +1,66 @@
+﻿@using ACUEDUCTO2-0_0.Data
+@using Microsoft.EntityFrameworkCore
+<div class="d-flex justify-content-center align-items-center flex-column">
+
+    @if (ReporteTipoConsumo is null || !ReporteTipoConsumo.Any())
+    {
+        <div class="text-center">
+            <p><em>Cargando datos...</em></p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive mt-auto" style="max-width: 600px;">
+            <table class="table table-sm table-bordered text-center">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Tipo Consumo</th>
+                        <th>Rango</th>
+                        <th>Cant Predios</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in ReporteTipoConsumo)
+                    {
+                        <tr>
+                            <td>@item.TipoConsumo</td>
+                            <td>@item.Rango</td>
+                            <td>@item.CantidadPredios</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ReporteTipoConsumoItem> ReporteTipoConsumo { get; set; } = new();
+
+    [Inject]
+    private IDbContextFactory<ApplicationDbContext> DbFactory { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        ReporteTipoConsumo = await context.Predio
+            .GroupBy(p => new {p.TipoConsumoNavigation.Id, p.TipoConsumoNavigation.Categoria, p.TipoConsumoNavigation.Rango }) // Agrupar por categoría y rango
+            .Select(g => new ReporteTipoConsumoItem
+            {
+                Id = g.Key.Id,
+                TipoConsumo = g.Key.Categoria,
+                Rango = g.Key.Rango,
+                CantidadPredios = g.Count()
+            }).OrderBy(c => c.Id)
+            .ToListAsync();
+    }
+
+    private class ReporteTipoConsumoItem
+    {
+        public int Id { get; set; }
+        public string TipoConsumo { get; set; }
+        public string Rango { get; set; }
+        public int CantidadPredios { get; set; }
+    }
+}

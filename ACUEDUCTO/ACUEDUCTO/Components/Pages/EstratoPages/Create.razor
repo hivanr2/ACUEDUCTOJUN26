@@ -1,0 +1,55 @@
+﻿@page "/estratos/create"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create</PageTitle>
+
+<h1>Create</h1>
+
+<h2>Estrato</h2>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <EditForm method="post" Model="Estrato" OnValidSubmit="AddEstrato" FormName="create" Enhance>
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert"/>
+            <div class="mb-3">
+                <label for="descripcion" class="form-label">Descripcion:</label> 
+                <InputText id="descripcion" @bind-Value="Estrato.Descripcion" class="form-control" /> 
+                <ValidationMessage For="() => Estrato.Descripcion" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="sobretasa" class="form-label">SobreTasa:</label> 
+                <InputNumber id="sobretasa" @bind-Value="Estrato.SobreTasa" class="form-control" /> 
+                <ValidationMessage For="() => Estrato.SobreTasa" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="cargofijo" class="form-label">CargoFijo:</label> 
+                <InputNumber id="cargofijo" @bind-Value="Estrato.CargoFijo" class="form-control" /> 
+                <ValidationMessage For="() => Estrato.CargoFijo" class="text-danger" /> 
+            </div>        
+            <button type="submit" class="btn btn-primary">Create</button>
+        </EditForm>
+    </div>
+</div>
+
+<div>
+    <a class="btn btn-outline-secondary btn-sm" href="" onclick="return cerrarVentana('');">Cerrar</a>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private Estrato Estrato { get; set; } = new();
+
+    // To protect from overposting attacks, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task AddEstrato()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Estratos.Add(Estrato);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/estratos");
+    }
+}

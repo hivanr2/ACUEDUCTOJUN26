@@ -1,0 +1,199 @@
+﻿@page "/planillas/excelplanilla"
+@using ACUEDUCTO.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@using OfficeOpenXml
+@using System.IO
+@inject IJSRuntime JSRuntime
+@inject IDbContextFactory<AcueductoContext> DbFactory
+
+@rendermode InteractiveServer
+
+<h3>Cargar Archivo Excel</h3>
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+<InputFile OnChange="HandleFileSelected" />
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string IdPlanilla { get; set; }
+
+    private string errorMessage;
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        errorMessage = null;
+
+        var file = e.File;
+        try
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            var fileBytes = memoryStream.ToArray();
+
+            await ProcessExcelFile(fileBytes);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error leyendo el archivo: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private async Task ProcessExcelFile(byte[] fileBytes)
+    {
+        try
+        {
+            if (fileBytes == null || fileBytes.Length == 0)
+            {
+                errorMessage = "El archivo está vacío.";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(IdPlanilla))
+            {
+                errorMessage = "IdPlanilla no fue proporcionado en la URL (?IdPlanilla=...).";
+                return;
+            }
+
+            ExcelPackage.License.SetNonCommercialOrganization("Acueducto Comunitario");
+
+            using var package = new ExcelPackage(new MemoryStream(fileBytes));
+            var planillaName = await GetPlanillaName();
+            if (string.IsNullOrWhiteSpace(planillaName))
+            {
+                errorMessage = "No se encontró la planilla o su nombre de hoja.";
+                return;
+            }
+
+            var worksheet = package.Workbook.Worksheets[planillaName];
+            if (worksheet == null)
+            {
+                errorMessage = $"No existe una hoja llamada '{planillaName}' en el Excel.";
+                return;
+            }
+
+            // Pre-cargar predios a memoria para lookup rápido y consistente
+            using var context = DbFactory.CreateDbContext();
+            var prediosByCodigo = await context.Predios
+                .Where(p => p.CodigoUsuario != null && p.Activo == true)
+                .ToDictionaryAsync(p => p.CodigoUsuario);
+
+            var facturaciones = new List<Facturacion>();
+            double porcentajeMora1 = 1.5;
+
+            int startRow = 6;
+            int lastRow = worksheet.Dimension?.End.Row ?? startRow;
+
+            int totalRowsRead = 0, added = 0, skippedEmptyCodigo = 0, skippedPredioMissing = 0, skippedEmptyRow = 0;
+
+            // Recorre hasta la última fila real del worksheet
+            for (int row = startRow; row <= lastRow; row++)
+            {
+                // Detectar fila vacía completa (1..27 columnas usadas por tu layout)
+                bool rowAllEmpty = true;
+                for (int col = 1; col <= 27; col++)
+                {
+                    if (!string.IsNullOrWhiteSpace(worksheet.Cells[row, col].Text))
+                    {
+                        rowAllEmpty = false;
+                        break;
+                    }
+                }
+                if (rowAllEmpty)
+                {
+                    skippedEmptyRow++;
+                    continue;
+                }
+
+                totalRowsRead++;
+
+                var codigoUsuario = worksheet.Cells[row, 5].Text?.Trim();
+                if (string.IsNullOrWhiteSpace(codigoUsuario))
+                {
+                    skippedEmptyCodigo++;
+                    continue;
+                }
+
+                if (!prediosByCodigo.TryGetValue(codigoUsuario, out var predio))
+                {
+                    skippedPredioMissing++;
+                    continue;
+                }
+
+                string CleanMoney(string s) =>
+                    (s ?? string.Empty).Replace(".", "").Replace("$", "").Replace(" ", "");
+
+                var vConsumo = CleanMoney(worksheet.Cells[row, 15].Text);
+                var vSobretasa = CleanMoney(worksheet.Cells[row, 17].Text);
+                var vSubsidio = CleanMoney(worksheet.Cells[row, 20].Text);
+
+                var facturacion = new Facturacion
+                {
+                    Idfactura = Guid.NewGuid().ToString(),
+                    Idplanilla = IdPlanilla,
+                    CodigoFactura = worksheet.Cells[row, 1].Text,
+                    Idpredio = predio.Idpredio,
+                    CodigoUsuario = codigoUsuario,
+                    FechaHoraRegistro = DateTime.Now.AddMonths(1),
+                    MedicionAnterior = double.TryParse(worksheet.Cells[row, 11].Text, out var medicionAnterior) ? medicionAnterior : (double?)0,
+                    MedicionActual = double.TryParse(worksheet.Cells[row, 12].Text, out var medicionActual) ? medicionActual : (double?)0,
+                    ConsumoM3 = double.TryParse(worksheet.Cells[row, 13].Text, out var consumoM3) ? consumoM3 : (double?)0,
+                    CargoFijo = double.TryParse(worksheet.Cells[row, 14].Text, out var cargoFijo) ? cargoFijo : (double?)0,
+                    ValorConsumo = (double.TryParse(vConsumo, out var valorConsumo) ? valorConsumo : (double?)0) / 100,
+                    PorcentajeSobreTasa = double.TryParse(worksheet.Cells[row, 16].Text, out var porcentajeSobreTasa) ? porcentajeSobreTasa : (double?)0,
+                    ValorSobreTasa = (double.TryParse(vSobretasa, out var valorSobreTasa) ? valorSobreTasa : (double?)0) / 100,
+                    PorcentajeMora = porcentajeMora1,
+                    ValorMora = double.TryParse(worksheet.Cells[row, 18].Text, out var valorMora) ? valorMora : (double?)0,
+                    PorcentajeSubsidio = double.TryParse(worksheet.Cells[row, 19].Text, out var porcentajeSubsidio) ? porcentajeSubsidio : (double?)0,
+                    ValorSubsidio = (double.TryParse(vSubsidio, out var valorSubsidioNum) ? valorSubsidioNum : (double?)0) / 100,
+                    OtrosValores = double.TryParse(worksheet.Cells[row, 21].Text, out var otrosValores) ? otrosValores : (double?)0,
+                    ValorPeriodo = double.TryParse(worksheet.Cells[row, 22].Text, out var valorPeriodo) ? valorPeriodo : (double?)0,
+                    DeudaAnterior = double.TryParse(worksheet.Cells[row, 23].Text, out var deudaAnterior) ? deudaAnterior : (double?)0,
+                    RecaudoPeriodoTotal = double.TryParse(worksheet.Cells[row, 24].Text, out var recaudoPeriodoTotal) ? recaudoPeriodoTotal : (double?)0,
+                    DeudaPasa = double.TryParse(worksheet.Cells[row, 25].Text, out var deudaPasa) ? deudaPasa : (double?)0,
+                    NotasFactura = worksheet.Cells[row, 26].Text,
+                    NotasRecaudo = worksheet.Cells[row, 27].Text
+                };
+
+                facturaciones.Add(facturacion);
+                added++;
+            }
+
+            // Persistir
+            using (var saveContext = DbFactory.CreateDbContext())
+            {
+                saveContext.Facturacions.AddRange(facturaciones);
+                await saveContext.SaveChangesAsync();
+            }
+
+            // Resumen para entender las diferencias
+            errorMessage =
+                $"Importación completada. Leídas: {totalRowsRead}, Insertadas: {added}, " +
+                $"Filas vacías: {skippedEmptyRow}, Sin CódigoUsuario: {skippedEmptyCodigo}, " +
+                $"Predio no encontrado: {skippedPredioMissing}. " +
+                $"Última fila hoja: {lastRow}.";
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error procesando el Excel: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private async Task<string> GetPlanillaName()
+    {
+        using var context = DbFactory.CreateDbContext();
+        var planilla = await context.Planillas
+            .Where(c => c.Idplanilla == IdPlanilla)
+            .Include(c => c.IdperiodoNavigation)
+            .FirstOrDefaultAsync();
+
+        return planilla?.IdperiodoNavigation?.DescripcionCorta;
+    }
+}

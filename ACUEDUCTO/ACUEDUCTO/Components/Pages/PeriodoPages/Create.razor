@@ -1,0 +1,50 @@
+﻿@page "/periodos/create"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Crear Periodo</PageTitle>
+
+<h1>Crear Periodo</h1>
+
+<h2>Periodo</h2>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <EditForm method="post" Model="Periodo" OnValidSubmit="AddPeriodo" FormName="create" Enhance>
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert"/>
+            <div class="mb-3">
+                <label for="descripcioncorta" class="form-label">DescripcionCorta:</label> 
+                <InputText id="descripcioncorta" @bind-Value="Periodo.DescripcionCorta" class="form-control" /> 
+                <ValidationMessage For="() => Periodo.DescripcionCorta" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="descripcionlarga" class="form-label">DescripcionLarga:</label> 
+                <InputText id="descripcionlarga" @bind-Value="Periodo.DescripcionLarga" class="form-control" /> 
+                <ValidationMessage For="() => Periodo.DescripcionLarga" class="text-danger" /> 
+            </div>        
+            <button type="submit" class="btn btn-primary">Create</button>
+        </EditForm>
+    </div>
+</div>
+
+<div>
+    <a class="btn btn-outline-secondary btn-sm" href="" onclick="return cerrarVentana('');">Cerrar</a>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private Periodo Periodo { get; set; } = new();
+
+    // To protect from overposting attacks, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task AddPeriodo()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Periodos.Add(Periodo);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/periodos");
+    }
+}

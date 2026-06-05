@@ -1,0 +1,50 @@
+﻿@page "/tipodocumentacions/create"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Create</PageTitle>
+
+<h1>Create</h1>
+
+<h2>TipoDocumentacion</h2>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <EditForm method="post" Model="TipoDocumentacion" OnValidSubmit="AddTipoDocumentacion" FormName="create" Enhance>
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert"/>
+            <div class="mb-3">
+                <label for="nombre" class="form-label">Nombre:</label> 
+                <InputText id="nombre" @bind-Value="TipoDocumentacion.Nombre" class="form-control" /> 
+                <ValidationMessage For="() => TipoDocumentacion.Nombre" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="descripcion" class="form-label">Descripcion:</label> 
+                <InputText id="descripcion" @bind-Value="TipoDocumentacion.Descripcion" class="form-control" /> 
+                <ValidationMessage For="() => TipoDocumentacion.Descripcion" class="text-danger" /> 
+            </div>        
+            <button type="submit" class="btn btn-primary">Create</button>
+        </EditForm>
+    </div>
+</div>
+
+<div>
+    <a href="/tipodocumentacions">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private TipoDocumentacion TipoDocumentacion { get; set; } = new();
+
+    // To protect from overposting attacks, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task AddTipoDocumentacion()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.TipoDocumentacions.Add(TipoDocumentacion);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/tipodocumentacions");
+    }
+}

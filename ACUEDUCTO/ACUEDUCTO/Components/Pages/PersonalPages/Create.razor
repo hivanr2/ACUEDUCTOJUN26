@@ -1,0 +1,54 @@
+﻿@page "/personals/create"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create</PageTitle>
+
+<h1>Create</h1>
+
+<h2>Personal</h2>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <EditForm method="post" Model="Personal" OnValidSubmit="AddPersonal" FormName="create" Enhance>
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert"/>
+            <div class="mb-3">
+                <label for="nombre" class="form-label">Nombre:</label> 
+                <InputText id="nombre" @bind-Value="Personal.Nombre" class="form-control" /> 
+                <ValidationMessage For="() => Personal.Nombre" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="cargo" class="form-label">Cargo:</label> 
+                <InputText id="cargo" @bind-Value="Personal.Cargo" class="form-control" /> 
+                <ValidationMessage For="() => Personal.Cargo" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="usuario" class="form-label">Usuario:</label> 
+                <InputText id="usuario" @bind-Value="Personal.Usuario" class="form-control" /> 
+                <ValidationMessage For="() => Personal.Usuario" class="text-danger" /> 
+            </div>        
+            <button type="submit" class="btn btn-primary">Create</button>
+        </EditForm>
+    </div>
+</div>
+
+<div>
+    <a href="/personals">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private Personal Personal { get; set; } = new();
+
+    // To protect from overposting attacks, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task AddPersonal()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Personals.Add(Personal);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/personals");
+    }
+}

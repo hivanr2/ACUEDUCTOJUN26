@@ -1,0 +1,18 @@
+@page "/solicitud/nueva"
+@inject Microsoft.EntityFrameworkCore.IDbContextFactory<ACUEDUCTO2.Data.ApplicationDbContext> DbFactory
+
+<h3>Nueva solicitud</h3>
+
+@code {
+    private ACUEDUCTO2.Data.ApplicationDbContext? _db;
+
+    protected override void OnInitialized()
+    {
+        _db = DbFactory.CreateDbContext();
+    }
+
+    public void Dispose()
+    {
+        _db?.Dispose();
+    }
+}

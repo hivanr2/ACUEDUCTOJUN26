@@ -1,0 +1,242 @@
+﻿@page "/predios"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using System.Linq
+@using System.Text.RegularExpressions
+@using ACUEDUCTO.Models
+@using System.Globalization
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+@rendermode InteractiveServer
+
+<PageTitle>Predios Servicio Acueducto</PageTitle>
+
+<style>
+    /* Estilos modernos y paleta de colores para comportamiento de pago */
+    .quickgrid-table { border-radius: 8px; overflow: hidden; }
+    .status-dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:8px; vertical-align:middle; }
+    .status-excellent { background:#2ecc71; }    /* Verde: siempre al día */
+    .status-good { background:#9be7a1; }         /* Verde claro: mayormente al día */
+    .status-fair { background:#f39c12; }         /* Naranja: pagos intermitentes */
+    .status-poor { background:#e74c3c; }         /* Rojo: casi nunca paga */
+    .predio-inactivo { background:#f8f9fa !important; color:#6c757d; }
+    .fab-create { position:fixed; right:24px; bottom:24px; background:#0d6efd; color:#fff; width:56px; height:56px; display:flex; align-items:center; justify-content:center; border-radius:50%; box-shadow:0 6px 18px rgba(13,110,253,0.24); text-decoration:none; }
+    .legend { display:flex; gap:12px; align-items:center; font-size:0.9rem; }
+    .legend .item { display:flex; gap:6px; align-items:center; }
+    /* Dashboard styles */
+    .dashboard-card { border-radius:10px; }
+    .dashboard-legend { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .behavior-row { display:flex; gap:12px; align-items:center; }
+    .bar { background:#e9ecef; height:12px; border-radius:6px; overflow:hidden; }
+    .bar-inner { height:100%; border-radius:6px 0 0 6px; }
+    .bar-label { min-width:110px; max-width:200px; font-size:0.95rem; }
+    .consumption-bar { background:#e9ecef; height:14px; border-radius:8px; overflow:hidden; }
+    .consumption-inner { height:100%; border-radius:8px 0 0 8px; transition:width .6s ease; }
+    .consumption-list { max-height:320px; overflow:auto; padding-right:6px; }
+    @@media (max-width: 767.98px) {
+        .bar-label { min-width:80px; font-size:0.9rem; }
+        .behavior-row { gap:8px; }
+        .consumption-list { max-height:220px; }
+        .card-body { padding:0.8rem; }
+    }
+
+    /* On desktop and larger screens show the full consumption report (no internal scrollbar) */
+    @@media (min-width: 768px) {
+        .consumption-list { max-height: none; overflow: visible; }
+    }
+
+    /* force all bars to start at same x: fix label width and remove left padding from bar column */
+    .behavior-row .bar-label { flex: 0 0 170px; width:170px; padding-right:8px; }
+    .behavior-row > .col { padding-left:0; }
+    .behavior-row > .col-auto.text-end { padding-left:8px; padding-right:0; }
+    @@media (max-width: 767.98px) {
+        .behavior-row .bar-label { flex: 0 0 110px; width:110px; }
+    }
+    /* estilos para tabla y badges */
+</style>
+
+<div class="container-fluid py-2 py-md-3">
+    <div class="row mb-2">
+        <div class="col-12 col-md-6">
+            <DesperdicioAlert />
+        </div>
+    </div>
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Predios</h1>
+            <small class="text-muted">Servicio Acueducto</small>
+        </div>
+    </div>
+
+
+    <div class="row g-2 align-items-center mb-1">
+        <div class="col-12 col-md-6">
+            <input type="search" class="form-control" autofocus @bind=filterText @bind:event="oninput" placeholder="Buscar por usuario, dirección, cedcatastral o ruta..." />
+        </div>
+        <div class="col-12 col-md-6 text-md-end small text-muted">
+            <span>Items: <span class="badge bg-secondary">@filterPredios.Count()</span></span>
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="editarObservaciones" @bind="editarObservaciones">
+            <label class="form-check-label" for="editarObservaciones">Ver Observaciones Predio</label>
+        </div>
+        <!-- Sorting is handled by the QuickGrid column for PaymentScore -->
+        <div class="ms-auto d-flex flex-wrap gap-2 small">
+    <!-- Replaced by separate report component. Use navigation to open it. -->
+            <a class="btn btn-primary btn-sm" href="/predios/report">(VER) REPORTE DE CONSUMOS Y PAGOS</a>
+            <a class="btn btn-outline-primary btn-sm" href="/predios/pueaa-general" target="_blank">PUEAA GENERAL</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/estratos" target="_self">Estratos</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/tarifas" target="_self">Tarifas</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/periodos" target="_self">Periodos</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/tipoconsumos" target="_self">Tipo Consumo</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <QuickGrid Class="table table-hover table-sm align-middle mb-0 quickgrid-table" Items="filterPredios.AsQueryable()" Pagination="@pagination" RowClassSelector="GetRowClass">
+                <PropertyColumn Property="predio => predio.ApellidosNombresUsuario" Sortable="true" Title="::::::::::::PREDIO::::::::::::::" />
+                <PropertyColumn Property="predio => predio.Ruta" Sortable="true" />
+                <PropertyColumn Property="predio => predio.Direccion" Sortable="true" Title="::::::::::::DIRECCIÓN:::::::::::" />
+                <!-- Hidden numeric score column (used internally for precise ordering) -->
+                <PropertyColumn Property="predio => predio.PaymentScore" Sortable="true" Title="Score" Class="visually-hidden" />
+                <!-- Visible sortable column for the persisted/computed text description so users can click header to sort asc/desc -->
+                <PropertyColumn Property="predio => predio.ComportamientoPagos" Sortable="true" Title="Comportamiento ultimos 6" />
+                <PropertyColumn Property="predio => predio.ContadorEnSeguimiento" Sortable="true" Title="En Seguimiento" />
+                <PropertyColumn Property="predio => predio.Activo" Sortable="true" Title="Activo" />
+                <PropertyColumn Property="predio => predio.CleanTipoConsumo" Title="Tipo Consumo" Sortable="true" />
+                <TemplateColumn Context="predio" Title="PUEAA">
+                    <a class="btn btn-outline-primary btn-sm" href="@($"/predios/pueaa?idpredio={predio.Idpredio}")" target="_blank">PUEAA</a>
+                </TemplateColumn>
+                @if (editarObservaciones)
+                {
+                    <PropertyColumn Property="predio => predio.Observaciones" Title="Observaciones Predio" />
+                }
+                <TemplateColumn Context="predio" Title="Acciones">
+                    <div class="text-end">
+                        <a class="btn btn-link btn-sm" href="@($"/predios/edit?idpredio={predio.Idpredio}")" target="_blank">Editar</a>
+                        <span class="text-muted">|</span>
+                        <a class="btn btn-link btn-sm" href="@($"/predios/details?idpredio={predio.Idpredio}")" target="_blank">Detalles</a>
+                        <span class="text-muted">|</span>
+                        <a class="btn btn-link btn-sm" href="@($"/predio/historicoconsumos?idpredio={predio.Idpredio}")" target="_blank">Facturas</a>
+                    </div>
+                </TemplateColumn>
+            </QuickGrid>
+        </div>
+    </div>
+
+    <Paginator State="@pagination" />
+</div>
+
+<!-- Botón flotante Crear Predio -->
+<a href="/predios/create" class="fab-create" title="Crear predio" aria-label="Crear predio">
+    <img src="/img/plus.svg" alt="Crear" onerror="this.onerror=null;this.outerHTML='+';" />
+</a>
+
+@code {
+    // Use a local DbContext per operation to avoid disposed/null context issues
+    private string? filterText = string.Empty;
+    private bool editarObservaciones = false;
+
+    PaginationState pagination = new PaginationState { ItemsPerPage = 10 };
+
+    // No dashboard initialization here. The full report lives in a separate component.
+
+    // report moved to separate component `ReporteConsumosPagos.razor`.
+
+    IEnumerable<PredioViewModel> filterPredios
+    {
+        get
+        {
+            using var ctx = DbFactory.CreateDbContext();
+            var query = ctx.Predios
+                .Include(c => c.TipoConsumoNavigation)
+                .Where(x => (x.ApellidosNombresUsuario ?? string.Empty).Contains(filterText!)
+                         || (x.Direccion ?? string.Empty).Contains(filterText!)
+                         || (x.Ruta != null && x.Ruta.ToString().Contains(filterText!))
+                         || (x.NumeroCatastral ?? string.Empty).Contains(filterText!)
+                         || (x.InformacionCatastral ?? string.Empty).Contains(filterText!)
+                         || (x.Observaciones ?? string.Empty).Contains(filterText!))
+                .OrderBy(u => (u.ApellidosNombresUsuario ?? ""))
+                .ThenBy(u => (u.Direccion ?? ""))
+                .ToList();
+
+            var list = query.Select(p => new PredioViewModel
+            {
+                Idpredio = p.Idpredio,
+                ApellidosNombresUsuario = p.ApellidosNombresUsuario,
+                Ruta = p.Ruta,
+                Direccion = p.Direccion,
+                ContadorEnSeguimiento = p.ContadorEnSeguimiento,
+                Activo = p.Activo,
+                TipoConsumoCategoria = p.TipoConsumoNavigation!.Categoria,
+                CleanTipoConsumo = Regex.Replace((p.TipoConsumoNavigation!.Categoria ?? string.Empty).Trim(), @"^[\s\p{Nd}\.\)\(\-#,:;\/\\]+", "").Trim(),
+                Observaciones = p.Observaciones,
+                PaymentScore = ComputePaymentScore(p.Activo, p.ContadorEnSeguimiento, p.Observaciones),
+                ComportamientoPagos = p.ComportamientoPagos
+            }).ToList();
+
+            return list;
+        }
+    }
+
+    // Sorting handled by QuickGrid PropertyColumn for PaymentScore
+
+
+
+    public class PredioViewModel
+    {
+        public string Idpredio { get; set; } = string.Empty;
+        public string? ApellidosNombresUsuario { get; set; }
+        public double? Ruta { get; set; }
+        public string? Direccion { get; set; }
+        public bool? ContadorEnSeguimiento { get; set; }
+        public bool? Activo { get; set; }
+        public string? TipoConsumoCategoria { get; set; }
+        public string? CleanTipoConsumo { get; set; }
+        public string? Observaciones { get; set; }
+        // 0 = excelente (siempre al día), 1 = mayormente, 2 = intermitente, 3 = pobre (casi no paga)
+        public int PaymentScore { get; set; }
+        public string? ComportamientoPagos { get; set; }
+    }
+
+    private static int ComputePaymentScore(bool? activo, bool? contadorEnSeguimiento, string? observaciones)
+    {
+        // Heurística simple basada en campos disponibles.
+        // Reemplazar por lógica real basada en historial de pagos cuando esté disponible.
+        if (!string.IsNullOrWhiteSpace(observaciones))
+        {
+            var obs = observaciones.ToLowerInvariant();
+            if (obs.Contains("mora") || obs.Contains("atras") || obs.Contains("deuda") || obs.Contains("no paga"))
+            {
+                return 3; // pobre
+            }
+        }
+
+        if (contadorEnSeguimiento == true)
+        {
+            return 2; // intermitente
+        }
+
+        if (activo == false)
+        {
+            return 1; // mayormente (inactivo pero no confirmado moroso)
+        }
+
+        return 0; // excelente
+    }
+
+    private static string? GetRowClass(PredioViewModel p)
+        => p.Activo == true ? null : "predio-inactivo";
+
+    private MarkupString FormatCategory(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return new MarkupString(string.Empty);
+        // Eliminar prefijo numérico seguido de punto o espacio, ejemplo: "1. Residencial" o "1 Residencial"
+        var cleaned = Regex.Replace(text.Trim(), @"^[\s\p{Nd}\.\)\(\-#,:;\/\\]+", "").Trim();
+        return new MarkupString(System.Net.WebUtility.HtmlEncode(cleaned));
+    }
+}

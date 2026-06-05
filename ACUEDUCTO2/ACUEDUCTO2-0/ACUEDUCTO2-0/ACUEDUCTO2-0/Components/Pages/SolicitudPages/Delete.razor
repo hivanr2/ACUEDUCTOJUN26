@@ -1,0 +1,49 @@
+@page "/solicitud/eliminar/{guid}"
+
+@using ACUEDUCTO2-0_0.Data
+@using ACUEDUCTO2-0_0.Compartir.MODELS
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Eliminar Solicitud</PageTitle>
+
+<h3>Eliminar Solicitud</h3>
+
+@if (solicitud == null)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <div class="alert alert-danger">
+        <p>¿Está seguro que desea eliminar la solicitud <strong>@solicitud.Guid</strong>?</p>
+        <button class="btn btn-danger" @onclick="Eliminar">Eliminar</button>
+        <button class="btn btn-secondary ms-2" @onclick="Cancelar">Cancelar</button>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string guid { get; set; } = string.Empty;
+
+    private Solicitud? solicitud;
+
+    protected override async Task OnInitializedAsync()
+    {
+        solicitud = await Db.Solicitud.FirstOrDefaultAsync(s => s.Guid == guid);
+    }
+
+    private async Task Eliminar()
+    {
+        if (solicitud != null)
+        {
+            Db.Remove(solicitud);
+            await Db.SaveChangesAsync();
+        }
+        Navigation.NavigateTo("/solicitud");
+    }
+
+    void Cancelar() => Navigation.NavigateTo("/solicitud");
+}

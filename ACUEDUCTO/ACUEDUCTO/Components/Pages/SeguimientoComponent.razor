@@ -1,0 +1,76 @@
+﻿@page "/seguimiento"
+@using ACUEDUCTO.Models
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<AcueductoContext> DbFactory
+<div class="container text-center">
+
+@if (prediosEnSeguimiento == null)
+{
+    <p>Cargando...</p>
+}
+else if (!prediosEnSeguimiento.Any())
+{
+    <p>No hay predios con seguimiento activo.</p>
+}
+else
+{
+    <a href="#" @onclick="ToggleList" @onclick:preventDefault="true" style="color: inherit; text-decoration: none;">Mostrar/Ocultar Lista</a>
+    <h3>@prediosEnSeguimiento.Count - Predios en Seguimiento</h3>
+    @if (showList)
+    {
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Apellidos y Nombres</th>
+                        <th>Observaciones Predio <h6 class="text-info-emphasis small">(Ultimos 200 caracteres)</h6></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var predio in prediosEnSeguimiento)
+                {
+                <tr>
+                    <td>@predio.ApellidosNombresUsuario - <a href="/predios/details?idpredio=@predio.Idpredio" target="_blank">Ver</a></td>
+                            <td >@if (predio.Observaciones.Length > 200) {@(". . . ")}@Ultimos300(predio.Observaciones)</td>
+                        </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+</div>
+<!--Se pone un  css con -->
+<style>
+    td {
+        text-warp:balance;
+    }
+</style>
+@code {
+    private List<Predio> prediosEnSeguimiento;
+    private bool showList = false;
+
+    private void ToggleList()
+    {
+        showList = !showList;
+    }
+    private static string Ultimos300(string? input)
+    {
+        if (string.IsNullOrEmpty(input)) return string.Empty;
+        if (input.Length <= 200) return input;
+        return input.Substring(input.Length - 200);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        prediosEnSeguimiento = await context.Predios
+            .Where(p => p.ContadorEnSeguimiento ?? false) // Filtrar por seguimiento activo
+            .Select(p => new Predio
+                {
+                    ApellidosNombresUsuario = p.ApellidosNombresUsuario,
+                    Observaciones = p.Observaciones,
+                    Idpredio = p.Idpredio
+                }).OrderBy(c => c.ApellidosNombresUsuario)
+            .ToListAsync();
+    }
+}

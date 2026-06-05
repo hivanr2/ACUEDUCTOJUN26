@@ -1,0 +1,420 @@
+@page "/predios/listado-mantenimiento"
+@page "/proceso/Listado de Mantenimientos de Predios"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO2.Data
+@using ACUEDUCTO2.Share.Models
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Listado Mantenimiento Predios</PageTitle>
+
+<div class="container py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h5 mb-0">Listado de Mantenimiento - Predios</h1>
+            <small class="text-muted">Ver y administrar predios en mantenimiento/seguimiento</small>
+        </div>
+        <div>
+            <button class="btn btn-sm btn-outline-secondary me-2" @onclick="LoadDataAsync">Actualizar</button>
+            <a class="btn btn-primary btn-sm" href="/predios">Volver a Predios</a>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(mensaje))
+    {
+        <div class="alert @(esError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+            @mensaje
+            <button type="button" class="btn-close" @onclick="() => mensaje = null"></button>
+        </div>
+    }
+
+    <div class="row g-2 align-items-center mb-3">
+        <div class="col-12 col-md-6">
+            <div class="input-group">
+                <input class="form-control" placeholder="Buscar por predio, dirección o medidor..." @bind="filtro" @bind:event="oninput" />
+                @if (!string.IsNullOrWhiteSpace(filtro))
+                {
+                    <button class="btn btn-outline-secondary" type="button" title="Borrar filtro" @onclick="ClearFilter">×</button>
+                }
+            </div>
+        </div>
+        <div class="col-auto">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="soloSeguimiento" @bind="soloSeguimiento" />
+                <label class="form-check-label" for="soloSeguimiento">Solo en seguimiento</label>
+            </div>
+        </div>
+        <div class="col text-end small">
+            <span class="badge bg-warning text-dark" style="padding:.45rem .8rem; font-size:1.05rem; font-weight:600;">@CountFiltrados registros (@predios.Count total)</span>
+        </div>
+    </div>
+
+    @if (cargando)
+    {
+        <div class="text-center text-muted py-4">Cargando...</div>
+    }
+    else if (!predios.Any())
+    {
+        <div class="alert alert-info">No hay predios registrados.</div>
+    }
+    else
+    {
+        @if (Filtered(prediosAbiertos).Any())
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h2 class="h6 mb-0">Predios con trabajos por terminar</h2>
+                    <span class="badge rounded-pill bg-info text-dark">@Filtered(prediosAbiertos).Count()</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0 mantenimiento-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Predio</th>
+                                <th>Ruta</th>
+                                <th>Dirección</th>
+                                <th>Medidor</th>
+                                <th>En seguimiento</th>
+                                <th>Observaciones</th>
+                                <th class="text-end">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in Filtered(prediosAbiertos))
+                            {
+                                <tr>
+                                    <td>@p.ApellidosNombresUsuario</td>
+                                    <td>@(p.Ruta?.ToString() ?? "—")</td>
+                                    <td>@(p.Direccion ?? "—")</td>
+                                    <td>@(string.IsNullOrWhiteSpace(p.NumeroMedidor) ? "—" : p.NumeroMedidor)</td>
+                                    <td>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" checked="@(p.ContadorEnSeguimiento == true)" @onchange="() => ToggleSeguimientoAsync(p)" />
+                                        </div>
+                                    </td>
+                                    <td style="white-space:normal; word-break:break-word;">@(p.Observaciones ?? "—")</td>
+                                    <td class="text-end">
+                                        <a class="btn btn-outline-primary btn-sm me-1" href="@($"/predios/details?idpredio={p.IdPredio}")" target="_blank">Ver</a>
+                                        <a class="btn btn-outline-secondary btn-sm me-1" href="@($"/predios/edit?idpredio={p.IdPredio}")" target="_blank">Editar</a>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarConfirm(p.IdPredio)">Eliminar</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        @if (Filtered(prediosFinalizados).Any())
+        {
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h2 class="h6 mb-0">Predios con trabajos terminados</h2>
+                    <span class="badge rounded-pill bg-success">@Filtered(prediosFinalizados).Count()</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0 mantenimiento-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Predio</th>
+                                <th>Ruta</th>
+                                <th>Dirección</th>
+                                <th>Medidor</th>
+                                <th>En seguimiento</th>
+                                <th>Observaciones</th>
+                                <th class="text-end">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in Filtered(prediosFinalizados))
+                            {
+                                <tr>
+                                    <td>@p.ApellidosNombresUsuario</td>
+                                    <td>@(p.Ruta?.ToString() ?? "—")</td>
+                                    <td>@(p.Direccion ?? "—")</td>
+                                    <td>@(string.IsNullOrWhiteSpace(p.NumeroMedidor) ? "—" : p.NumeroMedidor)</td>
+                                    <td>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" checked="@(p.ContadorEnSeguimiento == true)" @onchange="() => ToggleSeguimientoAsync(p)" />
+                                        </div>
+                                    </td>
+                                    <td style="white-space:normal; word-break:break-word;">@(p.Observaciones ?? "—")</td>
+                                    <td class="text-end">
+                                        <a class="btn btn-outline-primary btn-sm me-1" href="@($"/predios/details?idpredio={p.IdPredio}")" target="_blank">Ver</a>
+                                        <a class="btn btn-outline-secondary btn-sm me-1" href="@($"/predios/edit?idpredio={p.IdPredio}")" target="_blank">Editar</a>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarConfirm(p.IdPredio)">Eliminar</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<Predio> predios = new();
+    private List<Predio> prediosAbiertos = new();
+    private List<Predio> prediosFinalizados = new();
+    private bool cargando = true;
+    private bool soloSeguimiento = false;
+    private string filtro = string.Empty;
+    private string? mensaje;
+    private bool esError = false;
+
+    private IEnumerable<Predio> Filtered(IEnumerable<Predio> list)
+    {
+        if (string.IsNullOrWhiteSpace(filtro))
+        {
+            return soloSeguimiento ? list.Where(p => p.ContadorEnSeguimiento ?? false) : list;
+        }
+
+        var q = list.Where(p =>
+            (!string.IsNullOrWhiteSpace(p.ApellidosNombresUsuario) && p.ApellidosNombresUsuario.Contains(filtro, StringComparison.OrdinalIgnoreCase))
+            || (!string.IsNullOrWhiteSpace(p.Direccion) && p.Direccion.Contains(filtro, StringComparison.OrdinalIgnoreCase))
+            || (!string.IsNullOrWhiteSpace(p.NumeroMedidor) && p.NumeroMedidor.Contains(filtro, StringComparison.OrdinalIgnoreCase)));
+
+        if (soloSeguimiento) q = q.Where(p => p.ContadorEnSeguimiento ?? false);
+        return q;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        cargando = true;
+        try
+        {
+            await using var ctx = await DbFactory.CreateDbContextAsync();
+
+            // Verificar que la tabla `Trabajo` exista en la base de datos antes de consultar
+            var connCheck = ctx.Database.GetDbConnection();
+            await connCheck.OpenAsync();
+            bool trabajoTableExists;
+            try
+            {
+                using var cmdCheck = connCheck.CreateCommand();
+                cmdCheck.CommandText = "SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Trabajo'";
+                using var rdr = await cmdCheck.ExecuteReaderAsync();
+                trabajoTableExists = await rdr.ReadAsync();
+            }
+            finally
+            {
+                await connCheck.CloseAsync();
+            }
+
+            if (!trabajoTableExists)
+            {
+                // La tabla Trabajo no existe en este esquema — listar tablas disponibles para diagnóstico
+                var tablas = new List<string>();
+                await connCheck.OpenAsync();
+                try
+                {
+                    using var cmdList = connCheck.CreateCommand();
+                    cmdList.CommandText = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME";
+                    using var rdrList = await cmdList.ExecuteReaderAsync();
+                    while (await rdrList.ReadAsync())
+                    {
+                        tablas.Add(rdrList.GetString(0));
+                    }
+                }
+                finally
+                {
+                    await connCheck.CloseAsync();
+                }
+
+                var available = tablas.Any() ? string.Join(", ", tablas.Take(50)) : "(no se encontraron tablas)";
+                mensaje = "Error: tabla 'Trabajo' no encontrada en la base de datos. Tablas detectadas: " + available;
+                esError = true;
+                predios = new List<Predio>();
+                prediosAbiertos = new List<Predio>();
+                prediosFinalizados = new List<Predio>();
+                cargando = false;
+                StateHasChanged();
+                return;
+            }
+
+            // Obtener predios que tienen al menos un trabajo en la tabla Trabajo
+            var sql = @"SELECT DISTINCT p.* FROM Predio p
+                        INNER JOIN Trabajo t ON t.IdPredio = p.IdPredio";
+
+            predios = await ctx.Predio.FromSqlRaw(sql).AsNoTracking().OrderBy(p => p.ApellidosNombresUsuario).ToListAsync();
+
+            // Consultar trabajos por IdPredio usando ADO.NET directo porque Trabajo no está mapeado en este DbContext
+            var trabajosPorPredio = new Dictionary<string, List<DateTime?>>(StringComparer.OrdinalIgnoreCase);
+            var conn = ctx.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "SELECT IdPredio, FechaFinalizacion FROM Trabajo WHERE IdPredio IS NOT NULL";
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var idPredio = reader[0]?.ToString() ?? string.Empty;
+                    DateTime? fecha = null;
+                    if (!reader.IsDBNull(1)) fecha = reader.GetFieldValue<DateTime>(1);
+
+                    if (!trabajosPorPredio.TryGetValue(idPredio, out var list))
+                    {
+                        list = new List<DateTime?>();
+                        trabajosPorPredio[idPredio] = list;
+                    }
+                    list.Add(fecha);
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+
+            prediosAbiertos = new List<Predio>();
+            prediosFinalizados = new List<Predio>();
+
+            foreach (var p in predios)
+            {
+                if (string.IsNullOrWhiteSpace(p.IdPredio)) continue;
+                if (!trabajosPorPredio.TryGetValue(p.IdPredio, out var lista))
+                {
+                    // No tiene trabajos → no debe mostrarse (filtrado inicialmente), omitimos
+                    continue;
+                }
+
+                // Si existe algún trabajo sin FechaFinalizacion -> abierto
+                if (lista.Any(v => !v.HasValue))
+                {
+                    prediosAbiertos.Add(p);
+                }
+                else
+                {
+                    // todos tienen fecha -> finalizados
+                    prediosFinalizados.Add(p);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            mensaje = "Error al cargar datos: " + ex.Message;
+            esError = true;
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ClearFilter()
+    {
+        filtro = string.Empty;
+        StateHasChanged();
+    }
+
+    private int CountFiltrados =>
+        (Filtered(prediosAbiertos).Count() + Filtered(prediosFinalizados).Count());
+
+    private async Task ToggleSeguimientoAsync(Predio p)
+    {
+        try
+        {
+            await using var ctx = await DbFactory.CreateDbContextAsync();
+            var entity = await ctx.Predio.FirstOrDefaultAsync(x => x.IdPredio == p.IdPredio);
+            if (entity is null)
+            {
+                mensaje = "Predio no encontrado.";
+                esError = true;
+                return;
+            }
+
+            entity.ContadorEnSeguimiento = !(entity.ContadorEnSeguimiento ?? false);
+            await ctx.SaveChangesAsync();
+
+            // actualizar la lista local
+            var local = predios.FirstOrDefault(x => x.IdPredio == p.IdPredio);
+            if (local != null) local.ContadorEnSeguimiento = entity.ContadorEnSeguimiento;
+
+            mensaje = entity.ContadorEnSeguimiento == true ? "Predio marcado en seguimiento." : "Predio desmarcado de seguimiento.";
+            esError = false;
+        }
+        catch (Exception ex)
+        {
+            mensaje = "Error al actualizar seguimiento: " + ex.Message;
+            esError = true;
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    private async Task EliminarConfirm(string idPredio)
+    {
+        if (!await JSConfirmAsync("¿Confirma que desea eliminar este predio? Esta acción no se puede deshacer."))
+        {
+            return;
+        }
+
+        await EliminarAsync(idPredio);
+    }
+
+    private async Task<bool> JSConfirmAsync(string message)
+    {
+        // fallback to browser confirm via JS interop
+        try
+        {
+            var result = await JSRuntime.InvokeAsync<bool>("confirm", message);
+            return result;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; } = default!;
+
+    private async Task EliminarAsync(string idPredio)
+    {
+        try
+        {
+            await using var ctx = await DbFactory.CreateDbContextAsync();
+            var entity = await ctx.Predio.FirstOrDefaultAsync(x => x.IdPredio == idPredio);
+            if (entity is null)
+            {
+                mensaje = "Predio no encontrado.";
+                esError = true;
+                return;
+            }
+
+            ctx.Predio.Remove(entity);
+            await ctx.SaveChangesAsync();
+
+            predios.RemoveAll(x => x.IdPredio == idPredio);
+            mensaje = "Predio eliminado correctamente.";
+            esError = false;
+        }
+        catch (Exception ex)
+        {
+            mensaje = "Error al eliminar predio: " + ex.Message;
+            esError = true;
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+}
+
+<style>
+    .mantenimiento-table td { white-space: normal; word-break: break-word; }
+</style>

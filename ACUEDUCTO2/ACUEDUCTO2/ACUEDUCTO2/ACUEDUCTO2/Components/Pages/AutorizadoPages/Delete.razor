@@ -1,0 +1,184 @@
+@page "/autorizados/delete/{Guid}"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO2.Data
+@using ACUEDUCTO2.Share.Models
+@attribute [Authorize]
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Eliminar Autorizado</PageTitle>
+
+<div class="container py-3">
+    <h1 class="h4 mb-1">Revocar Autorización</h1>
+    <p class="text-muted">¿Está seguro de que desea revocar esta autorización?</p>
+    <hr />
+
+    @if (!string.IsNullOrEmpty(mensaje))
+    {
+        <div class="alert @(esError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+            @mensaje
+            <button type="button" class="btn-close" @onclick="() => mensaje = null"></button>
+        </div>
+    }
+
+    @if (!cargado)
+    {
+        <div class="text-center text-muted py-5">Cargando...</div>
+    }
+    else if (autorizado is null)
+    {
+        <div class="alert alert-warning">No se encontró la autorización solicitada.</div>
+        <a class="btn btn-outline-secondary" href="/autorizados">Volver al listado</a>
+    }
+    else if (!puedeEliminar)
+    {
+        <div class="alert alert-warning">No tiene permiso para revocar esta autorización.</div>
+        <a class="btn btn-outline-secondary" href="/autorizados">Volver al listado</a>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-header bg-light"><strong>Datos de la Autorización</strong></div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Identificador</dt>
+                    <dd class="col-sm-8"><code>@autorizado.Guid</code></dd>
+
+                    <dt class="col-sm-4">Quién Autoriza</dt>
+                    <dd class="col-sm-8">
+                        <div>@autorizado.QuienAutoriza</div>
+                        @if (!string.IsNullOrWhiteSpace(nombreQuienAutoriza))
+                        {
+                            <small class="text-muted">@nombreQuienAutoriza</small>
+                        }
+                    </dd>
+
+                    <dt class="col-sm-4">A Quién Autoriza</dt>
+                    <dd class="col-sm-8">
+                        <div>@autorizado.AQueAutoriza</div>
+                        @if (!string.IsNullOrWhiteSpace(nombreAQueAutoriza))
+                        {
+                            <small class="text-muted">@nombreAQueAutoriza</small>
+                        }
+                    </dd>
+
+                    <dt class="col-sm-4">Fecha de Registro</dt>
+                    <dd class="col-sm-8">@autorizado.FechaHoraRegistro.ToString("dd/MM/yyyy HH:mm")</dd>
+
+                    <dt class="col-sm-4">Observaciones</dt>
+                    <dd class="col-sm-8">@(string.IsNullOrWhiteSpace(autorizado.Observaciones) ? "—" : autorizado.Observaciones)</dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-danger" @onclick="EliminarAsync" disabled="@eliminando">
+                @if (eliminando) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                Confirmar Revocación
+            </button>
+            <a class="btn btn-outline-secondary" href="/autorizados">Cancelar</a>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Guid { get; set; } = default!;
+
+    private Autorizado? autorizado;
+    private bool cargado;
+    private bool puedeEliminar;
+    private bool eliminando;
+    private string? mensaje;
+    private bool esError;
+
+    private string? nombreQuienAutoriza;
+    private string? nombreAQueAutoriza;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var claimsPrincipal = authState.User;
+
+        if (claimsPrincipal.Identity?.IsAuthenticated != true)
+        {
+            NavigationManager.NavigateTo("/Account/Login");
+            return;
+        }
+
+        var esAdmin = claimsPrincipal.IsInRole("Administradores");
+
+        await using var context = await DbFactory.CreateDbContextAsync();
+
+        var userId = UserManager.GetUserId(claimsPrincipal);
+        var usuarioActual = await context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (usuarioActual is null)
+        {
+            NavigationManager.NavigateTo("/Account/Login");
+            return;
+        }
+
+        autorizado = await context.Set<Autorizado>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Guid == Guid);
+
+        if (autorizado is not null)
+        {
+            puedeEliminar = esAdmin || autorizado.QuienAutoriza == usuarioActual.Identificacion;
+            nombreQuienAutoriza = await ResolverNombreAsync(context, autorizado.QuienAutoriza);
+            nombreAQueAutoriza = await ResolverNombreAsync(context, autorizado.AQueAutoriza);
+        }
+
+        cargado = true;
+    }
+
+    private async Task EliminarAsync()
+    {
+        if (autorizado is null) return;
+
+        eliminando = true;
+        mensaje = null;
+
+        try
+        {
+            await using var context = await DbFactory.CreateDbContextAsync();
+            var entity = await context.Set<Autorizado>().FindAsync(autorizado.Guid);
+
+            if (entity is null)
+            {
+                mensaje = "La autorización ya no existe.";
+                esError = true;
+                eliminando = false;
+                return;
+            }
+
+            context.Set<Autorizado>().Remove(entity);
+            await context.SaveChangesAsync();
+
+            NavigationManager.NavigateTo("/autorizados");
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Error al revocar: {ex.Message}";
+            esError = true;
+            eliminando = false;
+        }
+    }
+
+    private static async Task<string?> ResolverNombreAsync(ApplicationDbContext context, string? identificacion)
+    {
+        if (string.IsNullOrWhiteSpace(identificacion)) return null;
+        var user = await context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Identificacion == identificacion);
+        return user?.ApellidosNombres;
+    }
+}

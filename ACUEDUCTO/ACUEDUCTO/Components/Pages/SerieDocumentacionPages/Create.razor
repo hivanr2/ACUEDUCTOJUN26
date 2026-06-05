@@ -1,0 +1,52 @@
+﻿@page "/seriedocumentacions/create"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+@rendermode InteractiveServer
+
+
+<PageTitle>Create</PageTitle>
+
+<h1>Create</h1>
+
+<h2>SerieDocumentacion</h2>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <EditForm method="post" Model="SerieDocumentacion" OnValidSubmit="AddSerieDocumentacion" FormName="create" Enhance>
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert"/>
+            <div class="mb-3">
+                <label for="nombre" class="form-label">Nombre:</label> 
+                <InputText id="nombre" @bind-Value="SerieDocumentacion.Nombre" class="form-control" /> 
+                <ValidationMessage For="() => SerieDocumentacion.Nombre" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="descripcion" class="form-label">Descripcion:</label> 
+                <InputText id="descripcion" @bind-Value="SerieDocumentacion.Descripcion" class="form-control" /> 
+                <ValidationMessage For="() => SerieDocumentacion.Descripcion" class="text-danger" /> 
+            </div>        
+            <button type="submit" class="btn btn-primary">Create</button>
+        </EditForm>
+    </div>
+</div>
+
+<div>
+    <a href="/seriedocumentacions">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private SerieDocumentacion SerieDocumentacion { get; set; } = new();
+
+    // To protect from overposting attacks, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task AddSerieDocumentacion()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.SerieDocumentacions.Add(SerieDocumentacion);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/seriedocumentacions");
+    }
+}

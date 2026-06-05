@@ -1,0 +1,186 @@
+@using ACUEDUCTO2.Data
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO2.Services
+@using ACUEDUCTO2.Share.Models
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IMenuPermissionService Perms
+@inject AuthenticationStateProvider Auth
+
+@if (IsAuthenticated)
+{
+<footer class="fixed-footer" id="appFooter">
+    <div class="footer-images">
+        @if (CanView("Footer-Facturacion"))
+        {
+            <a href="/periodos/facturacionPages?id=@id_periodo_siguiente" target="_facturacion">
+                <img src="/facturacion.jpg" alt="Facturación" />
+            </a>
+        }
+        @if (CanView("Footer-Consumos"))
+        {
+            <a href="/consumoscomponent?id=@id_periodo_siguiente" target="_consumo">
+                <img src="/consumos.jpg" alt="Consumo" />
+            </a>
+        }
+        @if (CanView("Footer-Recaudo"))
+        {
+            <a href="/periodos/recaudopages?id=@id_periodo_siguiente" target="_recaudo">
+                <img src="/recaudo.jpg" alt="Recaudo" />
+            </a>
+        }
+        @if (CanView("Footer-Mantenimiento"))
+        {
+            <a href="/periodos/trabajopages?id=@id_periodo_siguiente" target="_mantenimiento">
+                <img src="/mantenimiento.jpg" alt="Mantenimiento" />
+            </a>
+        }
+    </div>
+    <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Powered By: Xcursor.Org - VERSION <VersionComponent /></div>
+</footer>
+}
+
+<style>
+    .footer-images {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin-bottom: 10px;
+    }
+
+    .footer-images img {
+        width: 80px;
+        height: 80px;
+        cursor: pointer;
+    }
+
+    .fixed-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background-color: #f8f9fa;
+        text-align: center;
+        padding: 10px 0;
+        box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        transition: opacity 400ms ease, transform 400ms ease;
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .fixed-footer.footer-hidden {
+        opacity: 0;
+        transform: translateY(100%);
+        pointer-events: none;
+    }
+
+    main { padding-bottom: 60px; }
+</style>
+
+<script>
+    (function () {
+        const footer = document.getElementById('appFooter');
+        if (!footer) return;
+
+        const HIDE_DELAY_MS = 3000;
+        let timerId = null;
+
+        function showFooter() { footer.classList.remove('footer-hidden'); }
+        function hideFooter() { footer.classList.add('footer-hidden'); }
+        function resetTimer() {
+            showFooter();
+            if (timerId) window.clearTimeout(timerId);
+            timerId = window.setTimeout(hideFooter, HIDE_DELAY_MS);
+        }
+
+        resetTimer();
+
+        const events = ['mousemove', 'wheel', 'keydown', 'touchstart', 'pointermove'];
+        events.forEach(ev => window.addEventListener(ev, resetTimer, { passive: true }));
+
+        footer.addEventListener('mouseenter', () => {
+            if (timerId) window.clearTimeout(timerId);
+            showFooter();
+        });
+        footer.addEventListener('mouseleave', resetTimer);
+
+        window.addEventListener('beforeunload', () => {
+            if (timerId) window.clearTimeout(timerId);
+            events.forEach(ev => window.removeEventListener(ev, resetTimer));
+        });
+    })();
+</script>
+
+@code {
+    private string id_periodo_actual;
+    private IReadOnlyDictionary<string, MenuPermission> permissions = new Dictionary<string, MenuPermission>();
+    private bool IsAuthenticated;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await DeterminarPeriodoActual();
+        var auth = await Auth.GetAuthenticationStateAsync();
+        IsAuthenticated = auth.User?.Identity?.IsAuthenticated == true;
+        if (!IsAuthenticated)
+        {
+            permissions = new Dictionary<string, MenuPermission>();
+            return;
+        }
+        permissions = await Perms.GetPermissionsAsync(auth.User);
+        if (permissions.Count == 0)
+        {
+            permissions = BuildDefaults(auth.User);
+        }
+    }
+
+    private bool CanView(string menuKey) =>
+        permissions.TryGetValue(menuKey, out var perm) && perm.CanView;
+
+    private IReadOnlyDictionary<string, MenuPermission> BuildDefaults(System.Security.Claims.ClaimsPrincipal user)
+    {
+        var dict = new Dictionary<string, MenuPermission>(StringComparer.OrdinalIgnoreCase);
+        bool isAdmin = user.IsInRole("Administradores");
+        bool isOperator = user.IsInRole("Tesorería");
+        void Add(string key, bool view) => dict[key] = new MenuPermission { MenuKey = key, CanView = view };
+
+        if (isAdmin)
+        {
+            foreach (var k in new[] { "Footer-Consumos", "Footer-Recaudo", "Footer-Facturacion", "Footer-Mantenimiento" }) Add(k, true);
+        }
+        else if (isOperator)
+        {
+            foreach (var k in new[] { "Footer-Consumos", "Footer-Recaudo", "Footer-Facturacion", "Footer-Mantenimiento" }) Add(k, true);
+        }
+        else
+        {
+            foreach (var k in new[] { "Footer-Consumos" }) Add(k, true);
+            foreach (var k in new[] { "Footer-Recaudo", "Footer-Facturacion", "Footer-Mantenimiento" }) Add(k, false);
+        }
+        return dict;
+    }
+
+    private string id_periodo_siguiente;
+
+    private async Task DeterminarPeriodoActual()
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        var fechaActual = DateTime.Now;
+        var periodoActual = await context.Periodos
+            .Where(p => p.FechaHoraIniciaPeriodo <= fechaActual)
+            .OrderByDescending(p => p.FechaHoraIniciaPeriodo)
+            .FirstOrDefaultAsync();
+
+        id_periodo_actual = periodoActual?.Guid ?? "No disponible";
+
+        var periodoSiguiente = await context.Periodos
+            .Where(p => p.FechaHoraIniciaPeriodo > fechaActual)
+            .OrderBy(p => p.FechaHoraIniciaPeriodo)
+            .FirstOrDefaultAsync();
+
+        if (periodoSiguiente != null)
+        {
+            id_periodo_siguiente = periodoSiguiente.Guid;
+        }
+    }
+}

@@ -1,0 +1,105 @@
+@page "/archivosdocumentos/{RequestedFileName?}"
+@layout SimpleLayout
+@using ACUEDUCTO2.Components.Layout
+@using ACUEDUCTO2.Components.Shared
+@using ACUEDUCTO2.Services.ArchivosGaleriaServices
+@using ACUEDUCTO2.Share.Models
+@* RenderMode not specified to match hosting model *@
+@rendermode InteractiveServer
+
+<PageTitle>Archivos Documentos</PageTitle>
+
+<h3 class="mb-3">Galería de Documentos</h3>
+
+@inject ACUEDUCTO2.Services.PredioServices.PredioService PredioService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+
+@if (predios != null && predios.Count > 0)
+{
+    <div class="mb-3">
+        <label class="form-label">Seleccione predio (carpeta)</label>
+        <div class="d-flex gap-2 align-items-center">
+            <select class="form-select w-auto" @onchange="OnPredioChange">
+                <option value="">-- Seleccione --</option>
+                @foreach (var p in predios)
+                {
+                    <option value="@p.IdPredio" selected="@(p.IdPredio == CodigoUsuario)">@p.IdPredio - @p.ApellidosNombresUsuario</option>
+                }
+            </select>
+            <button class="btn btn-sm btn-primary" @onclick="ApplyPredio">Usar predio</button>
+        </div>
+    </div>
+}
+
+<ArchivosDocumentos Show="true"
+                  RequestedFileName="@RequestedFileName"
+                  CodigoUsuario="@CodigoUsuario"
+                  CodigoInventario="@CodigoInventario"
+                  OnClosed="CerrarVentana" />
+
+@code {
+    [Parameter]
+    public string? RequestedFileName { get; set; }
+    [SupplyParameterFromQuery]
+    public string? CodigoUsuario { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? CodigoInventario { get; set; }
+
+    [Inject] IJSRuntime JS { get; set; } = default!;
+
+    private List<PredioListItem>? predios;
+    private string? selectedPredio;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPrediosAsync();
+        // If no CodigoUsuario was supplied, default to the first predio available
+        if (string.IsNullOrWhiteSpace(CodigoUsuario) && predios != null && predios.Count > 0)
+        {
+            CodigoUsuario = predios[0].IdPredio;
+            selectedPredio = CodigoUsuario;
+        }
+    }
+
+    private async Task LoadPrediosAsync()
+    {
+        try
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = auth.User;
+            var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(userId)) return;
+
+            predios = await PredioService.GetListingForAuthorizedUserAsync(userId);
+        }
+        catch
+        {
+            predios = new List<PredioListItem>();
+        }
+    }
+
+    private void OnPredioChange(ChangeEventArgs e)
+    {
+        selectedPredio = Convert.ToString(e.Value);
+    }
+
+    private void ApplyPredio()
+    {
+        if (string.IsNullOrWhiteSpace(selectedPredio)) return;
+        // navigate to same page with CodigoUsuario query so the ArchivosDocumentos component picks it up
+        var uri = NavigationManager.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["CodigoUsuario"] = selectedPredio,
+            ["CodigoInventario"] = CodigoInventario,
+            ["RequestedFileName"] = RequestedFileName
+        });
+        NavigationManager.NavigateTo(uri);
+    }
+
+    private async Task CerrarVentana()
+    {
+        await JS.InvokeVoidAsync("close");
+    }
+}

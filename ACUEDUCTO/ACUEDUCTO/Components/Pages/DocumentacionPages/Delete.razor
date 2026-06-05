@@ -1,0 +1,80 @@
+﻿@page "/documentacions/delete"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Delete</PageTitle>
+
+<h1>Delete</h1>
+
+<p>Are you sure you want to delete this?</p>
+<div>
+    <h2>Documentacion</h2>
+    <hr />
+    @if (documentacion is null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Idserie</dt>
+            <dd class="col-sm-10">@documentacion.Idserie</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Idtipo</dt>
+            <dd class="col-sm-10">@documentacion.Idtipo</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Codigo</dt>
+            <dd class="col-sm-10">@documentacion.Codigo</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">TiempoArchivoGestion</dt>
+            <dd class="col-sm-10">@documentacion.TiempoArchivoGestion</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">TiempoArchivoCentral</dt>
+            <dd class="col-sm-10">@documentacion.TiempoArchivoCentral</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">DisposicionFinal</dt>
+            <dd class="col-sm-10">@documentacion.DisposicionFinal</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Observaciones</dt>
+            <dd class="col-sm-10">@documentacion.Observaciones</dd>
+        </dl>
+        <EditForm method="post" Model="documentacion" OnValidSubmit="DeleteDocumentacion" FormName="delete" Enhance>
+            <button type="submit" class="btn btn-danger" disabled="@(documentacion is null)">Delete</button> |
+            <a class="btn btn-light" href="" onclick="return cerrarVentana('');">Close</a>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private Documentacion? documentacion;
+
+    [SupplyParameterFromQuery]
+    private string Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        documentacion = await context.Documentacions.FirstOrDefaultAsync(m => m.Id == Id);
+
+        if (documentacion is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    private async Task DeleteDocumentacion()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Documentacions.Remove(documentacion!);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/documentacions");
+    }
+}

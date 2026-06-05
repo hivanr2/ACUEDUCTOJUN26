@@ -1,0 +1,82 @@
+﻿@page "/indicadors/create"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Crear indicador</PageTitle>
+
+<div class="container py-2">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Crear indicador</h1>
+            <small class="text-muted">Registra un nuevo indicador</small>
+        </div>
+        <div>
+            <a class="btn btn-secondary" href="/indicadors">Volver</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <EditForm method="post" Model="Indicador" OnValidSubmit="AddIndicador" FormName="create" Enhance>
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" role="alert"/>
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label for="categoría" class="form-label">Categoría</label>
+                        <InputText id="categoría" @bind-Value="Indicador.Categoría" class="form-control" />
+                        <ValidationMessage For="() => Indicador.Categoría" class="text-danger" />
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label for="responsable" class="form-label">Responsable</label>
+                        <InputText id="responsable" @bind-Value="Indicador.Responsable" class="form-control" />
+                        <ValidationMessage For="() => Indicador.Responsable" class="text-danger" />
+                    </div>
+                    <div class="col-12">
+                        <label for="descripción" class="form-label">Descripcion</label>
+                        <InputText id="descripción" @bind-Value="Indicador.Descripcion" class="form-control" />
+                        <ValidationMessage For="() => Indicador.Descripcion" class="text-danger" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="fórmulaunidad" class="form-label">Fórmula/Unidad</label>
+                        <InputText id="fórmulaunidad" @bind-Value="Indicador.FórmulaUnidad" class="form-control" />
+                        <ValidationMessage For="() => Indicador.FórmulaUnidad" class="text-danger" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="frecuencia" class="form-label">Frecuencia</label>
+                        <InputText id="frecuencia" @bind-Value="Indicador.Frecuencia" class="form-control" />
+                        <ValidationMessage For="() => Indicador.Frecuencia" class="text-danger" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="metaumbral" class="form-label">Meta/Umbral</label>
+                        <InputText id="metaumbral" @bind-Value="Indicador.MetaUmbral" class="form-control" />
+                        <ValidationMessage For="() => Indicador.MetaUmbral" class="text-danger" />
+                    </div>
+                    <div class="col-12">
+                        <label for="semáforogestión" class="form-label">Semáforo de gestión</label>
+                        <InputText id="semáforogestión" @bind-Value="Indicador.SemáforoGestión" class="form-control" />
+                        <ValidationMessage For="() => Indicador.SemáforoGestión" class="text-danger" />
+                    </div>
+                </div>
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                    <a class="btn btn-light" href="/indicadors">Cancelar</a>
+                    <button type="submit" class="btn btn-primary">Crear</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private Indicador Indicador { get; set; } = new();
+
+    private async Task AddIndicador()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Indicadores.Add(Indicador);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/indicadors");
+    }
+}

@@ -1,0 +1,39 @@
+﻿@page "/estratos"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Models
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+<PageTitle>Estratos</PageTitle>
+
+<h1>Estratos</h1>
+
+<p>
+    <a href="estratos/create">Crear Nuevo</a>
+</p>
+
+<QuickGrid Class="table" Items="context.Estratos">
+    <PropertyColumn Property="estrato => estrato.Idestrato" Title="Estrato"/>
+    <PropertyColumn Property="estrato => estrato.Descripcion" />
+    <PropertyColumn Property="estrato => estrato.SobreTasa" />
+    <PropertyColumn Property="estrato => estrato.CargoFijo" />
+
+    <TemplateColumn Context="estrato">
+        <a href="@($"estratos/edit?idestrato={estrato.Idestrato}")" target="_blank">Edit</a> |
+        <a href="@($"estratos/details?idestrato={estrato.Idestrato}")" target="_blank">Details</a> |
+        <a href="@($"estratos/delete?idestrato={estrato.Idestrato}")" target="_blank">Delete</a>
+    </TemplateColumn>
+</QuickGrid>
+
+@code {
+    private AcueductoContext context = default!;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}

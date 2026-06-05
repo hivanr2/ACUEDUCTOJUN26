@@ -1,0 +1,236 @@
+@page "/trabajos/edit"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+@rendermode InteractiveServer
+
+<PageTitle>Editar Trabajo</PageTitle>
+
+<div class="container py-2">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Editar trabajo</h1>
+            <small class="text-muted">Actualiza los datos del trabajo</small>
+        </div>
+        <div>
+            <a class="btn btn-secondary" href="/trabajos" onclick="return cerrarVentana('/trabajos');">Cerrar</a>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(loadError))
+    {
+        <div class="alert alert-danger">@loadError</div>
+    }
+    else if (TrabajoVM is null)
+    {
+        <p><em>Cargando...</em></p>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <EditForm Model="TrabajoVM" OnValidSubmit="UpdateTrabajo">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Planilla</label>
+                            <InputSelect class="form-select" @bind-Value="TrabajoVM.Idplanilla">
+                                <option value="">Seleccione una planilla</option>
+                                @foreach (var p in Planillas)
+                                {
+                                    <option value="@p.Idplanilla">@(!string.IsNullOrWhiteSpace(p.Descripcion) ? p.Descripcion : p.Idplanilla)
+                                    </option>
+                                }
+                            </InputSelect>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Predio</label>
+                            <InputSelect class="form-select" @bind-Value="TrabajoVM.IdPredio">
+                                <option value="">Seleccione un predio</option>
+                                @foreach (var pr in Predios)
+                                {
+                                    <option value="@pr.Idpredio">
+                                        @((pr.ApellidosNombresUsuario ?? pr.Direccion) ?? pr.Idpredio)
+                                    </option>
+                                }
+                            </InputSelect>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Inventario</label>
+                            <InputSelect class="form-select" @bind-Value="TrabajoVM.IdInventario">
+                                <option value="">Seleccione un inventario</option>
+                                @foreach (var inv in Inventarios)
+                                {
+                                    <option value="@inv.Idinventario">
+                                        @((inv.DescripcionCorta ?? inv.Codigo) ?? inv.Idinventario)
+                                    </option>
+                                }
+                            </InputSelect>
+                        </div>
+
+                        <div class="col-12 col-md-3">
+                            <label class="form-label">Fecha inicio</label>
+                            <InputDate class="form-control" @bind-Value="TrabajoVM.FechaInicio" />
+                        </div>
+
+                        <div class="col-12 col-md-3">
+                            <label class="form-label">Fecha finalización</label>
+                            <InputDate class="form-control" @bind-Value="TrabajoVM.FechaFinalizacion" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Descripción</label>
+                            <InputText class="form-control" @bind-Value="TrabajoVM.Descripcion" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Tipo de trabajo</label>
+                            <InputSelect class="form-select" @bind-Value="TrabajoVM.TipoTrabajo">
+                                <option value="">Seleccione un tipo</option>
+                                @foreach (var tt in TiposTrabajo)
+                                {
+                                    <option value="@tt.IdTipoTrabajo">@tt.Nombre</option>
+                                }
+                            </InputSelect>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Estado</label>
+                            <InputText class="form-control" @bind-Value="TrabajoVM.Estado" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Observaciones</label>
+                            <InputTextArea class="form-control" @bind-Value="TrabajoVM.Observaciones" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Personal</label>
+                            <InputTextArea class="form-control" @bind-Value="TrabajoVM.Personal" rows="3" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Materiales</label>
+                            <InputTextArea class="form-control" @bind-Value="TrabajoVM.Materiales" rows="3" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <a class="btn btn-light" href="/trabajos" onclick="return cerrarVentana('/trabajos');">Cerrar</a>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    // Query param used by links in Index
+    [SupplyParameterFromQuery(Name = "idtrabajo")] public int IdTrabajo { get; set; }
+
+    private Trabajo? entity;
+    private Trabajo TrabajoVM { get; set; } = new();
+    private string? loadError;
+
+    private List<TiposTrabajo> TiposTrabajo { get; set; } = new();
+    private List<Planilla> Planillas { get; set; } = new();
+    private List<Predio> Predios { get; set; } = new();
+    private List<Inventario> Inventarios { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IdTrabajo <= 0)
+        {
+            loadError = "Parámetro idtrabajo inválido.";
+            return;
+        }
+
+        using var context = DbFactory.CreateDbContext();
+        try
+        {
+            // Load reference lists
+            TiposTrabajo = await context.TiposTrabajos
+                .AsNoTracking()
+                .OrderBy(t => t.Nombre)
+                .ToListAsync();
+
+            Planillas = await context.Planillas
+                .AsNoTracking()
+                .OrderByDescending(p => p.FechaHoraFacturacion)
+                .ToListAsync();
+
+            Predios = await context.Predios
+                .AsNoTracking()
+                .OrderBy(p => p.ApellidosNombresUsuario)
+                .ToListAsync();
+
+            Inventarios = await context.Inventarios
+                .AsNoTracking()
+                .OrderBy(i => i.DescripcionCorta)
+                .ToListAsync();
+
+            // Load entity
+            entity = await context.Trabajos.AsNoTracking().FirstOrDefaultAsync(t => t.IdTrabajo == IdTrabajo);
+            if (entity is null)
+            {
+                loadError = $"Trabajo {IdTrabajo} no encontrado.";
+                return;
+            }
+
+            // Copy to VM
+            TrabajoVM = new Trabajo
+            {
+                IdTrabajo = entity.IdTrabajo,
+                FechaInicio = entity.FechaInicio,
+                FechaFinalizacion = entity.FechaFinalizacion,
+                Descripcion = entity.Descripcion,
+                TipoTrabajo = entity.TipoTrabajo,
+                Estado = entity.Estado,
+                Idplanilla = entity.Idplanilla,
+                Observaciones = entity.Observaciones,
+                IdPredio = entity.IdPredio,
+                IdInventario = entity.IdInventario,
+                Personal = entity.Personal,
+                Materiales = entity.Materiales
+            };
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Error cargando trabajo: {ex.Message}";
+        }
+    }
+
+    private async Task UpdateTrabajo()
+    {
+        using var context = DbFactory.CreateDbContext();
+        var dbEntity = await context.Trabajos.FirstOrDefaultAsync(t => t.IdTrabajo == IdTrabajo);
+        if (dbEntity is null)
+        {
+            loadError = $"Trabajo {IdTrabajo} no encontrado.";
+            return;
+        }
+
+        dbEntity.FechaInicio = TrabajoVM.FechaInicio;
+        dbEntity.FechaFinalizacion = TrabajoVM.FechaFinalizacion;
+        dbEntity.Descripcion = TrabajoVM.Descripcion;
+        dbEntity.TipoTrabajo = TrabajoVM.TipoTrabajo;
+        dbEntity.Estado = TrabajoVM.Estado;
+        dbEntity.Idplanilla = TrabajoVM.Idplanilla;
+        dbEntity.Observaciones = TrabajoVM.Observaciones;
+        dbEntity.IdPredio = TrabajoVM.IdPredio;
+        dbEntity.IdInventario = TrabajoVM.IdInventario;
+        dbEntity.Personal = TrabajoVM.Personal;
+        dbEntity.Materiales = TrabajoVM.Materiales;
+
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/trabajos");
+    }
+}

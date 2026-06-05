@@ -1,0 +1,18 @@
+@page "/account/logout"
+@rendermode InteractiveServer
+@inject IHttpContextAccessor Http
+@inject NavigationManager Nav
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+
+<PageTitle>Salir</PageTitle>
+
+<p>Cerrando sesión...</p>
+
+@code {
+ protected override async Task OnInitializedAsync()
+ {
+ await Http.HttpContext!.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+ Nav.NavigateTo("/");
+ }
+}

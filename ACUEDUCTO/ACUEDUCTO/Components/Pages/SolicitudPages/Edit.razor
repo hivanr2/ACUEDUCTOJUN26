@@ -1,0 +1,304 @@
+﻿@page "/solicitudes/edit"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+@rendermode InteractiveServer
+
+<PageTitle>Editar Solicitud</PageTitle>
+
+<h1 class="visually-hidden">Editar</h1>
+
+@if (Solicitud is null)
+{
+    <div class="container py-3"><p><em>Cargando…</em></p></div>
+}
+else
+{
+    <div class="container-fluid py-2 py-md-3">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-10 col-xl-9">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <div>
+                            <h2 class="h5 mb-0">Editar Solicitud #@Solicitud.Id</h2>
+                            <small class="text-muted">Actualice los campos necesarios y guarde los cambios.</small>
+                        </div>
+                        <div>
+                            <span class="badge rounded-pill @GetEstadoBadgeClass(Estados.FirstOrDefault(e=>e.Id==Solicitud.EstadoID)?.Nombre)">
+                                @Estados.FirstOrDefault(e=>e.Id==Solicitud.EstadoID)?.Nombre
+                            </span>
+                        </div>
+                    </div>
+
+                    <EditForm method="post" Model="Solicitud" OnValidSubmit="UpdateSolicitud" FormName="edit" Enhance>
+                        <DataAnnotationsValidator />
+
+                        <div class="card-body">
+                            <ValidationSummary class="text-danger mb-2" role="alert" />
+                            <input type="hidden" name="Solicitud.Id" value="@Solicitud.Id" />
+
+                            <h3 class="section-title">Datos generales</h3>
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label for="descripcion" class="form-label">Descripción</label>
+                                    <InputTextArea id="descripcion" @bind-Value="Solicitud.Descripción" class="form-control" rows="4" placeholder="Describa la solicitud" />
+                                    <ValidationMessage For="() => Solicitud.Descripción" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="idusuario" class="form-label">Usuario</label>
+                                    <InputSelect id="idusuario" @bind-Value="Solicitud.IdUsuario" class="form-select">
+                                        <option value="">Seleccione un usuario</option>
+                                        @foreach (var usuario in Usuarios)
+                                        {
+                                            <option value="@usuario.Identificacion">@usuario.ApellidosNombres</option>
+                                        }
+                                    </InputSelect>
+                                    <ValidationMessage For="() => Solicitud.IdUsuario" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="codigo" class="form-label">Palabras clave o Código</label>
+                                    <InputText id="codigo" @bind-Value="Solicitud.Codigo" class="form-control" placeholder="Ej: fuga, medidor" />
+                                    <ValidationMessage For="() => Solicitud.Codigo" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="tipo" class="form-label">Tipo</label>
+                                    <InputSelect id="tipo" @bind-Value="Solicitud.Tipo" class="form-select">
+                                        <option value="">Seleccione un tipo</option>
+                                        @foreach (var tipo in Tipos)
+                                        {
+                                            <option value="@tipo.Id">@tipo.Nombre</option>
+                                        }
+                                    </InputSelect>
+                                    <ValidationMessage For="() => Solicitud.Tipo" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="fechahorarecepcion" class="form-label">Fecha de recepción</label>
+                                    <InputDate id="fechahorarecepcion" @bind-Value="Solicitud.FechaHoraRecepcion" class="form-control" />
+                                    <ValidationMessage For="() => Solicitud.FechaHoraRecepcion" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="estado" class="form-label">Estado</label>
+                                    <InputSelect id="estado" @bind-Value="Solicitud.EstadoID" class="form-select">
+                                        <option value="">Seleccione un estado</option>
+                                        @foreach (var estado in Estados)
+                                        {
+                                        <option value="@estado.Id">@estado.Nombre</option>
+                                        }
+                                    </InputSelect>
+                                    <ValidationMessage For="() => Solicitud.EstadoID" class="text-danger" />
+                                </div>
+                            </div>
+
+                            <h3 class="section-title mt-3">Ciclo PHVA</h3>
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label for="planear" class="form-label">Planear - Análisis metodológico</label>
+                                    <InputTextArea id="planear" @bind-Value="Solicitud.Planear" class="form-control" rows="3" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="usuarioplanear" class="form-label">Usuario Planear</label>
+                                    <InputSelect id="usuarioplanear" @bind-Value="Solicitud.UsuarioPlanear" class="form-select">
+                                        <option value="">Seleccione un usuario</option>
+                                        @foreach (var usuario in Usuarios)
+                                        {
+                                            <option value="@usuario.Identificacion">@usuario.ApellidosNombres</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="fechahoraplanear" class="form-label">Fecha Planear</label>
+                                    <InputDate id="fechahoraplanear" @bind-Value="Solicitud.FechaHoraPlanear" class="form-control" />
+                                </div>
+                                <div class="col-12">
+                                    <label for="hacer" class="form-label">Hacer</label>
+                                    <InputTextArea id="hacer" @bind-Value="Solicitud.Hacer" class="form-control" rows="3" />
+                                    <ValidationMessage For="() => Solicitud.Hacer" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="usuariohacer" class="form-label">Usuario Hacer</label>
+                                    <InputSelect id="usuariohacer" @bind-Value="Solicitud.UsuarioHacer" class="form-select">
+                                        <option value="">Seleccione un usuario</option>
+                                        @foreach (var usuario in Usuarios)
+                                        {
+                                            <option value="@usuario.Identificacion">@usuario.ApellidosNombres</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="fechahorahacer" class="form-label">Fecha Hacer</label>
+                                    <InputDate id="fechahorahacer" @bind-Value="Solicitud.FechaHoraHacer" class="form-control" />
+                                </div>
+                                <div class="col-12">
+                                    <label for="verificar" class="form-label">Verificar</label>
+                                    <InputTextArea id="verificar" @bind-Value="Solicitud.Verificar" class="form-control" rows="3" />
+                                    <ValidationMessage For="() => Solicitud.Verificar" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="usuarioverifica" class="form-label">Usuario Verifica</label>
+                                    <InputSelect id="usuarioverifica" @bind-Value="Solicitud.UsuarioVerifica" class="form-select">
+                                        <option value="">Seleccione un usuario</option>
+                                        @foreach (var usuario in Usuarios)
+                                        {
+                                            <option value="@usuario.Identificacion">@usuario.ApellidosNombres</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="fechahoraverifica" class="form-label">Fecha Verifica</label>
+                                    <InputDate id="fechahoraverifica" @bind-Value="Solicitud.FechaHoraVerifica" class="form-control" />
+                                    <ValidationMessage For="() => Solicitud.FechaHoraVerifica" class="text-danger" />
+                                </div>
+                                <div class="col-12">
+                                    <label for="actuarmejora" class="form-label">Actuar para mejorar</label>
+                                    <InputTextArea id="actuarmejora" @bind-Value="Solicitud.ActuarMejora" class="form-control" rows="3" />
+                                    <ValidationMessage For="() => Solicitud.ActuarMejora" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="usuarioactuamejora" class="form-label">Usuario Actúa Mejora</label>
+                                    <InputSelect id="usuarioactuamejora" @bind-Value="Solicitud.UsuarioActuaMejora" class="form-select">
+                                        <option value="">Seleccione un usuario</option>
+                                        @foreach (var usuario in Usuarios)
+                                        {
+                                            <option value="@usuario.Identificacion">@usuario.ApellidosNombres</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="fechahoraactuamejora" class="form-label">Fecha Actúa Mejora</label>
+                                    <InputDate id="fechahoraactuamejora" @bind-Value="Solicitud.FechaHoraActuaMejora" class="form-control" />
+                                </div>
+                            </div>
+
+                            <h3 class="section-title mt-3">Cierre</h3>
+                            <div class="row g-3">
+                                <div class="col-12 col-md-6">
+                                    <label for="usuariocerrada" class="form-label">Usuario Cierre</label>
+                                    <InputSelect id="usuariocerrada" @bind-Value="Solicitud.UsuarioCerrada" class="form-select">
+                                        <option value="">Seleccione un usuario</option>
+                                        @foreach (var usuario in Usuarios)
+                                        {
+                                            <option value="@usuario.Identificacion">@usuario.ApellidosNombres</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="fechahoracerrada" class="form-label">Fecha Cierre</label>
+                                    <InputDate id="fechahoracerrada" @bind-Value="Solicitud.FechaHoraCerrada" class="form-control" />
+                                </div>
+                                <div class="col-12">
+                                    <label for="observaciones" class="form-label">Observaciones</label>
+                                    <InputTextArea id="observaciones" @bind-Value="Solicitud.Observaciones" class="form-control" rows="3" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-footer bg-white">
+                            <div class="actions-bar">
+                                <a class="btn btn-outline-secondary" href="/solicitudes" onclick="return cerrarVentana('/solicitudes');">Cerrar</a>
+                                <button type="submit" class="btn btn-primary">Guardar</button>
+                            </div>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="container py-2">
+    <a href="/solicitudes">Volver al listado</a>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private int Id { get; set; }
+
+    [SupplyParameterFromForm]
+    private Solicitud? Solicitud { get; set; }
+
+    private bool Cerrada { get; set; } = false;
+    private List<Tipo> Tipos { get; set; } = new();
+    private List<Usuario> Usuarios { get; set; } = new();
+    private List<Estado> Estados { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Tipos = await context.Tipos.OrderBy(t => t.Id).ToListAsync();
+        Usuarios = await context.Usuarios.OrderBy(u => u.ApellidosNombres).ToListAsync();
+        Estados = await context.Estados.OrderBy(e => e.Id).ToListAsync();
+        Solicitud ??= await context.Solicitudes.FirstOrDefaultAsync(m => m.Id == Id);
+
+        if (Solicitud is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+        else
+        {
+            Cerrada = Solicitud.Cerrada ?? false;
+        }
+    }
+
+    private async Task UpdateSolicitud()
+    {
+        using var context = DbFactory.CreateDbContext();
+        if (Solicitud is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+            return;
+        }
+        var solicitudDb = await context.Solicitudes.FindAsync(Solicitud.Id);
+        if (solicitudDb != null)
+        {
+            // Actualiza campos
+            solicitudDb.EstadoID = Solicitud.EstadoID;
+            solicitudDb.Cerrada = Cerrada;
+            solicitudDb.Descripción = Solicitud.Descripción;
+            solicitudDb.IdUsuario = Solicitud.IdUsuario;
+            solicitudDb.Codigo = Solicitud.Codigo;
+            solicitudDb.Tipo = Solicitud.Tipo;
+            solicitudDb.FechaHoraRecepcion = Solicitud.FechaHoraRecepcion;
+            solicitudDb.Planear = Solicitud.Planear;
+            solicitudDb.UsuarioPlanear = Solicitud.UsuarioPlanear;
+            solicitudDb.FechaHoraPlanear = Solicitud.FechaHoraPlanear;
+            solicitudDb.Hacer = Solicitud.Hacer;
+            solicitudDb.UsuarioHacer = Solicitud.UsuarioHacer;
+            solicitudDb.FechaHoraHacer = Solicitud.FechaHoraHacer;
+            solicitudDb.Verificar = Solicitud.Verificar;
+            solicitudDb.UsuarioVerifica = Solicitud.UsuarioVerifica;
+            solicitudDb.FechaHoraVerifica = Solicitud.FechaHoraVerifica;
+            solicitudDb.ActuarMejora = Solicitud.ActuarMejora;
+            solicitudDb.UsuarioActuaMejora = Solicitud.UsuarioActuaMejora;
+            solicitudDb.FechaHoraActuaMejora = Solicitud.FechaHoraActuaMejora;
+            solicitudDb.UsuarioCerrada = Solicitud.UsuarioCerrada;
+            solicitudDb.FechaHoraCerrada = Solicitud.FechaHoraCerrada;
+            solicitudDb.Observaciones = Solicitud.Observaciones;
+
+            await context.SaveChangesAsync();
+            NavigationManager.NavigateTo("/solicitudes");
+        }
+        else
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    private bool SolicitudExists(int id)
+    {
+        using var context = DbFactory.CreateDbContext();
+        return context.Solicitudes.Any(e => e.Id == id);
+    }
+
+    private string GetEstadoBadgeClass(string? nombre)
+    {
+        if (string.IsNullOrWhiteSpace(nombre)) return "bg-secondary";
+        var n = nombre.ToLowerInvariant();
+        if (n.Contains("cerr")) return "bg-success";
+        if (n.Contains("pend") || n.Contains("abier")) return "bg-warning text-dark";
+        if (n.Contains("proc") || n.Contains("tram")) return "bg-info text-dark";
+        return "bg-secondary";
+    }
+}

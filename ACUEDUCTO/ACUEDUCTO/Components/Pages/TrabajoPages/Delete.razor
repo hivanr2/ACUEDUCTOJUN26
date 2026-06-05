@@ -1,0 +1,93 @@
+@page "/trabajos/delete"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Eliminar Trabajo</PageTitle>
+
+<h3>Eliminar Trabajo</h3>
+
+@if (!string.IsNullOrEmpty(loadError))
+{
+    <div class="alert alert-danger">@loadError</div>
+}
+else if (trabajo is null)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <p>¿Está seguro que desea eliminar el trabajo <strong>@trabajo.IdTrabajo</strong>?</p>
+    <dl class="row">
+        <dt class="col-sm-3">Descripción</dt>
+        <dd class="col-sm-9">@trabajo.Descripcion</dd>
+        <dt class="col-sm-3">Fecha Inicio</dt>
+        <dd class="col-sm-9">@trabajo.FechaInicio</dd>
+        <dt class="col-sm-3">Fecha Finalización</dt>
+        <dd class="col-sm-9">@trabajo.FechaFinalizacion</dd>
+        <dt class="col-sm-3">Observaciones</dt>
+        <dd class="col-sm-9">@trabajo.Observaciones</dd>
+    </dl>
+
+    <button class="btn btn-danger" @onclick="DeleteTrabajo">Eliminar</button>
+    <a class="btn btn-light" href="" onclick="return cerrarVentana('');">Cerrar</a>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "idtrabajo")]
+    public int IdTrabajo { get; set; }
+
+    private Trabajo? trabajo;
+    private string? loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IdTrabajo <= 0)
+        {
+            loadError = "Parámetro idtrabajo inválido.";
+            return;
+        }
+
+        try
+        {
+            using var context = DbFactory.CreateDbContext();
+            trabajo = await context.Trabajos
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.IdTrabajo == IdTrabajo);
+
+            if (trabajo is null)
+            {
+                loadError = $"Trabajo {IdTrabajo} no encontrado.";
+            }
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Error cargando trabajo: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteTrabajo()
+    {
+        try
+        {
+            using var context = DbFactory.CreateDbContext();
+            var entity = await context.Trabajos.FirstOrDefaultAsync(t => t.IdTrabajo == IdTrabajo);
+            if (entity is null)
+            {
+                loadError = $"Trabajo {IdTrabajo} no encontrado.";
+                return;
+            }
+
+            context.Trabajos.Remove(entity);
+            await context.SaveChangesAsync();
+            NavigationManager.NavigateTo("/trabajos");
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Error eliminando trabajo: {ex.Message}";
+        }
+    }
+}

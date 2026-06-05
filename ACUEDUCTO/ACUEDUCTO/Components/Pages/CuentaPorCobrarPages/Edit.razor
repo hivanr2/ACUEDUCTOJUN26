@@ -1,0 +1,143 @@
+﻿@page "/cuentaporcobrars/edit"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit</PageTitle>
+
+<h1>Edit</h1>
+
+<h2>CuentaPorCobrar</h2>
+<hr />
+@if (CuentaPorCobrar is null)
+{
+    <p><em>Llamando...</em></p>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-4">
+            <EditForm method="post" Model="CuentaPorCobrar" OnValidSubmit="UpdateCuentaPorCobrar" FormName="edit" Enhance>
+                <DataAnnotationsValidator />
+                <ValidationSummary role="alert"/>
+                <input type="hidden" name="CuentaPorCobrar.IdcuentaxC" value="@CuentaPorCobrar.IdcuentaxC" />
+                <div class="mb-3">
+                    <label for="numero" class="form-label">Numero:</label>
+                    <InputNumber id="numero" @bind-Value="CuentaPorCobrar.Numero" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorCobrar.Numero" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="identificacion" class="form-label">Identificacion:</label>
+                    <InputText id="identificacion" @bind-Value="CuentaPorCobrar.Identificacion" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorCobrar.Identificacion" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="descripción" class="form-label">Descripcion:</label>
+                    <InputText id="descripción" @bind-Value="CuentaPorCobrar.Descripcion" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorCobrar.Descripcion" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="fechahora" class="form-label">FechaHora:</label>
+                    <InputDate id="fechahora" @bind-Value="CuentaPorCobrar.FechaHora" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorCobrar.FechaHora" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="vencimiento" class="form-label">Vencimiento:</label>
+                    <InputDate id="vencimiento" @bind-Value="CuentaPorCobrar.Vencimiento" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorCobrar.Vencimiento" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="valordebe" class="form-label">ValorDebe:</label>
+                    <InputNumber id="valordebe" @bind-Value="CuentaPorCobrar.ValorDebe" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorCobrar.ValorDebe" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="valorpagado" class="form-label">ValorPagado:</label>
+                    <InputNumber id="valorpagado" @bind-Value="CuentaPorCobrar.ValorPagado" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorCobrar.ValorPagado" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="cuotastotales" class="form-label">CuotasTotales:</label>
+                    <InputNumber id="cuotastotales" @bind-Value="CuentaPorCobrar.CuotasTotales" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorCobrar.CuotasTotales" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="cuotaspagadas" class="form-label">CuotasPagadas:</label>
+                    <InputNumber id="cuotaspagadas" @bind-Value="CuentaPorCobrar.CuotasPagadas" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorCobrar.CuotasPagadas" class="text-danger" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="enviacorreo" class="form-label">Se cobra EN FACTURA CONSUMO:</label>
+                    <InputCheckbox id="enviacorreo" @bind-Value="EnFactura" class="form-check-input" />
+                    <ValidationMessage For="() => CuentaPorCobrar.EnFactura" class="text-danger" />
+                </div>
+
+                <button type="submit" class="btn btn-primary">Save</button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<div>
+    <a href="/cuentaporcobrars">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string IdcuentaxC { get; set; }
+
+    private bool EnFactura { get; set; } = false;
+
+
+    [SupplyParameterFromForm]
+    private CuentaPorCobrar? CuentaPorCobrar { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        CuentaPorCobrar ??= await context.CuentaPorCobrars.FirstOrDefaultAsync(m => m.IdcuentaxC == IdcuentaxC);
+
+        if (CuentaPorCobrar is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+        else
+        {
+            EnFactura = CuentaPorCobrar.EnFactura ?? false;
+        }
+    }
+
+    // To protect from overposting attacks, enable the specific properties you want to bind to.
+    // For more information, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task UpdateCuentaPorCobrar()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Attach(CuentaPorCobrar!).State = EntityState.Modified;
+
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (!CuentaPorCobrarExists(CuentaPorCobrar!.IdcuentaxC))
+            {
+                NavigationManager.NavigateTo("notfound");
+            }
+            else
+            {
+                throw;
+            }
+        }
+
+        NavigationManager.NavigateTo("/cuentaporcobrars");
+    }
+
+    private bool CuentaPorCobrarExists(string idcuentaxc)
+    {
+        using var context = DbFactory.CreateDbContext();
+        return context.CuentaPorCobrars.Any(e => e.IdcuentaxC == idcuentaxc);
+    }
+}

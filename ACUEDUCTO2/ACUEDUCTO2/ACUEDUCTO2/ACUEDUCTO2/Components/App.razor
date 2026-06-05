@@ -1,0 +1,60 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["ACUEDUCTO2.styles.css"]" />
+
+    <!-- Global favicon: water drop similar to title icon -->
+    <link rel="icon" href="/img/favicon-drop.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="/img/favicon-drop.png" type="image/png" />
+    <link rel="shortcut icon" href="/img/favicon-drop.ico" type="image/x-icon" />
+
+    <script src="js/ImprimirFactura.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/GeoLocation.js"></script>
+    <script>
+        window.setPageTitle = function (title) {
+            document.title = title;
+        }
+
+        window.scrollToElement = function (elementId) {
+            try {
+                const el = document.getElementById(elementId);
+                if (!el) return;
+                el.scrollIntoView({ behavior: 'instant', block: 'center' });
+            } catch {
+                // ignore
+            }
+        }
+    </script>
+    <ImportMap />
+    <HeadOutlet />
+</head>
+
+<body>
+    <Router AppAssembly="typeof(Program).Assembly">
+        <Found Context="routeData">
+            <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
+            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <PageTitle>Not found</PageTitle>
+            <LayoutView Layout="typeof(MainLayout)">
+                <p role="alert">Sorry, there's nothing at this address.</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+    <ConsumoChart />
+    <script src="_framework/blazor.web.js"></script>
+    <script src="js/consumoChart.js"></script>
+</body>
+
+</html>

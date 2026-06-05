@@ -1,0 +1,54 @@
+﻿@page "/estados/create"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+@rendermode InteractiveServer
+
+<PageTitle>Create</PageTitle>
+
+<h1>Create</h1>
+
+<h2>Estado</h2>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <EditForm method="post" Model="Estado" OnValidSubmit="AddEstado" FormName="create" Enhance>
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert"/>
+            <div class="mb-3">
+                <label for="nombre" class="form-label">Nombre:</label> 
+                <InputText id="nombre" @bind-Value="Estado.Nombre" class="form-control" /> 
+                <ValidationMessage For="() => Estado.Nombre" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="descripcion" class="form-label">Descripcion:</label> 
+                <InputText id="descripcion" @bind-Value="Estado.Descripcion" class="form-control" /> 
+                <ValidationMessage For="() => Estado.Descripcion" class="text-danger" /> 
+            </div>        
+            <button type="submit" class="btn btn-primary">Create</button>
+        </EditForm>
+    </div>
+</div>
+
+<div>
+    <a href="/estados">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private Estado Estado { get; set; } = new();
+
+    private async Task AddEstado()
+    {
+        using var context = DbFactory.CreateDbContext();
+        
+        // Estado.Nombre = Estado.Nombre.Trim();
+        // Estado.Descripcion = Estado.Descripcion.Trim();
+        
+        context.Estados.Add(Estado);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/estados");
+    }
+}

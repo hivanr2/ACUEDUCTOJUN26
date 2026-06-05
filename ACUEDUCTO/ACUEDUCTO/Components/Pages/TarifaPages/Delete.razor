@@ -1,0 +1,64 @@
+﻿@page "/tarifas/delete"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Delete</PageTitle>
+
+<h1>Delete</h1>
+
+<p>Are you sure you want to delete this?</p>
+<div>
+    <h2>Tarifa</h2>
+    <hr />
+    @if (tarifa is null)
+    {
+        <p><em>Llamando...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Desde</dt>
+            <dd class="col-sm-10">@tarifa.Desde</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Hasta</dt>
+            <dd class="col-sm-10">@tarifa.Hasta</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorUnidad</dt>
+            <dd class="col-sm-10">@tarifa.ValorUnidad</dd>
+        </dl>
+        <EditForm method="post" Model="tarifa" OnValidSubmit="DeleteTarifa" FormName="delete" Enhance>
+            <button type="submit" class="btn btn-danger" disabled="@(tarifa is null)">Delete</button> |
+            <a class="btn btn-outline-secondary btn-sm" href="" onclick="return cerrarVentana('');">Cerrar</a>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private Tarifa? tarifa;
+
+    [SupplyParameterFromQuery]
+    private string Tipo { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        tarifa = await context.Tarifas.FirstOrDefaultAsync(m => m.Tipo == Tipo);
+
+        if (tarifa is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    private async Task DeleteTarifa()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Tarifas.Remove(tarifa!);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/tarifas");
+    }
+}

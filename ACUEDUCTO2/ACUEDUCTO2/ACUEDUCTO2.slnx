@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="../../ACUEDUCTO/ACUEDUCTO/ACUEDUCTO.csproj" />
+  <Project Path="ACUEDUCTO2.Share/ACUEDUCTO2.Share.csproj" Id="85c98e03-8f45-49d7-8ab7-f28b28158a69" />
+  <Project Path="ACUEDUCTO2/ACUEDUCTO2.Client/ACUEDUCTO2.Client.csproj" />
+  <Project Path="ACUEDUCTO2/ACUEDUCTO2/ACUEDUCTO2.csproj" />
+</Solution>

@@ -1,0 +1,6 @@
+/* Estilos aislados para Edit Solicitud */
+.section-title { font-size: 1rem; font-weight: 700; color: #334155; margin: .5rem 0; }
+.actions-bar { display:flex; gap:.5rem; justify-content:flex-end; }
+@media (max-width: 576px) {
+  .actions-bar { position: sticky; bottom: 0; background: #fff; padding: .5rem; border-top: 1px solid #e5e7eb; z-index: 5; }
+}

@@ -1,0 +1,71 @@
+﻿@page "/materiales/delete"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Delete</PageTitle>
+
+<h1>Delete</h1>
+
+<p>¿Está seguro que desea eliminar este material?</p>
+<div>
+    <h2>Material</h2>
+    <hr />
+    @if (materiales is null)
+    {
+        <p><em>Cargando...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Nombre</dt>
+            <dd class="col-sm-10">@materiales.Nombre</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Descripción</dt>
+            <dd class="col-sm-10">@materiales.Descripcion</dd>
+        </dl>
+        <EditForm method="post" Model="materiales" OnValidSubmit="DeleteMateriale" FormName="delete" Enhance>
+            <button type="submit" class="btn btn-danger" disabled="@(materiales is null)">Eliminar</button> |
+            <a href="/materiales">Volver a la lista</a>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private Material? materiales;
+
+    [SupplyParameterFromQuery]
+    private int IdMaterial { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        // Evita la carga de propiedades de navegación para prevenir recursión
+        materiales = await context.Materiales
+            .AsNoTracking()
+            .Select(m => new Material {
+                IdMaterial = m.IdMaterial,
+                Nombre = m.Nombre,
+                Descripcion = m.Descripcion
+            })
+            .FirstOrDefaultAsync(m => m.IdMaterial == IdMaterial);
+
+        if (materiales is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    private async Task DeleteMateriale()
+    {
+        using var context = DbFactory.CreateDbContext();
+        var material = await context.Materiales.FindAsync(IdMaterial);
+        if (material != null)
+        {
+            context.Materiales.Remove(material);
+            await context.SaveChangesAsync();
+        }
+        NavigationManager.NavigateTo("/materiales");
+    }
+}

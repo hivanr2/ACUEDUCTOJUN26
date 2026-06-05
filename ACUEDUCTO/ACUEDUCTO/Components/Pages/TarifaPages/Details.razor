@@ -1,0 +1,51 @@
+﻿@page "/tarifas/details"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Details</PageTitle>
+
+<h1>Details</h1>
+
+<div>
+    <h2>Tarifa</h2>
+    <hr />
+    @if (tarifa is null)
+    {
+        <p><em>Llamando...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Desde</dt>
+            <dd class="col-sm-10">@tarifa.Desde</dd>
+            <dt class="col-sm-2">Hasta</dt>
+            <dd class="col-sm-10">@tarifa.Hasta</dd>
+            <dt class="col-sm-2">ValorUnidad</dt>
+            <dd class="col-sm-10">@tarifa.ValorUnidad</dd>
+        </dl>
+        <div>
+            <a href="@($"/tarifas/edit?tipo={tarifa.Tipo}")">Edit</a> |
+            <a class="btn btn-outline-secondary btn-sm" href="" onclick="return cerrarVentana('');">Cerrar</a>
+        </div>
+    }
+</div>
+
+@code {
+    private Tarifa? tarifa;
+
+    [SupplyParameterFromQuery]
+    private string Tipo { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        tarifa = await context.Tarifas.FirstOrDefaultAsync(m => m.Tipo == Tipo);
+
+        if (tarifa is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+}

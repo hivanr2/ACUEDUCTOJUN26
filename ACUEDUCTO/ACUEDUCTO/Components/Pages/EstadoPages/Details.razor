@@ -1,0 +1,49 @@
+﻿@page "/estados/details"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Details</PageTitle>
+
+<h1>Details</h1>
+
+<div>
+    <h2>Estado</h2>
+    <hr />
+    @if (estado is null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Nombre</dt>
+            <dd class="col-sm-10">@estado.Nombre</dd>
+            <dt class="col-sm-2">Descripcion</dt>
+            <dd class="col-sm-10">@estado.Descripcion</dd>
+        </dl>
+        <div>
+            <a href="@($"/estados/edit?id={estado.Id}")">Edit</a> |
+            <a href="@($"/estados")">Back to List</a>
+        </div>
+    }
+</div>
+
+@code {
+    private Estado? estado;
+
+    [SupplyParameterFromQuery]
+    private int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        estado = await context.Estados.FirstOrDefaultAsync(m => m.Id == Id);
+
+        if (estado is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+}

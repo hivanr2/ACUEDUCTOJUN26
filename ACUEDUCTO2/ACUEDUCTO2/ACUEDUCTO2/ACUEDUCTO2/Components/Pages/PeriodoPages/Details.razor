@@ -1,0 +1,71 @@
+@page "/periodos/detalles/{id}"
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Detalle del periodo</PageTitle>
+
+<h3>Detalle del periodo</h3>
+<div class="mb-3 d-flex gap-2 flex-wrap">
+    <button type="button" class="btn btn-secondary" @onclick="Volver">Volver al listado</button>
+    @if (periodo is not null)
+    {
+        <button type="button" class="btn btn-warning" @onclick="() => Editar(periodo.Guid)">Editar</button>
+    }
+</div>
+
+@if (cargando)
+{
+    <p>Cargando...</p>
+}
+else if (periodo is null)
+{
+    <div class="alert alert-warning">No se encontró el periodo solicitado.</div>
+}
+else
+{
+    <dl class="row">
+        <dt class="col-sm-3">Descripción</dt>
+        <dd class="col-sm-9">@periodo.Descripcion</dd>
+        <dt class="col-sm-3">Fecha facturación</dt>
+        <dd class="col-sm-9">@(periodo.FechaHoraFacturacion?.ToString("dd/MM/yyyy") ?? "-")</dd>
+        <dt class="col-sm-3">Fecha límite pago</dt>
+        <dd class="col-sm-9">@(periodo.FechaLimitePago?.ToString("dd/MM/yyyy") ?? "-")</dd>
+        <dt class="col-sm-3">Porcentaje mora</dt>
+        <dd class="col-sm-9">@(periodo.PorcentajeMora?.ToString("N2") ?? "-")</dd>
+        <dt class="col-sm-3">Porcentaje subsidio</dt>
+        <dd class="col-sm-9">@(periodo.PorcentajeSubsidio?.ToString("N2") ?? "-")</dd>
+        <dt class="col-sm-3">Total predios</dt>
+        <dd class="col-sm-9">@(periodo.TotalPredios?.ToString() ?? "-")</dd>
+        <dt class="col-sm-3">Consumo total m³</dt>
+        <dd class="col-sm-9">@(periodo.CantidadConsumoM3Total?.ToString("N2") ?? "-")</dd>
+        <dt class="col-sm-3">Valor total planilla</dt>
+        <dd class="col-sm-9">@(periodo.ValorTotalPlanilla?.ToString("N2") ?? "-")</dd>
+        <dt class="col-sm-3">Valor total recaudo</dt>
+        <dd class="col-sm-9">@(periodo.ValorTotalRecaudo?.ToString("N2") ?? "-")</dd>
+        <dt class="col-sm-3">Estado</dt>
+        <dd class="col-sm-9">@(periodo.Abierta == true ? "Abierta" : "Cerrada")</dd>
+        <dt class="col-sm-3">Observaciones</dt>
+        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(periodo.Observaciones) ? "(sin observaciones)" : periodo.Observaciones)</dd>
+    </dl>
+}
+
+@code {
+    [Parameter]
+    public string id { get; set; } = string.Empty;
+
+    private Periodo? periodo;
+    private bool cargando = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        cargando = true;
+        using var db = DbFactory.CreateDbContext();
+        periodo = await db.Periodos.AsNoTracking().FirstOrDefaultAsync(p => p.Guid == id);
+        cargando = false;
+    }
+
+    void Volver() => Navigation.NavigateTo("/periodos", forceLoad: true);
+    void Editar(string guid) => Navigation.NavigateTo($"/periodos/editar/{guid}", forceLoad: true);
+}

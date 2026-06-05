@@ -1,0 +1,780 @@
+﻿@page "/predios/details"
+@page "/proceso/Busqueda por Datos Predio"
+@layout SimpleLayout
+@using ACUEDUCTO2.Share.Models
+@using ACUEDUCTO2.Services.PredioServices
+@using ACUEDUCTO2.Data
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using System.Net.Mail
+@using System.Text
+@attribute [Authorize]
+@inject PredioService PredioService
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AuthenticationStateProvider AuthStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@inject IWebHostEnvironment Env
+
+@rendermode InteractiveServer
+
+<style>
+    /* Encabezado fijo para tablas de historial */
+    .table-sticky-wrapper { position: relative; max-height: 560px; overflow-y: auto; }
+    .table-sticky thead th { position: sticky; top: 0; z-index: 5; }
+    /* Ajustar colores existentes al ser sticky para evitar transparencia */
+    .table-sticky thead th.bg-dark { background-color: #212529 !important; }
+    .table-sticky thead th.bg-secondary { background-color: #6c757d !important; }
+    /* Sombra ligera debajo del header al hacer scroll */
+    .table-sticky-wrapper:has(tbody tr:first-child:not(:hover)) .table-sticky thead { box-shadow: 0 2px 4px rgba(0,0,0,.15); }
+</style>
+
+<PageTitle>@(predio?.ApellidosNombresUsuario ?? "Predio - Detalles")</PageTitle>
+
+@if (sinAcceso)
+{
+    <div class="container py-5">
+        <div class="alert alert-warning">No tiene permiso para ver este predio. Solo administradores o usuarios autorizados pueden acceder.</div>
+        <a class="btn btn-outline-secondary" href="/predios">Volver al listado</a>
+    </div>
+}
+else if (predio is null)
+{
+    <div class="container py-5">
+        <div class="text-center text-muted">Cargando...</div>
+    </div>
+}
+else
+{
+    <div class="container py-3">
+        <!-- Encabezado -->
+        <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+            <div>
+                <h1 class="h4 mb-2">@predio.ApellidosNombresUsuario</h1>
+                <div class="d-flex flex-wrap gap-2">
+                    @if (!string.IsNullOrWhiteSpace(predio.CodigoUsuario))
+                    {
+                        <span class="badge bg-primary">Código: @predio.CodigoUsuario</span>
+                    }
+                    <span class="badge @(predio.Activo == true ? "bg-success" : "bg-danger")">
+                        @(predio.Activo == true ? "Activo" : "Inactivo")
+                    </span>
+@*                     @if (predio.TipoConsumoNavigation is not null)
+                    {
+                        <span class="badge bg-info text-dark">Tipo Consumo: @predio.TipoConsumoNavigation.Categoria</span>
+                    }
+ *@                </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-secondary" href="/predios" onclick="return cerrarVentana('/predios');">Cerrar</a>
+                @if (esAdmin)
+                {
+                    <a class="btn btn-primary" href="@($"/predios/edit?idpredio={predio.IdPredio}")">Editar</a>
+                }
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <!-- Información del Predio -->
+            <div class="col-12 col-lg-8">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <strong>Información del Predio</strong>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-2">
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Identificación Facturación</div>
+                                <div>
+                                    @if (!string.IsNullOrWhiteSpace(predio.IdentificacionFacturacion))
+                                    {
+                                        <span class="fw-semibold">@predio.IdentificacionFacturacion</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">N/A</span>
+                                    }
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="small text-muted">Estrato</div>
+                                <div class="fw-semibold">@predio.Estrato</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="small text-muted">Ruta</div>
+                                <div class="fw-semibold">@predio.Ruta</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Dirección</div>
+                                <div class="fw-semibold">@predio.Direccion</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Número Catastral</div>
+                                <div class="fw-semibold">@predio.NumeroCatastral</div>
+                            </div>
+                            <div class="col-12">
+                                <div class="small text-muted">Información Catastral</div>
+                                <div class="fw-semibold">@predio.InformacionCatastral</div>
+                            </div>
+                        </div>
+                        <hr />
+                        <div class="row g-3">
+                            <div class="col-6 col-md-3">
+                                <div class="small text-muted">Extensión (m²)</div>
+                                <div class="fw-semibold">@predio.ExtensionM2</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="small text-muted">Construidos (m²)</div>
+                                <div class="fw-semibold">@predio.M2construidos</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="small text-muted">Puntos Futuros</div>
+                                <div class="fw-semibold">@predio.PuntosFuturos</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="small text-muted">Fecha Registro</div>
+                                <div class="fw-semibold">@predio.FechaHoraRegistro</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                    <div class="col-lg-12 col-md-12 col-sm-1">
+                    <div class="card shadow-sm mt-3">
+                        <div class="card-header bg-light">
+                            <div class="small text-muted">Tipo Consumo</div>
+                        </div>
+                        <div class="card-body">
+                            <div class="fw-semibold">@((predio.TipoConsumoNavigation?.Categoria) ?? "N/A")</div>
+                        </div>
+                    </div>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(predio.Observaciones))
+                {
+                    <div class="card shadow-sm mt-3">
+                        <div class="card-header bg-light">
+                            <strong>Observaciones</strong>
+                        </div>
+                        <div class="card-body">
+                            <div class="fs-6">@predio.Observaciones</div>
+                        </div>
+                    </div>
+                }
+
+                @if ((imageUrls?.Count ?? 0) > 0 || (videoUrls?.Count ?? 0) > 0 || (docUrls?.Count ?? 0) > 0)
+                {
+                    <div class="card shadow-sm mt-3">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <strong>Imágenes, videos y archivos</strong>
+                            <a class="btn btn-sm btn-outline-primary" href="@($"/archivosgaleria?CodigoUsuario={predio.CodigoUsuario}")" target="_blank">Abrir galería</a>
+                        </div>
+                        <div class="card-body">
+                            @if ((imageUrls?.Count ?? 0) > 0)
+                            {
+                                <div id="predioCarousel" class="carousel slide" data-bs-ride="carousel">
+                                    <div class="carousel-indicators">
+                                        @for (var i = 0; i < imageUrls.Count; i++)
+                                        {
+                                            <button type="button" data-bs-target="#predioCarousel" data-bs-slide-to="@i" class="@(i==0?"active":"")" aria-current="@(i==0?"true":null)" aria-label="Slide @(i+1)"></button>
+                                        }
+                                    </div>
+                                    <div class="carousel-inner rounded">
+                                        @for (var i = 0; i < imageUrls.Count; i++)
+                                        {
+                                            var url = imageUrls[i];
+                                            <div class="carousel-item @(i==0?"active":null)">
+                                                <a href="@($"/archivosgaleria?CodigoUsuario={predio.CodigoUsuario}")" target="_blank" class="d-block w-100" title="Abrir galería completa">
+                                                    <img src="@url" class="d-block w-100" alt="Imagen @i" loading="lazy" style="max-height:420px;object-fit:cover;border-radius:.5rem;" />
+                                                </a>
+                                            </div>
+                                        }
+                                    </div>
+                                    <button class="carousel-control-prev" type="button" data-bs-target="#predioCarousel" data-bs-slide="prev">
+                                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                        <span class="visualmente-hidden">Anterior</span>
+                                    </button>
+                                    <button class="carousel-control-next" type="button" data-bs-target="#predioCarousel" data-bs-slide="next">
+                                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                        <span class="visualmente-hidden">Siguiente</span>
+                                    </button>
+                                </div>
+
+                                <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 g-2 mt-2">
+                                    @for (var i = 0; i < imageUrls.Count; i++)
+                                    {
+                                        var url = imageUrls[i];
+                                        <div class="col">
+                                            <a href="@($"/archivosgaleria?CodigoUsuario={predio.CodigoUsuario}")" target="_blank" class="d-block" title="Abrir galería completa">
+                                                <img src="@url" class="img-fluid rounded" alt="thumb @i" loading="lazy" style="height:80px;object-fit:cover;width:100%;" />
+                                            </a>
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            @if ((videoUrls?.Count ?? 0) > 0)
+                            {
+                                <hr />
+                                <h6 class="mb-2">Videos</h6>
+                                <div class="row row-cols-1 row-cols-md-2 g-3">
+                                    @foreach (var v in videoUrls)
+                                    {
+                                        <div class="col">
+                                            <video src="@v" class="w-100 rounded" controls preload="metadata" style="max-height:360px; object-fit:contain;"></video>
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            @if ((docUrls?.Count ?? 0) > 0)
+                            {
+                                <hr />
+                                <h6 class="mb-2">Archivos</h6>
+                                <ul class="list-group">
+                                    @foreach (var d in docUrls)
+                                    {
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <a href="@d.Url" target="_blank">@d.Name</a>
+                                            <a class="btn btn-sm btn-outline-secondary" href="@d.Url" target="_blank">Abrir</a>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <!-- Gráfico de Consumos -->
+                <div class="card shadow-sm mt-3 mb-3">
+                    <div class="card-header bg-light">
+                        <strong>Consumos bimestrales totales</strong>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="consumoChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Medidor y preferencias -->
+            <div class="col-12 col-lg-4">
+                <div class="card shadow-sm h-30">
+                    <div class="card-header bg-light">
+                        <strong>Medidor y Preferencias</strong>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <div class="small text-muted">Número medidor</div>
+                                <div class="fw-semibold">@predio.NumeroMedidor</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="small text-muted">Marca</div>
+                                <div class="fw-semibold">@predio.MarcaMedidor</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="small text-muted">Estado</div>
+                                <div class="fw-semibold">@predio.EstadoMedidor</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="small text-muted">Última medición</div>
+                                <div class="fw-semibold">@predio.UltimaMedicion</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="small text-muted">Consumo promedio (m³)</div>
+                                <div class="fw-semibold">@predio.ConsumoM3promedio</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="small text-muted">Último consumo (m³)</div>
+                                <div class="fw-semibold">@predio.UltimoConsumoM3</div>
+                            </div>
+                        </div>
+                        <hr />
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <span class="small text-muted d-block">Subsidio</span>
+                                <span class="badge bg-@(predio.TieneSubsidio == true ? "success" : "secondary")">
+                                    @(predio.TieneSubsidio == true ? "Sí" : "No")
+                                </span>
+                            </div>
+                            <div class="col-6">
+                                <span class="small text-muted d-block">Imprime factura</span>
+                                <span class="badge bg-@(predio.ImprimeFactura == true ? "success" : "secondary")">
+                                    @(predio.ImprimeFactura == true ? "Sí" : "No")
+                                </span>
+                            </div>
+                            <div class="col-6">
+                                <span class="small text-muted d-block">WhatsApp</span>
+                                <span class="badge bg-@(predio.EnviaWhatsapp == true ? "success" : "secondary")">
+                                    @(predio.EnviaWhatsapp == true ? "Sí" : "No")
+                                </span>
+                            </div>
+                            <div class="col-6">
+                                <span class="small text-muted d-block">Correo</span>
+                                <span class="badge bg-@(predio.EnviaCorreo == true ? "success" : "secondary")">
+                                    @(predio.EnviaCorreo == true ? "Sí" : "No")
+                                </span>
+                            </div>
+                        </div>
+                        <hr />
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <div class="small text-muted">Latitud</div>
+                                <div class="fw-semibold">@predio.Latitud?.ToString("F10")</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="small text-muted">Longitud</div>
+                                <div class="fw-semibold">@predio.Longitud?.ToString("F10")</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PUEAA - Ahorro de Agua -->
+                <div class="card shadow-sm mt-3">
+                    <div class="card-header bg-light">
+                        <strong>Requisitos PUEAA - Ahorro de Agua</strong>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <span class="small text-muted d-block">Tanque de reserva de acueducto</span>
+                                <span class="badge bg-@(predio.PUEAA_TanqueReservaAcueducto == true ? "success" : "secondary")">@(predio.PUEAA_TanqueReservaAcueducto == true ? "Sí" : "No")</span>
+                                @if (predio.PUEAA_TanqueReservaAcueducto == true && !string.IsNullOrWhiteSpace(predio.PUEAA_TanqueReservaAcueductoObservaciones))
+                                {
+                                    <div class="text-muted small mt-1">@predio.PUEAA_TanqueReservaAcueductoObservaciones</div>
+                                }
+                            </div>
+                            <div class="col-12">
+                                <span class="small text-muted d-block">Tanque de reserva de lluvia</span>
+                                <span class="badge bg-@(predio.PUEAA_TanqueReservaLluvia == true ? "success" : "secondary")">@(predio.PUEAA_TanqueReservaLluvia == true ? "Sí" : "No")</span>
+                                @if (predio.PUEAA_TanqueReservaLluvia == true && !string.IsNullOrWhiteSpace(predio.PUEAA_TanqueReservaLluviaObservaciones))
+                                {
+                                    <div class="text-muted small mt-1">@predio.PUEAA_TanqueReservaLluviaObservaciones</div>
+                                }
+                            </div>
+                            <div class="col-12">
+                                <span class="small text-muted d-block">Reciclaje de aguas</span>
+                                <span class="badge bg-@(predio.PUEAA_ReciclajeAguas == true ? "success" : "secondary")">@(predio.PUEAA_ReciclajeAguas == true ? "Sí" : "No")</span>
+                                @if (predio.PUEAA_ReciclajeAguas == true && !string.IsNullOrWhiteSpace(predio.PUEAA_ReciclajeAguasObservaciones))
+                                {
+                                    <div class="text-muted small mt-1">@predio.PUEAA_ReciclajeAguasObservaciones</div>
+                                }
+                            </div>
+                            <div class="col-12">
+                                <span class="small text-muted d-block">Recirculación de aguas</span>
+                                <span class="badge bg-@(predio.PUEAA_RecirculacionAguas == true ? "success" : "secondary")">@(predio.PUEAA_RecirculacionAguas == true ? "Sí" : "No")</span>
+                                @if (predio.PUEAA_RecirculacionAguas == true && !string.IsNullOrWhiteSpace(predio.PUEAA_RecirculacionAguasObservaciones))
+                                {
+                                    <div class="text-muted small mt-1">@predio.PUEAA_RecirculacionAguasObservaciones</div>
+                                }
+                            </div>
+                            <div class="col-12">
+                                <span class="small text-muted d-block">Control de pérdidas</span>
+                                <span class="badge bg-@(predio.PUEAA_ControlPerdidas == true ? "success" : "secondary")">@(predio.PUEAA_ControlPerdidas == true ? "Sí" : "No")</span>
+                                @if (predio.PUEAA_ControlPerdidas == true && !string.IsNullOrWhiteSpace(predio.PUEAA_ControlPerdidasObservaciones))
+                                {
+                                    <div class="text-muted small mt-1">@predio.PUEAA_ControlPerdidasObservaciones</div>
+                                }
+                            </div>
+                            <div class="col-12">
+                                <span class="small text-muted d-block">Mantenimiento de piscina</span>
+                                <span class="badge bg-@(predio.PUEAA_MantenimientoPiscina == true ? "success" : "secondary")">@(predio.PUEAA_MantenimientoPiscina == true ? "Sí" : "No")</span>
+                                @if (predio.PUEAA_MantenimientoPiscina == true && !string.IsNullOrWhiteSpace(predio.PUEAA_MantenimientoPiscinaObservaciones))
+                                {
+                                    <div class="text-muted small mt-1">@predio.PUEAA_MantenimientoPiscinaObservaciones</div>
+                                }
+                            </div>
+                            <div class="col-12">
+                                <span class="small text-muted d-block">Otros procesos</span>
+                                <span class="badge bg-@(predio.PUEAA_OtrosProcesos == true ? "success" : "secondary")">@(predio.PUEAA_OtrosProcesos == true ? "Sí" : "No")</span>
+                                @if (predio.PUEAA_OtrosProcesos == true && !string.IsNullOrWhiteSpace(predio.PUEAA_OtrosProcesosObservaciones))
+                                {
+                                    <div class="text-muted small mt-1">@predio.PUEAA_OtrosProcesosObservaciones</div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-light">
+                <strong>Resumen valores</strong>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="small text-muted">Total cobros</div>
+                        <div class="fw-semibold">@FormatCurrency(predio.ValorTotalCobros)</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="small text-muted">Cuotas cobros</div>
+                        <div class="fw-semibold">@predio.CantidadCoutasCobros</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="small text-muted">Cuotas pagadas</div>
+                        <div class="fw-semibold">@predio.CantidadCuotasPagadas</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="small text-muted">Total pagos</div>
+                        <div class="fw-semibold">@FormatCurrency(predio.ValorTotalPagos)</div>
+                    </div>
+                    <div class="col-12">
+                        <div class="small text-muted">Total deuda</div>
+                        <div class="fw-bold text-danger">@FormatCurrency(predio.ValorTotalDeuda)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Facturas -->
+@*         <div class="card shadow-sm mt-3">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <strong>Facturas</strong>
+                <small class="text-muted">Histórico</small>
+                @if (!string.IsNullOrWhiteSpace(predio?.IdentificacionFacturacionNavigation?.CorreoElectronico))
+                {
+                    <button class="btn btn-outline-primary btn-sm" @onclick="DisableButton" disabled="@(isSending || isProcessing)">Enviar Histórico</button>
+                }
+                else
+                {
+                    <div class="alert alert-warning small ms-2">No se puede enviar reporte a correo electrónico, el Usuario no registra.</div>
+                }
+            </div>
+            <div class="card-body p-0">
+                @if (facturacion == null || !facturacion.Any())
+                {
+                    <div class="p-3 text-muted">No tiene facturas</div>
+                }
+                else
+                {
+                    <div class="table-responsive table-sticky-wrapper">
+                        <table class="table table-hover table-sm align-middle mb-0 table-sticky">
+                            <thead>
+                                <tr>
+                                    <th class="bg-dark text-white">Fecha</th>
+                                    <th class="bg-dark text-white">Periodo</th>
+                                    <th class="bg-dark text-white">Número</th>
+                                    <th class="bg-dark text-white">Medición Ant.</th>
+                                    <th class="bg-dark text-white">Medición Act.</th>
+                                    <th class="bg-dark text-white">Consumo (m³)</th>
+                                    <th class="bg-dark text-white">Valor factura</th>
+                                    <th class="bg-secondary text-white">Deuda anterior</th>
+                                    <th class="bg-secondary text-white">Recaudo</th>
+                                    <th class="bg-secondary text-white">Deuda pasa</th>
+                                    <th class="bg-secondary text-white">Nota factura</th>
+                                    <th class="bg-secondary text-white">Nota recaudo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var factura in facturacion)
+                                {
+                                    var colorFondo = factura.DeudaAnterior <= factura.RecaudoPeriodoTotal ? "bg-success text-white" : "bg-danger text-white";
+                                    <tr>
+                                        <td>@factura.FechaHoraRegistro - <a href="@($"/facturacion/edit?id={factura.Idfactura}")" target="_blank">Edita</a> - <a href="@($"/imagenes/{predio.CodigoUsuario}/{factura.CodigoFactura}.pdf")" target="_blank">F</a>@if (factura.RecaudoPeriodoTotal > 0 && _reciboNumeroPorFactura.TryGetValue(factura.Idfactura, out var nro) && nro > 0) { <text> - <a href="@($"/imagenes/{predio.CodigoUsuario}/REC-{nro:0000}.pdf")" target="_blank">R</a></text> }</td>
+                                        <td class="text-xl-center"><b>@factura.IdplanillaNavigation.IdperiodoNavigation.DescripcionCorta</b></td>
+                                        <td>@factura.CodigoFactura</td>
+                                        <td><b>@factura.MedicionAnterior</b></td>
+                                        <td><b>@factura.MedicionActual</b></td>
+                                        <td>@factura.ConsumoM3</td>
+                                        <td class="bg-dark text-white"><strong>@FormatCurrency(factura.ValorPeriodo)</strong></td>
+                                        <td>@FormatCurrency(factura.DeudaAnterior)</td>
+                                        <td>@FormatCurrency(factura.RecaudoPeriodoTotal)</td>
+                                        <td class="@colorFondo">@FormatCurrency(factura.DeudaPasa)</td>
+                                        <td>@factura.NotasFactura</td>
+                                        <td>@factura.NotasRecaudo</td>
+                                    </tr>
+                                }
+                            </tbody>
+                            @if (facturacion is not null && facturacion.Any())
+                            {
+                                <tfoot>
+                                    <tr>
+                                        <td class="text-end" colspan="5"><strong>Promedio bimestre (m³)</strong></td>
+                                        @if (facturacion.Any(c => c.ConsumoM3 != null))
+                                        {
+                                            <td class="bg-dark text-white">
+                                                <strong>
+                                                    @{
+                                                        var total = facturacion.Sum(c => c.ConsumoM3 ?? 0);
+                                                        var count = facturacion.Count;
+                                                        @(count > 0 ? Convert.ToInt64(total / count) : 0);
+                                                    }
+                                                </strong>
+                                            </td>
+                                        }
+                                        else
+                                        {
+                                            <td class="bg-dark text-white"><strong>N.A.</strong></td>
+                                        }
+                                        <td class="bg-dark text-white"><strong>@FormatCurrency(facturacion.Sum(c => c.ValorPeriodo))</strong></td>
+                                        <td class="bg-dark text-white"><strong>@FormatCurrency(facturacion.Sum(c => c.DeudaAnterior))</strong></td>
+                                        <td class="bg-dark text-white"><strong>@FormatCurrency(facturacion.Sum(c => c.RecaudoPeriodoTotal))</strong></td>
+                                        <td class="bg-dark text-white"><strong>@FormatCurrency(facturacion.Sum(c => c.DeudaPasa))</strong></td>
+                                        <td colspan="2">-</td>
+                                    </tr>
+                                </tfoot>
+                            }
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+ *@    </div>
+}
+
+@code {
+    private Predio? predio;
+   // private IList<Facturacion> facturacion;
+    private const int MaxPeriodos = 10;
+    private List<ConsumoPorPeriodo> consumosPorPeriodo = new List<ConsumoPorPeriodo>();
+    private bool chartRendered = false;
+    private List<string> imageUrls = new();
+    private List<string> videoUrls = new();
+    private List<(string Url, string Name)> docUrls = new();
+    private Dictionary<string, int> _reciboNumeroPorFactura = new();
+    private bool isSending = false;
+    private bool isProcessing = false;
+    private bool sinAcceso;
+    private bool esAdmin;
+
+    [SupplyParameterFromQuery]
+    private string Idpredio { get; set; }
+
+    private string FormatCurrency(double? value)
+    {
+        if (value.HasValue)
+        {
+            return $"${value.Value:N0}";
+        }
+        return "$0";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var claimsPrincipal = authState.User;
+        esAdmin = claimsPrincipal.IsInRole("Administradores");
+
+        predio = await PredioService.GetByIdAsync(Idpredio, includeTipoConsumo: true, includeUsuarioFacturacion: true);
+
+        if (predio is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+            return;
+        }
+
+        if (!esAdmin)
+        {
+            await using var context = await DbFactory.CreateDbContextAsync();
+            var userId = UserManager.GetUserId(claimsPrincipal);
+            var usuario = await context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (usuario is null || string.IsNullOrWhiteSpace(usuario.Identificacion))
+            {
+                sinAcceso = true;
+                return;
+            }
+
+            var identificacion = usuario.Identificacion;
+            var esPropietario = predio.IdentificacionFacturacion == identificacion;
+
+            if (!esPropietario)
+            {
+                var estaAutorizado = await context.Set<Autorizado>()
+                    .AsNoTracking()
+                    .AnyAsync(a => a.QuienAutoriza == predio.IdentificacionFacturacion
+                                && a.AQueAutoriza == identificacion);
+
+                if (!estaAutorizado)
+                {
+                    sinAcceso = true;
+                    return;
+                }
+            }
+        }
+
+        LoadPredioMedia();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // if (!chartRendered && predio is not null)
+        // {
+        //     using var context = DbFactory.CreateDbContext();
+        //     consumosPorPeriodo = await context.Facturacions
+        //         .Where(c => c.Idpredio == Idpredio)
+        //         .OrderBy(c => c.IdplanillaNavigation.FechaHoraFacturacion)
+        //         .Include(f => f.IdplanillaNavigation)
+        //         .ThenInclude(p => p.IdperiodoNavigation)
+        //         .GroupBy(f => f.IdplanillaNavigation.Descripcion)
+        //         .Select(g => new ConsumoPorPeriodo
+        //         {
+        //             Periodo = g.Key,
+        //             TotalConsumoM3 = g.Sum(f => f.ConsumoM3 ?? 0)
+        //         })
+        //         .Take(MaxPeriodos)
+        //         .ToListAsync();
+
+        //     await JS.InvokeVoidAsync("renderConsumoChart", consumosPorPeriodo);
+        //     chartRendered = true;
+        // }
+    }
+
+    private void LoadPredioMedia()
+    {
+        imageUrls.Clear();
+        videoUrls.Clear();
+        docUrls.Clear();
+        try
+        {
+            var code = predio?.CodigoUsuario?.Trim();
+            if (string.IsNullOrWhiteSpace(code)) return;
+            var folder = System.IO.Path.Combine(Env.WebRootPath, "imagenes", code);
+            if (!System.IO.Directory.Exists(folder)) return;
+
+            var images = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+            var videos = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".mp4", ".webm", ".ogg" };
+            var docs = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".ppt", ".pptx", ".odt", ".ods", ".odp", ".txt", ".zip" };
+
+            foreach (var file in System.IO.Directory.EnumerateFiles(folder).OrderBy(f => f))
+            {
+                var ext = System.IO.Path.GetExtension(file);
+                var name = System.IO.Path.GetFileName(file);
+                var url = $"/imagenes/{Uri.EscapeDataString(code)}/{Uri.EscapeDataString(name)}";
+                if (images.Contains(ext)) imageUrls.Add(url);
+                else if (videos.Contains(ext)) videoUrls.Add(url);
+                else if (docs.Contains(ext)) docUrls.Add((url, name));
+            }
+        }
+        catch { }
+    }
+
+    private void DisableButton()
+    {
+        if (isProcessing) return;
+        isProcessing = true;
+        isSending = true;
+        StateHasChanged();
+        _ = EnviarHistorico();
+    }
+
+    private async Task EnviarHistorico()
+    {
+        try
+        {
+            var email = predio?.IdentificacionFacturacion;
+            if (string.IsNullOrWhiteSpace(email)) return;
+
+            var subject = $"Histórico de Facturas - {predio?.ApellidosNombresUsuario}";
+            var body = GenerateHistoricoBody();
+
+            await SendEmailAsync(email, subject, body);
+            await JS.InvokeVoidAsync("alert", "Histórico enviado por correo electrónico.");
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error enviando correo: {ex.Message}");
+            isSending = false; // allow retry on error
+            StateHasChanged();
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private string GenerateHistoricoBody()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("<html><head><style>");
+        sb.AppendLine("table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; }");
+        sb.AppendLine("th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }");
+        sb.AppendLine("th { background-color: #f2f2f2; }");
+        sb.AppendLine("tr:nth-child(even) { background-color: #f9f9f9; }");
+        sb.AppendLine(".bg-dark { background-color: #212529 !important; color: white !important; }");
+        sb.AppendLine(".bg-secondary { background-color: #6c757d !important; color: white !important; }");
+        sb.AppendLine(".bg-success { background-color: #28a745 !important; color: white !important; }");
+        sb.AppendLine(".bg-danger { background-color: #dc3545 !important; color: white !important; }");
+        sb.AppendLine("</style></head><body>");
+        sb.AppendLine($"<h2>Histórico de Facturas para {predio?.ApellidosNombresUsuario}</h2>");
+        sb.AppendLine("<table>");
+        sb.AppendLine("<thead><tr>");
+        sb.AppendLine("<th class='bg-dark'>Fecha</th>");
+        sb.AppendLine("<th class='bg-dark'>Periodo</th>");
+        sb.AppendLine("<th class='bg-dark'>Número</th>");
+        sb.AppendLine("<th class='bg-dark'>Medición Ant.</th>");
+        sb.AppendLine("<th class='bg-dark'>Medición Act.</th>");
+        sb.AppendLine("<th class='bg-dark'>Consumo (m³)</th>");
+        sb.AppendLine("<th class='bg-dark'>Valor factura</th>");
+        sb.AppendLine("<th class='bg-secondary'>Deuda anterior</th>");
+        sb.AppendLine("<th class='bg-secondary'>Recaudo</th>");
+        sb.AppendLine("<th class='bg-secondary'>Deuda pasa</th>");
+        sb.AppendLine("<th class='bg-secondary'>Nota factura</th>");
+        sb.AppendLine("<th class='bg-secondary'>Nota recaudo</th>");
+        sb.AppendLine("</tr></thead><tbody>");
+
+        // foreach (var f in facturacion)
+        // {
+        //     var colorFondo = f.DeudaAnterior <= f.RecaudoPeriodoTotal ? "bg-success" : "bg-danger";
+        //     sb.AppendLine("<tr>");
+        //     sb.AppendLine($"<td>{f.FechaHoraRegistro}</td>");
+        //     sb.AppendLine($"<td><b>{f.IdplanillaNavigation.IdperiodoNavigation.DescripcionCorta}</b></td>");
+        //     sb.AppendLine($"<td>{f.CodigoFactura}</td>");
+        //     sb.AppendLine($"<td><b>{f.MedicionAnterior}</b></td>");
+        //     sb.AppendLine($"<td><b>{f.MedicionActual}</b></td>");
+        //     sb.AppendLine($"<td>{f.ConsumoM3}</td>");
+        //     sb.AppendLine($"<td class='bg-dark'><strong>{FormatCurrency(f.ValorPeriodo)}</strong></td>");
+        //     sb.AppendLine($"<td>{FormatCurrency(f.DeudaAnterior)}</td>");
+        //     sb.AppendLine($"<td>{FormatCurrency(f.RecaudoPeriodoTotal)}</td>");
+        //     sb.AppendLine($"<td class='{colorFondo}'>{FormatCurrency(f.DeudaPasa)}</td>");
+        //     sb.AppendLine($"<td>{f.NotasFactura}</td>");
+        //     sb.AppendLine($"<td>{f.NotasRecaudo}</td>");
+        //     sb.AppendLine("</tr>");
+        // }
+
+        // sb.AppendLine("</tbody>");
+        // if (facturacion.Any())
+        // {
+        //     sb.AppendLine("<tfoot><tr>");
+        //     sb.AppendLine("<td colspan='5' style='text-align: right;'><strong>Promedio bimestre (m³)</strong></td>");
+        //     if (facturacion.Any(c => c.ConsumoM3 != null))
+        //     {
+        //         var total = facturacion.Sum(c => c.ConsumoM3 ?? 0);
+        //         var count = facturacion.Count;
+        //         var promedio = count > 0 ? Convert.ToInt64(total / count) : 0;
+        //         sb.AppendLine($"<td class='bg-dark'><strong>{promedio}</strong></td>");
+        //     }
+        //     else
+        //     {
+        //         sb.AppendLine("<td class='bg-dark'><strong>N.A.</strong></td>");
+        //     }
+        //     sb.AppendLine($"<td class='bg-dark'><strong>{FormatCurrency(facturacion.Sum(c => c.ValorPeriodo))}</strong></td>");
+        //     sb.AppendLine($"<td class='bg-dark'><strong>{FormatCurrency(facturacion.Sum(c => c.DeudaAnterior))}</strong></td>");
+        //     sb.AppendLine($"<td class='bg-dark'><strong>{FormatCurrency(facturacion.Sum(c => c.RecaudoPeriodoTotal))}</strong></td>");
+        //     sb.AppendLine($"<td class='bg-dark'><strong>{FormatCurrency(facturacion.Sum(c => c.DeudaPasa))}</strong></td>");
+        //     sb.AppendLine("<td colspan='2'>-</td>");
+        //     sb.AppendLine("</tr></tfoot>");
+        // }
+        // sb.AppendLine("</table>");
+        // sb.AppendLine("</body></html>");
+        return sb.ToString();
+    }
+
+    private async Task SendEmailAsync(string to, string subject, string body)
+    {
+       // var emailService = new EmailService("smtp.gmail.com", 587, "facturacionacueductotobiachica@gmail.com", "hbic brlb lhgj zmfp");
+      //  await emailService.SendEmailAsync(to, subject, body);
+    }
+
+    public class ConsumoPorPeriodo
+    {
+        public string Periodo { get; set; }
+        public double TotalConsumoM3 { get; set; }
+    }
+}

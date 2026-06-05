@@ -1,0 +1,180 @@
+﻿@page "/predios/delete"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO2-0.Compartir.MODELS
+@using ACUEDUCTO2-0.Data
+@inject IDbContextFactory<ACUEDUCTO2-0.Data.ApplicationDbContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Delete</PageTitle>
+
+<h1>Delete</h1>
+
+<p>Are you sure you want to delete this?</p>
+<div>
+    <h2>Predio</h2>
+    <hr />
+    @if (predio is null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">ApellidosNombresUsuario</dt>
+            <dd class="col-sm-10">@predio.ApellidosNombresUsuario</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">CodigoUsuario</dt>
+            <dd class="col-sm-10">@predio.CodigoUsuario</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">IdentificacionFacturacion</dt>
+            <dd class="col-sm-10">@predio.IdentificacionFacturacion</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Estrato</dt>
+            <dd class="col-sm-10">@predio.Estrato</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Ruta</dt>
+            <dd class="col-sm-10">@predio.Ruta</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Direccion</dt>
+            <dd class="col-sm-10">@predio.Direccion</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">NumeroCatastral</dt>
+            <dd class="col-sm-10">@predio.NumeroCatastral</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">InformacionCatastral</dt>
+            <dd class="col-sm-10">@predio.InformacionCatastral</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ExtensionM2</dt>
+            <dd class="col-sm-10">@predio.ExtensionM2</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">M2construidos</dt>
+            <dd class="col-sm-10">@predio.M2construidos</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">PuntosFuturos</dt>
+            <dd class="col-sm-10">@predio.PuntosFuturos</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">NumeroMedidor</dt>
+            <dd class="col-sm-10">@predio.NumeroMedidor</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">MarcaMedidor</dt>
+            <dd class="col-sm-10">@predio.MarcaMedidor</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">EstadoMedidor</dt>
+            <dd class="col-sm-10">@predio.EstadoMedidor</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">UltimaMedicion</dt>
+            <dd class="col-sm-10">@predio.UltimaMedicion</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ConsumoM3promedio</dt>
+            <dd class="col-sm-10">@predio.ConsumoM3promedio</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">UltimoConsumoM3</dt>
+            <dd class="col-sm-10">@predio.UltimoConsumoM3</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorTotalCobros</dt>
+            <dd class="col-sm-10">@predio.ValorTotalCobros</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">CantidadCoutasCobros</dt>
+            <dd class="col-sm-10">@predio.CantidadCoutasCobros</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">CantidadCuotasPagadas</dt>
+            <dd class="col-sm-10">@predio.CantidadCuotasPagadas</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorTotalPagos</dt>
+            <dd class="col-sm-10">@predio.ValorTotalPagos</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorTotalDeuda</dt>
+            <dd class="col-sm-10">@predio.ValorTotalDeuda</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">TieneSubsidio</dt>
+            <dd class="col-sm-10">@predio.TieneSubsidio</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ImprimeFactura</dt>
+            <dd class="col-sm-10">@predio.ImprimeFactura</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">EnviaWhatsapp</dt>
+            <dd class="col-sm-10">@predio.EnviaWhatsapp</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">EnviaCorreo</dt>
+            <dd class="col-sm-10">@predio.EnviaCorreo</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ContadorEnSeguimiento</dt>
+            <dd class="col-sm-10">@predio.ContadorEnSeguimiento</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Latitud</dt>
+            <dd class="col-sm-10">@predio.Latitud</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Longitud</dt>
+            <dd class="col-sm-10">@predio.Longitud</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Activo</dt>
+            <dd class="col-sm-10">@predio.Activo</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">FechaHoraRegistro</dt>
+            <dd class="col-sm-10">@predio.FechaHoraRegistro</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Observaciones</dt>
+            <dd class="col-sm-10">@predio.Observaciones</dd>
+        </dl>
+        <EditForm method="post" Model="predio" OnValidSubmit="DeletePredio" FormName="delete" Enhance>
+            <button type="submit" class="btn btn-danger" disabled="@(predio is null)">Delete</button> |
+            <a href="/predios">Back to List</a>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private Predio? predio;
+
+    [SupplyParameterFromQuery]
+    private string Idpredio { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        predio = await context.Predio.FirstOrDefaultAsync(m => m.IdPredio == Idpredio);
+
+        if (predio is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    private async Task DeletePredio()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Predio.Remove(predio!);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/predios");
+    }
+}

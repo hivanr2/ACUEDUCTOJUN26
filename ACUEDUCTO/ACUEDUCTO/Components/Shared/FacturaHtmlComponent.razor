@@ -1,0 +1,156 @@
+@using ACUEDUCTO.Models
+@using System.Globalization
+@inherits ComponentBase
+
+@* Componente sin ruta ni layout que genera el HTML imprimible de una factura *@
+
+@if (Factura is not null)
+{
+    <div id="printableArea" style="max-width:720px;margin:20px auto;padding:18px 22px;border:1px solid #ccc;border-radius:8px;background:#fff;">
+        <div class="text-center" style="text-align:center">
+            <h3 style="margin:4px 0">Factura: @Factura.CodigoFactura</h3>
+            <img src="/fondologo-acueducto.jpg" style="max-width:180px;display:block;margin:0 auto;" />
+            <div><b>JUNTA DE ACCIÓN COMUNAL TOBIA CHICA</b></div>
+            <div><b>MUNICIPIO DE NOCAIMA - CUNDINAMARCA</b></div>
+            <div><b>NIT: 832.003.939-2</b></div>
+            <hr />
+        </div>
+        <div>
+            <div style="font-weight:700; text-align:center;">SERVICIO DE ACUEDUCTO</div>
+            <div style="font-weight:700; text-align:center;">JAC TOBIA CHICA</div>
+            <div style="font-weight:600; text-align:center;">BIMESTRE: @Factura.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionLarga</div>
+            <div style="text-align:center">Fecha Elabora: @Factura.FechaHoraRegistro</div>
+            <div style="text-align:center">Fecha Registro Consumo: @Factura.IdplanillaNavigation?.FechaHoraRegistroConsumo</div>
+            <div style="text-align:center">Ultimo día Pago: <b>@Factura.IdplanillaNavigation?.FechaLimitePago?.ToString("D", CultureInfo.CurrentCulture)</b></div>
+            <div style="text-align:center">Fecha Suspensión: <b>@Factura.IdplanillaNavigation?.FechaSuspension?.ToString("D", CultureInfo.CurrentCulture)</b></div>
+            <hr />
+            <div style="border:1px solid #999;border-radius:6px;background:#fafafa;padding:10px 12px;">
+                <table style="width:100%; border-collapse:collapse;">
+                    <tbody>
+                        <tr>
+                            <td style="width:40%;"><strong>Predio:</strong></td>
+                            <td style="font-size:16px"><strong>@Factura.IdpredioNavigation?.ApellidosNombresUsuario</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Dirección:</strong></td>
+                            <td style="font-size:16px"><strong>@Factura.IdpredioNavigation?.Direccion</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Código Usuario:</strong></td>
+                            <td style="font-size:16px"><strong>@Factura.CodigoUsuario</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Id o Cédula:</strong></td>
+                            <td style="font-size:16px"><strong>@Factura.IdpredioNavigation?.IdentificacionFacturacion</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Ruta:</strong></td>
+                            <td style="font-size:16px"><strong>@Factura.IdpredioNavigation?.Ruta</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Medidor Numero:</strong></td>
+                            <td style="font-size:16px"><strong>@Factura.IdpredioNavigation?.NumeroMedidor</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Medidor Marca:</strong></td>
+                            <td style="font-size:16px"><strong>@Factura.IdpredioNavigation?.MarcaMedidor</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Medidor Estado:</strong></td>
+                            <td style="font-size:16px"><strong>@Factura.IdpredioNavigation?.EstadoMedidor</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Medición Anterior M3:</strong></td>
+                            <td style="font-size:16px"><strong>@Factura.MedicionAnterior</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Medición Actual M3:</strong></td>
+                            <td style="font-size:16px"><strong>@Factura.MedicionActual</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Consumo M3:</strong></td>
+                            <td style="font-size:16px"><strong>@Factura.ConsumoM3</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Valor Consumo:</strong></td>
+                            <td style="font-size:16px"><strong>@FormatCurrency(Factura.ValorConsumo)</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Cargo Fijo:</strong></td>
+                            <td style="font-size:16px"><strong>@FormatCurrency(Factura.CargoFijo)</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Sub Total:</strong></td>
+                            <td style="font-size:16px"><strong>@FormatCurrency((Factura.CargoFijo ?? 0) + (Factura.ValorConsumo ?? 0))</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Porcentaje SobreTasa:</strong></td>
+                            <td style="font-size:16px"><strong>@Factura.PorcentajeSobreTasa</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Valor SobreTasa:</strong></td>
+                            <td style="font-size:16px"><strong>@FormatCurrency(Factura.ValorSobreTasa)</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Porcentaje Mora:</strong></td>
+                            <td style="font-size:16px"><strong>@Factura.PorcentajeMora</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Valor Mora:</strong></td>
+                            <td style="font-size:16px"><strong>@FormatCurrency(Factura.ValorMora)</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Porcentaje Subsidio:</strong></td>
+                            <td style="font-size:16px"><strong>@Factura.PorcentajeSubsidio</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Valor Subsidio:</strong></td>
+                            <td style="font-size:16px"><strong>@FormatCurrency(Factura.ValorSubsidio)</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Otros Valores:</strong></td>
+                            <td style="font-size:16px"><strong>@FormatCurrency(Factura.OtrosValores)</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>VALOR BIMESTRE:</strong></td>
+                            <td style="font-size:20px"><strong>@FormatCurrency(Factura.ValorPeriodo)</strong></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2"><strong>@Factura.NotasFactura</strong></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" style="text-align:center; font-weight:700;">REPORTE CUENTA</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Deuda Bimestre Anterior:</strong></td>
+                            <td style="font-size:16px"><strong>@FormatCurrency(Factura.DeudaAnterior)</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Pago Realizados Bimestre:</strong></td>
+                            <td style="font-size:18px"><strong>@FormatCurrency(Factura.RecaudoPeriodoTotal)</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Deuda Total:</strong></td>
+                            <td><strong style="font-size:20px">@FormatCurrency(Factura.DeudaPasa)</strong></td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2" style="font-weight:600;">CONSIGNAR CUENTA AHORROS BANCOLOMBIA # 89233904466. NIT:832003939-2. JUNTA DE ACCIÓN COMUNAL TOBIA</td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" style="font-weight:600;">HORARIO DE ATENCIÓN: MARTES, JUEVES Y SÁBADO DE 2:30PM A 5:00PM</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Facturacion? Factura { get; set; }
+
+    private string FormatCurrency(double? value)
+        => value.HasValue ? $"${value.Value:N0}" : "$0";
+}

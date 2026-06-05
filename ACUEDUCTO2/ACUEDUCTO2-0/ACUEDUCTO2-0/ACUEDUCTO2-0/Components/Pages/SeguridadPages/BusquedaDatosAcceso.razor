@@ -1,0 +1,441 @@
+@page "/proceso/Busqueda por Datos Acceso"
+@page "/proceso/Busqueda de Acceso por Usuario"
+@page "/proceso/Busqueda por Datos Usuario"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using ACUEDUCTO2-0_0.Compartir.MODELS
+@using ACUEDUCTO2-0_0.Data
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@attribute [Authorize(Roles = "Administradores")]
+
+@inject ACUEDUCTO2-0_0.Data.SeguridadService SeguridadService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h3>Búsqueda de Datos de Seguridad</h3>
+<p class="text-muted">Busque información de accesos por rol, usuario o proceso.</p>
+
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <button class="nav-link @(modoActivo == "rol" ? "active" : "")" @onclick='() => CambiarModo("rol")'>Por Rol</button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(modoActivo == "usuario" ? "active" : "")" @onclick='() => CambiarModo("usuario")'>Por Usuario</button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(modoActivo == "proceso" ? "active" : "")" @onclick='() => CambiarModo("proceso")'>Por Proceso</button>
+    </li>
+</ul>
+
+@* ===== SEARCH BY ROLE ===== *@
+@if (modoActivo == "rol")
+{
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label class="form-label"><strong>Seleccionar Rol:</strong></label>
+            <select class="form-select" @onchange="OnRolSeleccionado">
+                <option value="">-- Seleccionar rol --</option>
+                @if (roles != null)
+                {
+                    @foreach (var role in roles)
+                    {
+                        <option value="@role.Name">@role.Name</option>
+                    }
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (buscando)
+    {
+        <p><em>Buscando...</em></p>
+    }
+    else if (rolSeleccionado != null)
+    {
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header"><strong>Procesos asignados al rol "@rolSeleccionado"</strong></div>
+                    <div class="card-body">
+                        @if (esAdminSeleccionado)
+                        {
+                            <span class="badge bg-warning text-dark mb-2">Acceso Total</span>
+                            <p class="text-success">Este rol tiene acceso a todos los procesos (@ProcesosCatalogo.Todos.Count).</p>
+                        }
+                        else if (procesosDeRol != null && procesosDeRol.Count > 0)
+                        {
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Proceso</th>
+                                        <th>Grupo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var proceso in procesosDeRol)
+                                    {
+                                        var def = ProcesosCatalogo.BuscarPorNombre(proceso);
+                                        <tr>
+                                            <td>@proceso</td>
+                                            <td>@(def?.Objeto ?? "—")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <p class="text-muted">Este rol no tiene procesos asignados.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header"><strong>Usuarios con el rol "@rolSeleccionado"</strong></div>
+                    <div class="card-body">
+                        @if (usuariosDeRol != null && usuariosDeRol.Count > 0)
+                        {
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Usuario</th>
+                                        <th>Email</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var u in usuariosDeRol)
+                                    {
+                                        <tr>
+                                            <td>@(u.UserName ?? u.Email)</td>
+                                            <td>@u.Email</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <p class="text-muted">No hay usuarios asignados a este rol.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@* ===== SEARCH BY USER ===== *@
+@if (modoActivo == "usuario")
+{
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label class="form-label"><strong>Buscar Usuario:</strong></label>
+            <input type="text" class="form-control" placeholder="Escriba para filtrar..." @bind="filtroUsuario" @bind:event="oninput" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label"><strong>Seleccionar Usuario:</strong></label>
+            <select class="form-select" @onchange="OnUsuarioSeleccionado">
+                <option value="">-- Seleccionar usuario --</option>
+                @if (usuarios != null)
+                {
+                    @foreach (var u in usuariosFiltrados)
+                    {
+                        <option value="@u.Id">@(u.UserName ?? u.Email) — @u.Email</option>
+                    }
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (buscando)
+    {
+        <p><em>Buscando...</em></p>
+    }
+    else if (usuarioSeleccionado != null)
+    {
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card mb-3">
+                    <div class="card-header"><strong>Roles de "@(usuarioSeleccionado.UserName ?? usuarioSeleccionado.Email)"</strong></div>
+                    <div class="card-body">
+                        @if (rolesDeUsuario != null && rolesDeUsuario.Count > 0)
+                        {
+                            @foreach (var rol in rolesDeUsuario)
+                            {
+                                <span class="badge @(rol == "Administradores" ? "bg-warning text-dark" : "bg-primary") me-1 mb-1">@rol</span>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted">Sin roles asignados.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card mb-3">
+                    <div class="card-header"><strong>Procesos autorizados</strong></div>
+                    <div class="card-body">
+                        @if (rolesDeUsuario != null && rolesDeUsuario.Contains("Administradores"))
+                        {
+                            <span class="badge bg-warning text-dark mb-2">Acceso Total</span>
+                            <p class="text-success">Este usuario tiene acceso a todos los procesos (@ProcesosCatalogo.Todos.Count).</p>
+                        }
+                        else if (procesosDeUsuario != null && procesosDeUsuario.Count > 0)
+                        {
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Proceso</th>
+                                        <th>Grupo</th>
+                                        <th>Tipo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var p in procesosDeUsuario)
+                                    {
+                                        <tr>
+                                            <td>@p.Nombre</td>
+                                            <td>@p.Objeto</td>
+                                            <td>
+                                                @if (p.Tipo == TipoProceso.Editar)
+                                                {
+                                                    <span class="badge bg-info">Editar</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">Información</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <p class="text-muted">Este usuario no tiene procesos autorizados.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@* ===== SEARCH BY PROCESS ===== *@
+@if (modoActivo == "proceso")
+{
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label class="form-label"><strong>Grupo:</strong></label>
+            <select class="form-select" @bind="filtroObjeto">
+                <option value="">Todos</option>
+                @foreach (var obj in ProcesosCatalogo.ObtenerObjetos().OrderBy(o => o))
+                {
+                    <option value="@obj">@obj</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-5">
+            <label class="form-label"><strong>Seleccionar Proceso:</strong></label>
+            <select class="form-select" @onchange="OnProcesoSeleccionado">
+                <option value="">-- Seleccionar proceso --</option>
+                @foreach (var p in procesosFiltrados)
+                {
+                    <option value="@p.Nombre">@p.Nombre</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (buscando)
+    {
+        <p><em>Buscando...</em></p>
+    }
+    else if (procesoSeleccionado != null)
+    {
+        <div class="row">
+            <div class="col-md-5">
+                <div class="card mb-3">
+                    <div class="card-header"><strong>Roles con acceso a "@procesoSeleccionado"</strong></div>
+                    <div class="card-body">
+                        <span class="badge bg-warning text-dark me-1 mb-1">Administradores (Acceso Total)</span>
+                        @if (rolesConProceso != null)
+                        {
+                            @foreach (var rol in rolesConProceso)
+                            {
+                                <span class="badge bg-primary me-1 mb-1">@rol</span>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-7">
+                <div class="card mb-3">
+                    <div class="card-header"><strong>Usuarios con acceso a "@procesoSeleccionado"</strong></div>
+                    <div class="card-body">
+                        @if (usuariosConProceso != null && usuariosConProceso.Count > 0)
+                        {
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Usuario</th>
+                                        <th>Email</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var u in usuariosConProceso)
+                                    {
+                                        <tr>
+                                            <td>@(u.UserName ?? u.Email)</td>
+                                            <td>@u.Email</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <p class="text-muted">No hay usuarios con acceso a este proceso.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private string modoActivo = "rol";
+    private bool buscando;
+
+    // Shared data
+    private List<IdentityRole>? roles;
+    private List<ApplicationUser>? usuarios;
+
+    // Search by Role
+    private string? rolSeleccionado;
+    private bool esAdminSeleccionado;
+    private List<string>? procesosDeRol;
+    private List<ApplicationUser>? usuariosDeRol;
+
+    // Search by User
+    private string? filtroUsuario;
+    private ApplicationUser? usuarioSeleccionado;
+    private IList<string>? rolesDeUsuario;
+    private List<DefinicionProceso>? procesosDeUsuario;
+
+    private List<ApplicationUser> usuariosFiltrados =>
+        usuarios == null
+            ? new()
+            : string.IsNullOrWhiteSpace(filtroUsuario)
+                ? usuarios
+                : usuarios.Where(u =>
+                    (u.UserName ?? "").Contains(filtroUsuario, StringComparison.OrdinalIgnoreCase) ||
+                    (u.Email ?? "").Contains(filtroUsuario, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+    // Search by Process
+    private string? filtroObjeto;
+    private string? procesoSeleccionado;
+    private List<string>? rolesConProceso;
+    private List<ApplicationUser>? usuariosConProceso;
+
+    private List<DefinicionProceso> procesosFiltrados =>
+        string.IsNullOrEmpty(filtroObjeto)
+            ? ProcesosCatalogo.Todos.OrderBy(p => p.Objeto).ThenBy(p => p.Nombre).ToList()
+            : ProcesosCatalogo.ObtenerPorObjeto(filtroObjeto).OrderBy(p => p.Nombre).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        roles = await SeguridadService.ObtenerRolesAsync();
+        usuarios = await SeguridadService.ObtenerUsuariosAsync();
+    }
+
+    private void CambiarModo(string modo)
+    {
+        modoActivo = modo;
+        LimpiarResultados();
+    }
+
+    private void LimpiarResultados()
+    {
+        rolSeleccionado = null;
+        procesosDeRol = null;
+        usuariosDeRol = null;
+        esAdminSeleccionado = false;
+
+        usuarioSeleccionado = null;
+        rolesDeUsuario = null;
+        procesosDeUsuario = null;
+        filtroUsuario = null;
+
+        procesoSeleccionado = null;
+        rolesConProceso = null;
+        usuariosConProceso = null;
+        filtroObjeto = null;
+    }
+
+    // ===== By Role =====
+    private async Task OnRolSeleccionado(ChangeEventArgs e)
+    {
+        var valor = e.Value?.ToString();
+        if (string.IsNullOrEmpty(valor))
+        {
+            rolSeleccionado = null;
+            procesosDeRol = null;
+            usuariosDeRol = null;
+            return;
+        }
+
+        buscando = true;
+        rolSeleccionado = valor;
+        esAdminSeleccionado = valor == "Administradores";
+
+        procesosDeRol = esAdminSeleccionado
+            ? null
+            : await SeguridadService.ObtenerNombresProcesosDeRolAsync(valor);
+
+        usuariosDeRol = await SeguridadService.ObtenerUsuariosEnRolAsync(valor);
+        buscando = false;
+    }
+
+    // ===== By User =====
+    private async Task OnUsuarioSeleccionado(ChangeEventArgs e)
+    {
+        var userId = e.Value?.ToString();
+        if (string.IsNullOrEmpty(userId))
+        {
+            usuarioSeleccionado = null;
+            rolesDeUsuario = null;
+            procesosDeUsuario = null;
+            return;
+        }
+
+        buscando = true;
+        usuarioSeleccionado = usuarios?.FirstOrDefault(u => u.Id == userId);
+        rolesDeUsuario = await SeguridadService.ObtenerRolesDeUsuarioAsync(userId);
+        procesosDeUsuario = await SeguridadService.ObtenerProcesosAutorizadosAsync(userId);
+        buscando = false;
+    }
+
+    // ===== By Process =====
+    private async Task OnProcesoSeleccionado(ChangeEventArgs e)
+    {
+        var valor = e.Value?.ToString();
+        if (string.IsNullOrEmpty(valor))
+        {
+            procesoSeleccionado = null;
+            rolesConProceso = null;
+            usuariosConProceso = null;
+            return;
+        }
+
+        buscando = true;
+        procesoSeleccionado = valor;
+        rolesConProceso = await SeguridadService.ObtenerRolesConProcesoAsync(valor);
+        usuariosConProceso = await SeguridadService.ObtenerUsuariosConAccesoAProcesoAsync(valor);
+        buscando = false;
+    }
+}

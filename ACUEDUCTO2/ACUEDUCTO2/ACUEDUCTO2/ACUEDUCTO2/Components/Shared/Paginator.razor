@@ -1,0 +1,46 @@
+@using ACUEDUCTO2.Components.Shared
+
+@if (State is null)
+{
+    <div class="text-danger">Estado de paginación no disponible.</div>
+}
+else
+{
+    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-2 mt-3">
+        <div class="text-muted small">
+            Mostrando @State.FirstItemIndex-@State.LastItemIndex de @State.TotalItems registros
+        </div>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Controles de paginación">
+            <button type="button" class="btn btn-outline-secondary" @onclick="MovePrevious" disabled="@(!State.HasPreviousPage)">Anterior</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="MoveNext" disabled="@(!State.HasNextPage)">Siguiente</button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public PaginationState State { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnPageChanged { get; set; }
+
+    private async Task MovePrevious()
+    {
+        State.MovePrevious();
+        await NotifyChangedAsync();
+    }
+
+    private async Task MoveNext()
+    {
+        State.MoveNext();
+        await NotifyChangedAsync();
+    }
+
+    private async Task NotifyChangedAsync()
+    {
+        if (OnPageChanged.HasDelegate)
+        {
+            await OnPageChanged.InvokeAsync();
+        }
+    }
+}

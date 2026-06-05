@@ -1,0 +1,38 @@
+﻿@page "/periodos"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Models
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+<PageTitle>Periodos</PageTitle>
+
+<h1>Periodos</h1>
+
+<p>
+    <a href="periodos/create" target="_blank">Crear Nuevo</a>
+</p>
+
+<QuickGrid Class="table" Items="context.Periodos" >
+    <PropertyColumn Property="periodo => periodo.DescripcionCorta" />
+    <PropertyColumn Property="periodo => periodo.DescripcionLarga" />
+
+    <TemplateColumn Context="periodo">
+        <a href="@($"periodos/edit?idperiodo={periodo.Idperiodo}")" target="_blank">Edit</a> |
+        <a href="@($"periodos/details?idperiodo={periodo.Idperiodo}")" target="_blank">Details</a> |
+        <a href="@($"periodos/delete?idperiodo={periodo.Idperiodo}")" target="_blank">Delete</a>
+    </TemplateColumn>
+</QuickGrid>
+
+@code {
+    private AcueductoContext context = default!;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+    PaginationState pagination = new PaginationState { ItemsPerPage = 10 };
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}

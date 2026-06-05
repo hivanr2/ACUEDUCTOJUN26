@@ -1,0 +1,55 @@
+@page "/estado-solicitud/editar/{guid}"
+@using ACUEDUCTO2-0.Compartir.MODELS
+@using ACUEDUCTO2-0.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Editar estado de solicitud</PageTitle>
+
+<h3>Editar estado de solicitud</h3>
+
+<div class="mb-3">
+    <button class="btn btn-secondary me-2" @onclick="Volver">Volver a solicitudes</button>
+</div>
+
+@if (item == null)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <label class="form-label">Nombre</label>
+    <InputText @bind-Value="item.NombreEstadoSolicitud" class="form-control mb-2" />
+
+    <button class="btn btn-primary" @onclick="Guardar">Guardar</button>
+    <button class="btn btn-secondary ms-2" @onclick="Cancelar">Cancelar</button>
+}
+
+@code {
+    [Parameter]
+    public string guid { get; set; } = string.Empty;
+
+    private EstadoSolicitud? item;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = DbFactory.CreateDbContext();
+        item = await db.EstadoSolicitud.FirstOrDefaultAsync(x => x.Guid == guid);
+    }
+
+    private async Task Guardar()
+    {
+        if (item == null) return;
+        using var db = DbFactory.CreateDbContext();
+        var dbItem = await db.EstadoSolicitud.FirstOrDefaultAsync(x => x.Guid == item.Guid);
+        if (dbItem == null) return;
+        dbItem.NombreEstadoSolicitud = item.NombreEstadoSolicitud;
+        await db.SaveChangesAsync();
+        Navigation.NavigateTo("/estado-solicitud");
+    }
+
+    void Cancelar() => Navigation.NavigateTo("/estado-solicitud");
+    void Volver() => Navigation.NavigateTo("/solicitud");
+}

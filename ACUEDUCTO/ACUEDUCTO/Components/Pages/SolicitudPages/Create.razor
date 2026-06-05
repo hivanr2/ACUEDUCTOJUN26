@@ -1,0 +1,127 @@
+﻿@page "/solicitudes/create"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Crear Solicitud</PageTitle>
+
+<div class="container-fluid py-2 py-md-3">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-10 col-lg-8 col-xl-7">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h2 class="h5 mb-0">Nueva Solicitud</h2>
+                    <small class="text-muted">Complete los campos requeridos. Marcados con <span class="text-danger">*</span></small>
+                </div>
+
+                <EditForm method="post" Model="Solicitud" OnValidSubmit="AddSolicitud" FormName="create" Enhance>
+                    <DataAnnotationsValidator />
+
+                    <div class="card-body">
+                        <ValidationSummary class="text-danger mb-3" role="alert" />
+
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label for="descripcion" class="form-label">Descripción <span class="text-danger">*</span></label>
+                                <InputTextArea id="descripcion" @bind-Value="Solicitud.Descripción" class="form-control" rows="4" placeholder="Describa la solicitud" aria-describedby="descHelp" />
+                                <small id="descHelp" class="form-text text-muted">Sea claro y concreto. Máximo 1000 caracteres.</small>
+                                <ValidationMessage For="() => Solicitud.Descripción" class="text-danger" />
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <label for="idusuario" class="form-label">Usuario <span class="text-danger">*</span></label>
+                                <InputSelect id="idusuario" @bind-Value="Solicitud.IdUsuario" class="form-select">
+                                    <option value="">Seleccione un usuario</option>
+                                    @foreach (var usuario in Usuarios)
+                                    {
+                                        <option value="@usuario.Identificacion">@usuario.ApellidosNombres</option>
+                                    }
+                                </InputSelect>
+                                <ValidationMessage For="() => Solicitud.IdUsuario" class="text-danger" />
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <label for="codigo" class="form-label">Palabras clave <span class="text-danger">*</span></label>
+                                <InputText id="codigo" @bind-Value="Solicitud.Codigo" class="form-control" placeholder="Ej: fuga, medidor, reparación" aria-describedby="codigoHelp" />
+                                <small id="codigoHelp" class="form-text text-muted">Separe por comas. Ej: "fuga, medidor, reparación".</small>
+                                <ValidationMessage For="() => Solicitud.Codigo" class="text-danger" />
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <label for="tipo" class="form-label">Tipo <span class="text-danger">*</span></label>
+                                <InputSelect id="tipo" @bind-Value="Solicitud.Tipo" class="form-select">
+                                    <option value="-1">Seleccione un tipo</option>
+                                    @foreach (var tipo in Tipos)
+                                    {
+                                        <option value="@tipo.Id">@tipo.Nombre</option>
+                                    }
+                                </InputSelect>
+                                <ValidationMessage For="() => Solicitud.Tipo" class="text-danger" />
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <label for="fechahorarecepcion" class="form-label">Fecha de recepción <span class="text-danger">*</span></label>
+                                <InputDate id="fechahorarecepcion" @bind-Value="Solicitud.FechaHoraRecepcion" class="form-control" />
+                                <ValidationMessage For="() => Solicitud.FechaHoraRecepcion" class="text-danger" />
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <label for="estado" class="form-label">Estado <span class="text-danger">*</span></label>
+                                <InputSelect id="estado" @bind-Value="Solicitud.EstadoID" class="form-select">
+                                    @foreach (var estado in Estados)
+                                    {
+                                        <option value="@estado.Id">@estado.Nombre</option>
+                                    }
+                                </InputSelect>
+                                <ValidationMessage For="() => Solicitud.EstadoID" class="text-danger" />
+                            </div>
+
+                            <div class="col-12">
+                                <label for="observaciones" class="form-label">Observaciones</label>
+                                <InputTextArea id="observaciones" @bind-Value="Solicitud.Observaciones" class="form-control" rows="3" placeholder="Notas adicionales (opcional)" />
+                                <ValidationMessage For="() => Solicitud.Observaciones" class="text-danger" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-footer bg-white">
+                        <div class="actions-bar">
+                            <a class="btn btn-outline-secondary" href="/solicitudes">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">Crear</button>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@code {
+    [SupplyParameterFromForm]
+    private Solicitud Solicitud { get; set; } = new() { Tipo = -1, EstadoID = 1, FechaHoraRecepcion = DateTime.Now };
+
+    private List<Usuario> Usuarios { get; set; } = new();
+    private List<Tipo> Tipos { get; set; } = new();
+    private List<Estado> Estados { get; set; } = new();
+    private bool Cerrada { get; set; } = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Usuarios = await context.Usuarios.OrderBy(c => c.ApellidosNombres).ToListAsync();
+        Tipos = await context.Tipos.OrderBy(c => c.Id).ToListAsync();
+        Estados = await context.Estados.OrderBy(c => c.Id).ToListAsync();
+    }
+
+    private async Task AddSolicitud()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Solicitud.Cerrada = Cerrada;
+        context.Solicitudes.Add(Solicitud);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/solicitudes");
+    }
+}

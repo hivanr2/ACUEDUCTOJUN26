@@ -1,0 +1,185 @@
+@layout ACUEDUCTO2.Components.Layout.SimpleLayout
+@page "/planillas/consumosimprimircomponent"
+@using ACUEDUCTO2.Share.Models
+@using Facturacion = ACUEDUCTO2.Share.Models.Factura
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IJSRuntime JSRuntime
+
+@rendermode InteractiveServer
+<h3 class="titulo-consumos">CONSUMOS :: @str_planilla.</h3>
+<h2 class="subtitulo-periodo">@str_periodo_largo</h2>
+
+@if (facturacion == null)
+{
+ <div>Cargando...</div>
+}
+else
+{
+ if (facturacion.Count >0)
+ {
+ <div class="contenedor-tabla">
+ <table class="table table-striped table-bordered table-responsive fixed-header tabla-consumos">
+ <thead>
+ <tr>
+ <th scope="col">It</th>
+ <th scope="col">Predio<br />Dirección</th>
+ <th scope="col">Ruta</th>
+ <th scope="col">Número Medidor</th>
+ <th scope="col">Marca Medidor</th>
+ <th scope="col">Estado Medidor</th>
+ <th scope="col">Medición Anterior</th>
+ <th scope="col">Medición Actual</th>
+ @if (!planillaAbierta)
+ {
+ <th scope="col">Consumo M3</th>
+ }
+ <th scope="col">Seg.</th>
+ <th scope="col">Notas</th>
+ </tr>
+ </thead>
+ <tbody>
+ @for (int i =0; i < facturacion.Count; i++)
+ {
+ var factura = facturacion[i];
+ <tr>
+ <th scope="col">@(i +1)</th>
+ <th scope="row" class="predio-col">
+ <div class="predio-nombre">@factura.IdpredioNavigation.ApellidosNombresUsuario</div>
+ <div class="predio-dir">@factura.IdpredioNavigation.Direccion</div>
+ </th>
+ <td class="ruta-col">@factura.IdpredioNavigation.Ruta</td>
+ <td>@(factura.IdpredioNavigation.NumeroMedidor != "N.A." ? factura.IdpredioNavigation.NumeroMedidor : null)</td>
+ <td>@(factura.IdpredioNavigation.MarcaMedidor != "N.A." ? factura.IdpredioNavigation.MarcaMedidor : null)</td>
+ <td>@(factura.IdpredioNavigation.EstadoMedidor != "N.A." ? factura.IdpredioNavigation.EstadoMedidor : null)</td>
+ <td class="text-center">@factura.MedicionAnterior</td>
+ <td class="text-center">
+ @if (planillaAbierta)
+ {
+ @:<!-- formato abierto: se deja en blanco -->
+ }
+ else
+ {
+ @factura.MedicionActual
+ }
+ </td>
+ @if (!planillaAbierta)
+ {
+ <td class="text-center consumo-m3">@factura.ConsumoM3</td>
+ }
+ <td class="text-center seguimiento-cell">
+ <input type="checkbox" @bind="factura.IdpredioNavigation.ContadorEnSeguimiento" tabindex="@((i *1) +4)" />
+ </td>
+ <td class="notas-cell">
+ <div class="nota-single">@factura.NotasFactura</div>
+ </td>
+ </tr>
+ }
+ <tr>
+ <td colspan="6" class="registrador-row">
+ <input type="text" value="@nombreRegistrador" class="form-control registrador-input" placeholder="Nombre de quien registra los consumos" />
+ </td>
+ </tr>
+ </tbody>
+ </table>
+ </div>
+ <style>
+ /* Forzar márgenes y padding en cero en toma de datos */
+ .page, .page main, .page article, .page .content { margin:0 !important; padding:0 !important; }
+ .fixed-header thead th { position: sticky; top:0; background-color: #fff; z-index:1; }
+ /* Compact general */
+ .contenedor-tabla { margin:0; padding:0; }
+ .tabla-consumos { width:100%; table-layout: fixed; }
+ .tabla-consumos th, .tabla-consumos td { vertical-align: middle; }
+ .predio-col { min-width:140px; }
+ .predio-nombre { font-weight:600; }
+ .predio-dir { font-size:0.75rem; color: #555; word-break: break-word; }
+ .registrador-input { width:100%; }
+ .nota-single { max-width:160px; overflow-wrap: anywhere; }
+ /* Mobile optimization */
+ @@media (max-width:576px) {
+ body, .page, main, article { margin:0 !important; padding:0 !important; }
+ h3.titulo-consumos { font-size:0.95rem; margin:4px02px; }
+ h2.subtitulo-periodo { font-size:0.85rem; margin:006px; }
+ .tabla-consumos th, .tabla-consumos td { padding:2px3px !important; font-size:0.65rem; }
+ .tabla-consumos thead th { font-size:0.6rem; }
+ .predio-nombre { font-size:0.65rem; }
+ .predio-dir { font-size:0.55rem; }
+ .nota-single { font-size:0.55rem; }
+ .seguimiento-cell input[type=checkbox] { width:14px; height:14px; }
+ .ruta-col { font-size:0.6rem; }
+ .consumo-m3 { font-weight:600; }
+ .registrador-input { font-size:0.65rem; padding:3px4px; }
+ .registrador-row { padding:0; }
+ .tabla-consumos { border-collapse: collapse; }
+ .tabla-consumos tr { border-bottom:1px solid #e3e3e3; }
+ }
+ </style>
+ }
+ else
+ {
+ <div>SE DEBE CREAR EN FACTURACIÓN LA PLANILLA por cada Predio Existente</div>
+ }
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+ <div class="alert alert-danger">@errorMessage</div>
+}
+
+@code {
+ [SupplyParameterFromQuery]
+ private string id { get; set; }
+ private IList<Facturacion> facturacion;
+ private string str_planilla;
+ private string str_periodo_corto;
+ private string str_periodo_largo;
+ private string errorMessage;
+ private bool sortAscending = true;
+ private double totalConsumoM3;
+ private bool showModal = false;
+ private Facturacion selectedFactura;
+ private string nombreRegistrador;
+ private string abre = "{";
+ private string cierra = "}";
+ private string currentSortHeader = "Predio"; // Valor predeterminado
+ private bool planillaAbierta;
+
+ protected override async Task OnInitializedAsync()
+ {
+ await LoadData();
+ }
+
+ private async Task LoadData()
+ {
+ using var context = DbFactory.CreateDbContext();
+ facturacion = await context.Facturacions
+ .Where(p => p.Guid == id).Include(f => f.IdpredioNavigation)
+ .OrderBy(c => c.IdpredioNavigation.Ruta)
+ .ToListAsync();
+
+ var planilla1 = await context.Periodos.Where(p => p.Guid == id).ToListAsync();
+ if (planilla1 == null)
+ {
+ str_planilla = "No hay planilla";
+ }
+ else
+ {
+ var pl = planilla1.FirstOrDefault();
+ str_planilla = pl?.Descripcion ?? "No hay planilla";
+ str_periodo_corto = pl?.NombreCortoPeriodo ?? "N/A";
+ str_periodo_largo = pl?.NombreLargoPeriodo ?? "N/A";
+ nombreRegistrador = pl?.EncargadoRegistroConsumos ?? "N/A";
+ planillaAbierta = pl?.Abierta ?? false;
+ }
+ }
+
+ private string FormatCurrency(double? value)
+ {
+ if (value.HasValue)
+ {
+ return $"${value.Value:N0}";
+ }
+ return "$0";
+ }
+}

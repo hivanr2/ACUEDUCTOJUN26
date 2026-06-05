@@ -1,0 +1,448 @@
+﻿@page "/recibos/details"
+@using ACUEDUCTO.Components.Layout
+@using ACUEDUCTO.Models
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@using System.Text.RegularExpressions
+@inject IDbContextFactory<AcueductoContext> DbFactory
+@inject IJSRuntime JSRuntime
+@inject IWebHostEnvironment Env
+@layout PrintLayout
+@rendermode InteractiveServer
+
+@if (factura is not null)
+{
+    <PageTitle>IMP:REC#@numero_ingreso</PageTitle>
+
+    @if (!string.IsNullOrEmpty(pdfSaveMessage))
+    {
+        <div class="no-print alert @(pdfSaved ? "alert-success" : "alert-warning") py-2 px-3 m-2" role="alert">
+            @pdfSaveMessage
+            @if (pdfSaved && !string.IsNullOrEmpty(pdfRelativePath))
+            {
+                <span> | <a href="@pdfRelativePath" target="_blank" class="alert-link">Abrir PDF</a></span>
+            }
+        </div>
+    }
+
+    <style>
+        @@page { size: 58mm auto; margin: 0; }
+        html, body { margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact; }
+        .ticket { width:58mm;margin:0 auto;padding:2mm 1mm 1.5mm 1mm;font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,'Noto Sans',sans-serif;font-size:12px;line-height:1.35;color:#111;letter-spacing:.15px; }
+        .center{text-align:center;} .right{text-align:right;} .small{font-size:11px;} .xsmall{font-size:10px;} .big{font-size:15px;font-weight:800;} .bold{font-weight:700;}
+        hr{border:none;border-top:1px dashed #555;margin:2mm 0;opacity:.9;}
+        .kv-table{width:100%;border-collapse:collapse;margin:0;font-size:11px;} .kv-table td{padding:1px 2px;vertical-align:top;border:1px solid #222;}
+        .kv-table td.k{text-align:right;padding-right:3px;font-weight:700;background:#f5f5f5;} .kv-table td.v{text-align:center;}
+        .section-line {border:1px solid #222;padding:3px 4px;font-size:11px;font-weight:800;text-align:center;background:#f9f9f9;margin-top:1.5mm;}
+        .section-line.inverse{background:#222;color:#fff;font-weight:800;}
+        .notas-box{border:1px solid #222;padding:3px 4px;white-space:pre-wrap;}
+        .blk { background:#000; color:#fff; text-align:center; padding:4px; font-size:13px; font-weight:800; margin-top:2mm; }
+        .no-print { position:sticky; top:0; z-index:1000; }
+        .img-50mm { width:52mm; max-width:52mm; height:auto; }
+        .chart-50mm { width:50mm; max-width:50mm; height:22mm; max-height:22mm; display:block; margin:0 auto; }
+        .predio-nombre-row{font-size:13px;font-weight:800;text-align:center;background:#fff;}
+        @@media print { .no-print { display:none !important; } .img-50mm { width:52mm !important; } .chart-50mm { width:50mm !important; height:22mm !important; } }
+    </style>
+
+    <div id="printableArea" class="ticket">
+        <div class="center">
+            <div class="big">Recibo: @numero_ingreso</div>
+            <img src="/fondologo-acueducto.jpg" alt="Logo" class="img-50mm" style="max-height:22mm;object-fit:contain;margin:4px auto;display:block;" />
+            <div class="small">JUNTA DE ACCIÓN COMUNAL TOBIA CHICA</div>
+            <div class="small">MUNICIPIO DE NOCAIMA - CUNDINAMARCA</div>
+            <div class="small">NIT: 832.003.939-2</div>
+        </div>
+
+        <div class="section-line">@("Bimestre: " + (factura?.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionLarga ?? factura?.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionCorta ?? ""))</div>
+        <table class="kv-table">
+            <tr><td class="k">Fecha Recibo</td><td class="v">@((ingresoActual?.FechaHora ?? DateTime.Now).ToString("g", new CultureInfo("es-CO")))</td></tr>
+            <tr><td class="k">Código Usuario</td><td class="v">@factura?.CodigoUsuario</td></tr>
+        </table>
+
+        <div class="section-line">DATOS DEL PREDIO</div>
+        <table class="kv-table">
+            <tr><td colspan="2" class="predio-nombre-row">@factura?.IdpredioNavigation?.ApellidosNombresUsuario</td></tr>
+            <tr><td class="k">Dirección</td><td class="v">@factura?.IdpredioNavigation?.Direccion</td></tr>
+            <tr><td class="k">Ruta</td><td class="v">@factura?.IdpredioNavigation?.Ruta</td></tr>
+        </table>
+
+        <div class="blk">Valor Recibido: @FormatCurrency(factura?.RecaudoPeriodoTotal)</div>
+
+        <div class="section-line inverse">RESUMEN</div>
+        <table class="kv-table">
+            <tr><td class="k">Deuda Bimestre Anterior</td><td class="v">@FormatCurrency(factura?.DeudaAnterior)</td></tr>
+            <tr><td class="k">Recaudo Bimestre</td><td class="v">@FormatCurrency(factura?.RecaudoPeriodoTotal)</td></tr>
+            <tr><td class="k"><strong>Saldo después Recaudo</strong></td><td class="v"><strong>@FormatCurrency((factura?.DeudaAnterior ?? 0) - (factura?.RecaudoPeriodoTotal ?? 0))</strong></td></tr>
+        </table>
+
+        <div class="section-line">NOTAS</div>
+        <div class="notas-box">
+            @if (ShouldApplyRecaudoReplacement())
+            {
+                <div><strong>Factura:</strong> @displayNotasFactura</div>
+                <div style="margin-top:4px"><strong>Recaudo:</strong> @displayNotasRecaudo</div>
+            }
+            else
+            {
+                <div>@(string.IsNullOrWhiteSpace(factura?.NotasFactura) ? string.Empty : factura!.NotasFactura)</div>
+                <div style="margin-top:4px">@(string.IsNullOrWhiteSpace(factura?.NotasRecaudo) ? string.Empty : factura!.NotasRecaudo)</div>
+            }
+        </div>
+
+        <div class="section-line">Recaudos Bimestrales Totales</div>
+        <canvas id="consumoChartRecibo" class="chart-50mm" width="200" height="85"></canvas>
+
+        <hr />
+        <div class="center xsmall">
+            CONSIGNAR CUENTA AHORROS BANCOLOMBIA # 89233904466<br />
+            NIT:832003939-2. JUNTA DE ACCIÓN COMUNAL TOBIA<br />
+            HORARIO CASA COMUNAL: MAR, JUE Y SÁB 3:00PM - 5:00PM
+        </div>
+    </div>
+}
+else
+{
+    <div>Cargando factura...</div>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    public string IdFactura { get; set; }
+    [SupplyParameterFromQuery]
+    public string? from { get; set; }
+    [SupplyParameterFromQuery]
+    public string? note { get; set; }
+    [SupplyParameterFromQuery]
+    public string? noteRecaudo { get; set; }
+    [SupplyParameterFromQuery]
+    public string? noteFactura { get; set; }
+    private const int MaxPeriodos = 10;
+    private string str_nombre_corto = string.Empty;
+    private string numero_ingreso = "0000";
+
+    private Facturacion factura;
+    private Ingreso? ingresoActual;
+
+    private string? pdfSaveMessage;
+    private bool pdfSaved;
+    private string? pdfRelativePath;
+    private CancellationTokenSource? _msgCts;
+    private bool _exportTriggered;
+    private List<RecaudoPorPeriodo> pagosPorPeriodo = new();
+
+    // Display-only notes when opened from RecaudoComponent
+    private string displayNotasFactura = string.Empty;
+    private string displayNotasRecaudo = string.Empty;
+
+    private async Task ShowTransientMessage(string message, bool success)
+    {
+        try { _msgCts?.Cancel(); } catch { }
+        _msgCts = new CancellationTokenSource();
+        var token = _msgCts.Token;
+        pdfSaved = success;
+        pdfSaveMessage = message;
+        StateHasChanged();
+        try
+        {
+            await Task.Delay(3000, token);
+            if (!token.IsCancellationRequested)
+            {
+                pdfSaveMessage = null;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("es-CO");
+        using var context = DbFactory.CreateDbContext();
+        factura = await context.Facturacions
+            .Include(f => f.IdplanillaNavigation).ThenInclude(p => p.IdperiodoNavigation)
+            .Include(f => f.IdpredioNavigation)
+            .FirstOrDefaultAsync(f => f.Idfactura == IdFactura);
+        if (factura != null)
+        {
+            str_nombre_corto = factura.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionCorta ?? string.Empty;
+            // Se pone la nota de factura para q no sea null y falle la primera vez
+            noteFactura = factura.NotasFactura;
+
+            // Apply note replacement early when coming from RecaudoComponent or FacturacionComponent
+            // This checks if there's recaudo in the current billing period (including negative for anticipos)
+            if (ShouldApplyRecaudoReplacement() && Math.Abs(factura.RecaudoPeriodoTotal ?? 0) > 0)
+            {
+                noteFactura = ReplaceNoRecaudoMessage(noteFactura, 1.0);
+            }
+
+            ingresoActual = await context.Ingresos.FirstOrDefaultAsync(i => i.Idfactura == factura.Idfactura);
+            var fechaActual = factura.IdplanillaNavigation?.FechaHoraFacturacion
+                ?? factura.IdplanillaNavigation?.FechaHoraRegistroConsumo
+                ?? factura.FechaHoraRegistro;
+
+            var facturaCancelada = await context.Facturacions
+                .Where(f => f.Idpredio == factura.Idpredio && f.Idfactura != factura.Idfactura)
+                .Select(f => new
+                {
+                    f.Idfactura,
+                    f.CodigoFactura,
+                    Fecha = f.IdplanillaNavigation.FechaHoraFacturacion ?? f.IdplanillaNavigation.FechaHoraRegistroConsumo,
+                    f.DeudaPasa
+                })
+                .Where(f => f.Fecha < fechaActual)
+                .OrderByDescending(f => f.Fecha)
+                .FirstOrDefaultAsync();
+
+            var codigoFacturaCancelada = facturaCancelada?.CodigoFactura ?? facturaCancelada?.Idfactura ?? factura.CodigoFactura;
+            var valorPeriodo = facturaCancelada?.DeudaPasa ?? 0;
+
+            // if (!string.IsNullOrWhiteSpace(codigoFacturaCancelada))
+            // {
+            //     factura.CodigoFactura = codigoFacturaCancelada;
+            // }
+
+            if (ingresoActual == null)
+            {
+                int siguienteNumero = (context.Ingresos.Any()) ? (await context.Ingresos.Where(a => a.Numero > 0).Select(a => a.Numero).MaxAsync()) + 1 : 1;
+                ingresoActual = new Ingreso
+                {
+                    Idingreso = Guid.NewGuid().ToString(),
+                    Numero = siguienteNumero,
+                    FechaHora = DateTime.Now,
+                    Idcliente = factura.IdpredioNavigation?.IdentificacionFacturacion,
+                    Idfactura = factura.Idfactura,
+                    Concepto = $"PAGO FACTURA #{codigoFacturaCancelada} por {FormatCurrency(valorPeriodo)}",
+                    Valor = factura.RecaudoPeriodoTotal ?? 0
+                };
+                context.Ingresos.Add(ingresoActual);
+                await context.SaveChangesAsync();
+            }
+            else
+            {
+                var desiredPrefix = $"PAGO FACTURA #{codigoFacturaCancelada} por {FormatCurrency(valorPeriodo)}";
+                var current = ingresoActual.Concepto ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(current) || !current.StartsWith(desiredPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    var suffix = string.Empty;
+                    var idx = current.IndexOf('|');
+                    if (idx >= 0)
+                        suffix = " " + current.Substring(idx);
+
+                    ingresoActual.Concepto = desiredPrefix + suffix;
+                    context.Ingresos.Update(ingresoActual);
+                    await context.SaveChangesAsync();
+                }
+            }
+            numero_ingreso = ingresoActual.Numero.ToString("0000");
+
+            // Prepare display notes when called from RecaudoComponent or FacturacionComponent
+            if (ShouldApplyRecaudoReplacement())
+            {
+                displayNotasFactura = noteFactura ?? "GRACIAS POR SU PAGO DE DEUDA ANTERIOR";
+                if (!string.IsNullOrWhiteSpace(codigoFacturaCancelada))
+                {
+                    displayNotasFactura = $"FACTURA #{codigoFacturaCancelada} por {FormatCurrency(valorPeriodo)}. {displayNotasFactura}";
+                }
+
+                // Obtain ingresos and compute total paid (prefer real ingresos sum, fallback to factura.RecaudoPeriodoTotal)
+                var ingresosList = await context.Ingresos
+                    .Where(i => i.Idfactura == factura.Idfactura)
+                    .OrderByDescending(i => i.FechaHora)
+                    .ToListAsync();
+
+                double pagosSum = ingresosList.Sum(i => i.Valor ?? 0);
+
+                // If no ingresos exist or sum is zero, try to use RecaudoPeriodoTotal (which can be positive, negative, or zero)
+                if (pagosSum == 0 && factura.RecaudoPeriodoTotal.HasValue)
+                {
+                    pagosSum = factura.RecaudoPeriodoTotal.Value;
+                }
+
+                if (pagosSum == 0 && ingresoActual?.Valor != null)
+                {
+                    pagosSum = ingresoActual.Valor.Value;
+                }
+
+                var ingresoLatest = ingresosList.FirstOrDefault() ?? ingresoActual;
+                var recDate = (ingresoLatest?.FechaHora ?? DateTime.Now).ToString("g", new CultureInfo("es-CO"));
+
+                var deudaPrev = factura.DeudaAnterior ?? 0;
+
+                var sb = new System.Text.StringBuilder();
+                sb.Append($"RECAUDO ({recDate}) {FormatCurrency(pagosSum)}.");
+
+                // Show difference: anticipado (pagos>deuda), falta (pagos<deuda), saldado (pagos == deuda and >0)
+                if (pagosSum > deudaPrev)
+                {
+                    sb.Append($" ABONO ANTICIPADO: {FormatCurrency(pagosSum - deudaPrev)}.");
+                }
+                else if (pagosSum < deudaPrev && pagosSum > 0)
+                {
+                    sb.Append($" FALTA: {FormatCurrency(deudaPrev - pagosSum)}.");
+                }
+                else if (pagosSum > 0 && Math.Abs(pagosSum - deudaPrev) <= 0.5)
+                {
+                    sb.Append(" SALDADO.");
+                }
+
+                displayNotasRecaudo = noteRecaudo ?? sb.ToString();
+                if (!string.IsNullOrWhiteSpace(codigoFacturaCancelada))
+                {
+                    displayNotasRecaudo = $"FACTURA #{codigoFacturaCancelada} por {FormatCurrency(valorPeriodo)}. {displayNotasRecaudo}";
+                }
+
+                // If a note was passed in querystring use it to avoid race conditions (it was persisted by RecaudoComponent)
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(note))
+                    {
+                        displayNotasRecaudo = Uri.UnescapeDataString(note);
+                    }
+                }
+                catch { }
+
+                // Replace "SIN RECAUDO EN EL BIMESTRE" with "GRACIAS POR SU PAGO" if there is recaudo
+                displayNotasFactura = ReplaceNoRecaudoMessage(displayNotasFactura, pagosSum);
+                displayNotasRecaudo = ReplaceNoRecaudoMessage(displayNotasRecaudo, pagosSum);
+
+                // Also persist the recibo note into ingreso.Concepto (if ingresoActual exists) so it's recorded
+                try
+                {
+                    var noteToSave = displayNotasRecaudo;
+                    if (ingresoActual != null)
+                    {
+                        var existing = ingresoActual.Concepto ?? string.Empty;
+                        if (!existing.Contains(noteToSave))
+                        {
+                            ingresoActual.Concepto = string.IsNullOrWhiteSpace(existing) ? noteToSave : existing + " | " + noteToSave;
+                            context.Ingresos.Update(ingresoActual);
+                            await context.SaveChangesAsync();
+                        }
+                    }
+                }
+                catch { /* ignore persistence errors to not block printing */ }
+            }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (factura != null && !_exportTriggered)
+        {
+            _exportTriggered = true;
+            await ShowTransientMessage("Generando PDF del recibo...", false);
+            try
+            {
+                using var context = DbFactory.CreateDbContext();
+                var rows = await context.Facturacions
+                    .Where(c => c.Idpredio == factura.Idpredio)
+                    .Select(f => new {
+                        PlanillaId = f.Idplanilla,
+                        PeriodoCorto = f.IdplanillaNavigation.IdperiodoNavigation.DescripcionCorta,
+                        Fecha = f.IdplanillaNavigation.FechaHoraFacturacion ?? f.IdplanillaNavigation.FechaHoraRegistroConsumo,
+                        Recaudo = f.RecaudoPeriodoTotal ?? 0
+                    })
+                    .ToListAsync();
+
+                var ordered = rows
+                    .GroupBy(x => x.PlanillaId)
+                    .Select(g => new { Periodo = g.First().PeriodoCorto, Fecha = g.First().Fecha, Total = g.Sum(x => x.Recaudo) })
+                    .OrderBy(x => x.Fecha)
+                    .ToList();
+
+                var last = ordered.TakeLast(MaxPeriodos).ToList();
+
+                pagosPorPeriodo = last
+                    .Select(x => new RecaudoPorPeriodo { Periodo = x.Periodo, TotalRecaudo = x.Total })
+                    .ToList();
+
+                await JSRuntime.InvokeVoidAsync("renderRecaudosChart", pagosPorPeriodo, "consumoChartRecibo", "Recaudo pesos");
+            }
+            catch { }
+
+            await Task.Delay(200);
+            await SavePdfAsync();
+        }
+    }
+
+    private async Task SavePdfAsync()
+    {
+        if (factura == null)
+        {
+            await ShowTransientMessage("Factura no cargada.", false);
+            return;
+        }
+        try
+        {
+            await ExportClientPdfWithRetry();
+        }
+        catch (Exception ex)
+        {
+            await ShowTransientMessage("Error guardando PDF: " + ex.Message, false);
+        }
+    }
+
+    private async Task ExportClientPdfWithRetry(int intentos = 2)
+    {
+        for (int i = 0; i < intentos; i++)
+        {
+            try
+            {
+                var codigoUsuario = factura.CodigoUsuario ?? "usuario";
+                var fileName = $"REC-{numero_ingreso}.pdf";
+                var path = await JSRuntime.InvokeAsync<string>("pdfExport.exportAndSave", "printableArea", fileName, codigoUsuario);
+                if (!string.IsNullOrEmpty(path))
+                {
+                    pdfRelativePath = path;
+                    var physical = string.Empty;
+                    try
+                    {
+                        var rel = pdfRelativePath?.TrimStart('/')?.Replace('/', System.IO.Path.DirectorySeparatorChar) ?? string.Empty;
+                        physical = System.IO.Path.Combine(Env.WebRootPath, rel);
+                    }
+                    catch { }
+                    await ShowTransientMessage($"PDF guardado correctamente en {pdfRelativePath} (servidor: {physical})", true);
+                    return;
+                }
+                else
+                {
+                    await ShowTransientMessage("Guardado sin ruta devuelta (reintento)...", false);
+                }
+            }
+            catch (Exception ex)
+            {
+                if (i == intentos - 1)
+                {
+                    await ShowTransientMessage("Error exportando: " + ex.Message, false);
+                    throw; // último intento: propagar
+                }
+                await ShowTransientMessage("Error exportando, reintenta: " + ex.Message, false);
+                await Task.Delay(400);
+            }
+        }
+    }
+
+    private string FormatCurrency(double? value) => value.HasValue ? value.Value.ToString("C0", new CultureInfo("es-CO")) : "$0";
+
+    private string ReplaceNoRecaudoMessage(string note, double pagosSum)
+    {
+        if (string.IsNullOrWhiteSpace(note) || Math.Abs(pagosSum) <= 0)
+            return note;
+
+        var textToReplace = $"SIN RECAUDO EN EL BIMESTRE {str_nombre_corto}";
+        var pattern = Regex.Escape(textToReplace);
+        return Regex.Replace(note, pattern, "GRACIAS POR SU PAGO", RegexOptions.IgnoreCase);
+    }
+
+    private bool ShouldApplyRecaudoReplacement()
+    {
+        return string.Equals(from, "recaudo", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(from, "facturacion", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public class RecaudoPorPeriodo
+    {
+        public string Periodo { get; set; }
+        public double TotalRecaudo { get; set; }
+    }
+}

@@ -1,0 +1,129 @@
+﻿@page "/cuentaporpagars/edit"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit</PageTitle>
+
+<h1>Edit</h1>
+
+<h2>CuentaPorPagar</h2>
+<hr />
+@if (CuentaPorPagar is null)
+{
+    <p><em>Llamando...</em></p>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-4">
+            <EditForm method="post" Model="CuentaPorPagar" OnValidSubmit="UpdateCuentaPorPagar" FormName="edit" Enhance>
+                <DataAnnotationsValidator />
+                <ValidationSummary role="alert"/>
+                <input type="hidden" name="CuentaPorPagar.IdcuentaxP" value="@CuentaPorPagar.IdcuentaxP" />
+                <div class="mb-3">
+                    <label for="numero" class="form-label">Numero:</label>
+                    <InputNumber id="numero" @bind-Value="CuentaPorPagar.Numero" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorPagar.Numero" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="identificacion" class="form-label">Identificacion:</label>
+                    <InputText id="identificacion" @bind-Value="CuentaPorPagar.Identificacion" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorPagar.Identificacion" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="descripción" class="form-label">Descripcion:</label>
+                    <InputText id="descripción" @bind-Value="CuentaPorPagar.Descripcion" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorPagar.Descripcion" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="fechahora" class="form-label">FechaHora:</label>
+                    <InputDate id="fechahora" @bind-Value="CuentaPorPagar.FechaHora" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorPagar.FechaHora" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="vencimiento" class="form-label">Vencimiento:</label>
+                    <InputDate id="vencimiento" @bind-Value="CuentaPorPagar.Vencimiento" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorPagar.Vencimiento" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="valordebe" class="form-label">ValorDebe:</label>
+                    <InputNumber id="valordebe" @bind-Value="CuentaPorPagar.ValorDebe" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorPagar.ValorDebe" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="valorpagado" class="form-label">ValorPagado:</label>
+                    <InputNumber id="valorpagado" @bind-Value="CuentaPorPagar.ValorPagado" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorPagar.ValorPagado" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="cuotastotales" class="form-label">CuotasTotales:</label>
+                    <InputNumber id="cuotastotales" @bind-Value="CuentaPorPagar.CuotasTotales" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorPagar.CuotasTotales" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="cuotaspagadas" class="form-label">CuotasPagadas:</label>
+                    <InputNumber id="cuotaspagadas" @bind-Value="CuentaPorPagar.CuotasPagadas" class="form-control" />
+                    <ValidationMessage For="() => CuentaPorPagar.CuotasPagadas" class="text-danger" />
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<div>
+    <a href="/cuentaporpagars">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string IdcuentaxP { get; set; }
+
+    [SupplyParameterFromForm]
+    private CuentaPorPagar? CuentaPorPagar { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        CuentaPorPagar ??= await context.CuentaPorPagars.FirstOrDefaultAsync(m => m.IdcuentaxP == IdcuentaxP);
+
+        if (CuentaPorPagar is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    // To protect from overposting attacks, enable the specific properties you want to bind to.
+    // For more information, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task UpdateCuentaPorPagar()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Attach(CuentaPorPagar!).State = EntityState.Modified;
+
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (!CuentaPorPagarExists(CuentaPorPagar!.IdcuentaxP))
+            {
+                NavigationManager.NavigateTo("notfound");
+            }
+            else
+            {
+                throw;
+            }
+        }
+
+        NavigationManager.NavigateTo("/cuentaporpagars");
+    }
+
+    private bool CuentaPorPagarExists(string idcuentaxp)
+    {
+        using var context = DbFactory.CreateDbContext();
+        return context.CuentaPorPagars.Any(e => e.IdcuentaxP == idcuentaxp);
+    }
+}

@@ -1,0 +1,113 @@
+﻿@page "/tipos/edit"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+@rendermode InteractiveServer
+
+<PageTitle>Edit</PageTitle>
+
+<h1>Edit</h1>
+
+<h2>Tipo</h2>
+<hr />
+@if (Tipo is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-4">
+            <EditForm method="post" Model="Tipo" OnValidSubmit="UpdateTipo" FormName="edit" Enhance>
+                <DataAnnotationsValidator />
+                <ValidationSummary role="alert"/>
+                <input type="hidden" name="Tipo.Id" value="@Tipo.Id" />
+                <div class="mb-3">
+                    <label for="nombre" class="form-label">Nombre:</label>
+                    <InputText id="nombre" @bind-Value="Tipo.Nombre" class="form-control" />
+                    <ValidationMessage For="() => Tipo.Nombre" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="descripcion" class="form-label">Descripcion:</label>
+                    <InputText id="descripcion" @bind-Value="Tipo.Descripcion" class="form-control" />
+                    <ValidationMessage For="() => Tipo.Descripcion" class="text-danger" />
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<div>
+    <a href="/tipos">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private int Id { get; set; }
+
+    private TipoEditDto? Tipo { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Tipo = await context.Tipos
+            .AsNoTracking()
+            .Where(t => t.Id == Id)
+            .Select(t => new TipoEditDto {
+                Id = t.Id,
+                Nombre = t.Nombre,
+                Descripcion = t.Descripcion
+            })
+            .FirstOrDefaultAsync();
+
+        if (Tipo is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    // To protect from overposting attacks, enable the specific properties you want to bind to.
+    // For more information, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task UpdateTipo()
+    {
+        using var context = DbFactory.CreateDbContext();
+        var tipo = await context.Tipos.FindAsync(Tipo!.Id);
+        if (tipo is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+            return;
+        }
+
+        tipo.Nombre = Tipo.Nombre;
+        tipo.Descripcion = Tipo.Descripcion;
+        context.Tipos.Update(tipo);
+        try
+        {
+            await context.SaveChangesAsync();
+            // Mensaje de depuración
+            Console.WriteLine("Datos guardados correctamente");
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (!TipoExists(Tipo.Id))
+            {
+                NavigationManager.NavigateTo("notfound");
+            }
+            else
+            {
+                throw;
+            }
+        }
+
+        NavigationManager.NavigateTo("/tipos");
+    }
+
+    private bool TipoExists(int id)
+    {
+        using var context = DbFactory.CreateDbContext();
+        return context.Tipos.Any(e => e.Id == id);
+    }
+}

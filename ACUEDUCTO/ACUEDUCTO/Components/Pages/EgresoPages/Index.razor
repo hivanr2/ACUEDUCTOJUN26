@@ -1,0 +1,45 @@
+﻿@page "/egresos"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Models
+@implements IAsyncDisposable
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+<PageTitle>Egreso</PageTitle>
+
+<h1>Egreso</h1>
+
+<p>
+    <a href="egresos/create" target="_blank">Create New</a>
+</p>
+
+<QuickGrid Class="table" Items="context.Egresos.OrderByDescending(c => c.Numero)" Pagination="@pagination">
+    <PropertyColumn Property="egreso => egreso.Numero" Sortable="true" />
+    <PropertyColumn Property="egreso => egreso.FechaHora" Sortable="true" />
+    <PropertyColumn Property="egreso => egreso.Idproveedor" Sortable="true" />
+    <PropertyColumn Property="egreso => egreso.Idfactura" Sortable="true" />
+    <PropertyColumn Property="egreso => egreso.Idcxp" Sortable="true" />
+    <PropertyColumn Property="egreso => egreso.Concepto" Sortable="true" />
+    <PropertyColumn Property="egreso => egreso.Valor" />
+
+    <TemplateColumn Context="egreso">
+        <a href="@($"egresos/edit?idegreso={egreso.Idegreso}")" target="_blank">Edit</a> |
+        <a href="@($"egresos/details?idegreso={egreso.Idegreso}")" target="_blank">Details</a> |
+    </TemplateColumn>
+</QuickGrid>
+<Paginator State="@pagination" />
+
+@code {
+    private AcueductoContext context = default!;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+    PaginationState pagination = new PaginationState { ItemsPerPage = 10 };
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}

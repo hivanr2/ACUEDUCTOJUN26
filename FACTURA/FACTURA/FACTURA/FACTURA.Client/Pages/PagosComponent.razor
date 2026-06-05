@@ -1,0 +1,190 @@
+﻿@page "/pagos"
+@using FACTURA.Client.Models
+@using FACTURA.Client.Services
+@inject IFacturasService Facturas
+@inject IPagosService Pagos
+@inject ICuentasBancariasService Cuentas
+
+<h3>Recaudos</h3>
+
+@if (loading)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label">Factura</label>
+            <select class="form-select" @onchange="FacturaSeleccionada">
+                <option value="">-- Seleccione factura --</option>
+                @foreach (var f in facturas)
+                {
+                    <option value="@f.Id">@f.Fecha.ToShortDateString() - @f.ClienteNombre - Total: @f.Total.ToString("N2")</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (seleccionada is not null)
+    {
+        <div class="mt-4">
+            <h5>Registrar pago</h5>
+            <EditForm Model="nuevoPago" OnValidSubmit="RegistrarPagoAsync">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Fecha</label>
+                        <InputDate class="form-control" @bind-Value="nuevoPago.Fecha" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Monto</label>
+                        <InputNumber class="form-control" @bind-Value="nuevoPago.Monto" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Método</label>
+                        <InputSelect class="form-select" @bind-Value="nuevoPago.Metodo" @onchange="MetodoChanged">
+                            <option>Efectivo</option>
+                            <option>Transferencia</option>
+                            <option>Tarjeta</option>
+                        </InputSelect>
+                    </div>
+                    @if (nuevoPago.Metodo == "Transferencia")
+                    {
+                        <div class="col-md-3">
+                            <label class="form-label">Cuenta Bancaria</label>
+                            <InputSelect class="form-select" @bind-Value="nuevoPago.CuentaBancariaId">
+                                <option value="">-- Seleccione cuenta --</option>
+                                @foreach (var cta in cuentas)
+                                {
+                                    <option value="@cta.Id">@cta.Alias - @cta.Banco (@cta.Numero)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Referencia</label>
+                            <InputText class="form-control" @bind-Value="nuevoPago.Referencia" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="col-md-3">
+                            <label class="form-label">Referencia</label>
+                            <InputText class="form-control" @bind-Value="nuevoPago.Referencia" />
+                        </div>
+                    }
+                    <div class="col-12">
+                        <label class="form-label">Observación</label>
+                        <InputText class="form-control" @bind-Value="nuevoPago.Observacion" />
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                        <button class="btn btn-success" type="submit">Registrar</button>
+                        <button class="btn btn-secondary" type="button" @onclick="LimpiarFormulario">Limpiar</button>
+                    </div>
+                </div>
+            </EditForm>
+        </div>
+
+        <div class="mt-4">
+            <h5>Pagos registrados</h5>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Método</th>
+                            <th>Cuenta/Banco</th>
+                            <th>Referencia</th>
+                            <th class="text-end">Monto</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in pagos)
+                        {
+                            var cuenta = cuentas.FirstOrDefault(x => x.Id == p.CuentaBancariaId);
+                            <tr>
+                                <td>@p.Fecha.ToShortDateString()</td>
+                                <td>@p.Metodo</td>
+                                <td>@(cuenta is null ? p.Banco : $"{cuenta.Alias} - {cuenta.Banco}")</td>
+                                <td>@p.Referencia</td>
+                                <td class="text-end">@p.Monto.ToString("N2")</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarPagoAsync(p)"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private bool loading;
+    private List<Factura> facturas = [];
+    private Factura? seleccionada;
+    private List<Pago> pagos = [];
+    private Pago nuevoPago = new();
+    private List<CuentaBancaria> cuentas = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        loading = true;
+        try
+        {
+            facturas = (await Facturas.GetAsync()).ToList();
+            // Cargar cuentas si el servicio está disponible
+            cuentas = (await Cuentas.GetAsync()).ToList();
+        }
+        finally { loading = false; }
+    }
+
+    private async Task CargarPagosAsync()
+    {
+        if (seleccionada is null) return;
+        pagos = (await Pagos.GetByFacturaAsync(seleccionada.Id)).ToList();
+    }
+
+    private async void FacturaSeleccionada(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id))
+        {
+            seleccionada = facturas.FirstOrDefault(f => f.Id == id);
+            if (seleccionada is not null)
+            {
+                await CargarPagosAsync();
+                LimpiarFormulario();
+            }
+        }
+    }
+
+    private void MetodoChanged(ChangeEventArgs _)
+    {
+        if (nuevoPago.Metodo != "Transferencia")
+        {
+            nuevoPago.CuentaBancariaId = null;
+            nuevoPago.Banco = null;
+        }
+    }
+
+    private async Task RegistrarPagoAsync()
+    {
+        if (seleccionada is null) return;
+        nuevoPago.FacturaId = seleccionada.Id;
+        var created = await Pagos.CreateAsync(nuevoPago);
+        if (created is not null) pagos.Insert(0, created);
+        LimpiarFormulario();
+    }
+
+    private async Task EliminarPagoAsync(Pago p)
+    {
+        await Pagos.DeleteAsync(p.Id);
+        pagos.Remove(p);
+    }
+
+    private void LimpiarFormulario()
+    {
+        nuevoPago = new Pago { Fecha = DateTime.Today, Metodo = "Efectivo" };
+    }
+}

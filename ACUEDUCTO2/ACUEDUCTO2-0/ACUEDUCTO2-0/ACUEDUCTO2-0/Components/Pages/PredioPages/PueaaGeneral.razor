@@ -1,0 +1,208 @@
+@page "/predios/pueaa-general"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO2-0.Compartir.MODELS
+@using ACUEDUCTO2-0.Data
+@using ACUEDUCTO2-0.Components.Layout
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+@rendermode InteractiveServer
+
+<PageTitle>PUEAA - Panel General</PageTitle>
+
+@if (loading)
+{
+    <div class="container py-5 text-center text-muted">Cargando...</div>
+}
+else
+{
+    <div class="container py-3">
+        <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+            <div>
+                <h1 class="h5 mb-1">Panel de control PUEAA</h1>
+                <div class="small text-muted">Resumen general de cumplimiento</div>
+            </div>
+            <div>
+                <a class="btn btn-outline-secondary btn-sm" href="" onclick="return cerrarVentana('');">Cerrar</a>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-light"><strong>Distribución Sí/No global</strong></div>
+                    <div class="card-body">
+                        <canvas id="pueaaDonutGlobal" height="260"></canvas>
+                        <div class="mt-3 small text-muted">
+                            <div><strong>Total predios:</strong> @totalPredios</div>
+                            <div><strong>Total ítems evaluados:</strong> @totalItemsEvaluados</div>
+                            <div><strong>Sí:</strong> @yesGlobal | <strong>No:</strong> @noGlobal</div>
+                            <div><strong>Peso:</strong> Sí=70%, Descripción=30%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-light"><strong>Puntaje promedio por requisito</strong></div>
+                    <div class="card-body">
+                        <canvas id="pueaaBarGlobal" height="260"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-light"><strong>Top predios por cumplimiento</strong></div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Predio</th>
+                                <th class="text-center">Puntaje total (%)</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in topPredios)
+                            {
+                                <tr>
+                                    <td>@row.Nombre</td>
+                                    <td class="text-center">@row.PuntajeTotal</td>
+                                    <td>
+                                        <a class="btn btn-link btn-sm" href="@($"/predios/pueaa?idpredio={row.Id}")" target="_blank">Ver detalle</a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool loading = true;
+    private int totalPredios = 0;
+    private int totalItemsEvaluados = 0;
+    private int yesGlobal = 0;
+    private int noGlobal = 0;
+
+    private string[] labels = new[] {
+        "Tanque reserva acueducto",
+        "Tanque reserva lluvia",
+        "Reciclaje de aguas",
+        "Recirculación de aguas",
+        "Control de pérdidas",
+        "Mantenimiento de piscina",
+        "Otros procesos"
+    };
+
+    private double[] scoresAvg = Array.Empty<double>();
+
+    private List<(string Id, string Nombre, int PuntajeTotal)> topPredios = new();
+
+    private bool chartsRendered = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        var data = await context.Predio
+            .Select(p => new {
+                p.IdPredio,
+                p.ApellidosNombresUsuario,
+                p.PUEAA_TanqueReservaAcueducto,
+                p.PUEAA_TanqueReservaAcueductoObservaciones,
+                p.PUEAA_TanqueReservaLluvia,
+                p.PUEAA_TanqueReservaLluviaObservaciones,
+                p.PUEAA_ReciclajeAguas,
+                p.PUEAA_ReciclajeAguasObservaciones,
+                p.PUEAA_RecirculacionAguas,
+                p.PUEAA_RecirculacionAguasObservaciones,
+                p.PUEAA_ControlPerdidas,
+                p.PUEAA_ControlPerdidasObservaciones,
+                p.PUEAA_MantenimientoPiscina,
+                p.PUEAA_MantenimientoPiscinaObservaciones,
+                p.PUEAA_OtrosProcesos,
+                p.PUEAA_OtrosProcesosObservaciones
+            })
+            .ToListAsync();
+
+        totalPredios = data.Count;
+
+        // score helper
+        int Score(bool? yes, string? desc) => (yes == true ? 70 : 0) + (!string.IsNullOrWhiteSpace(desc) ? 30 : 0);
+
+        // acumular totales por categoría
+        double s1=0,s2=0,s3=0,s4=0,s5=0,s6=0,s7=0;
+        yesGlobal = 0; noGlobal = 0; totalItemsEvaluados = 0;
+
+        foreach (var p in data)
+        {
+            s1 += Score(p.PUEAA_TanqueReservaAcueducto, p.PUEAA_TanqueReservaAcueductoObservaciones);
+            s2 += Score(p.PUEAA_TanqueReservaLluvia, p.PUEAA_TanqueReservaLluviaObservaciones);
+            s3 += Score(p.PUEAA_ReciclajeAguas, p.PUEAA_ReciclajeAguasObservaciones);
+            s4 += Score(p.PUEAA_RecirculacionAguas, p.PUEAA_RecirculacionAguasObservaciones);
+            s5 += Score(p.PUEAA_ControlPerdidas, p.PUEAA_ControlPerdidasObservaciones);
+            s6 += Score(p.PUEAA_MantenimientoPiscina, p.PUEAA_MantenimientoPiscinaObservaciones);
+            s7 += Score(p.PUEAA_OtrosProcesos, p.PUEAA_OtrosProcesosObservaciones);
+
+            // conteo global de sí/no (por requisito)
+            yesGlobal += (p.PUEAA_TanqueReservaAcueducto == true ? 1 : 0)
+                + (p.PUEAA_TanqueReservaLluvia == true ? 1 : 0)
+                + (p.PUEAA_ReciclajeAguas == true ? 1 : 0)
+                + (p.PUEAA_RecirculacionAguas == true ? 1 : 0)
+                + (p.PUEAA_ControlPerdidas == true ? 1 : 0)
+                + (p.PUEAA_MantenimientoPiscina == true ? 1 : 0)
+                + (p.PUEAA_OtrosProcesos == true ? 1 : 0);
+
+            noGlobal += (p.PUEAA_TanqueReservaAcueducto == true ? 0 : 1)
+                + (p.PUEAA_TanqueReservaLluvia == true ? 0 : 1)
+                + (p.PUEAA_ReciclajeAguas == true ? 0 : 1)
+                + (p.PUEAA_RecirculacionAguas == true ? 0 : 1)
+                + (p.PUEAA_ControlPerdidas == true ? 0 : 1)
+                + (p.PUEAA_MantenimientoPiscina == true ? 0 : 1)
+                + (p.PUEAA_OtrosProcesos == true ? 0 : 1);
+
+            totalItemsEvaluados += 7;
+
+            // score total predio (promedio de 7 categorías)
+            var totalScore = (Score(p.PUEAA_TanqueReservaAcueducto, p.PUEAA_TanqueReservaAcueductoObservaciones)
+                + Score(p.PUEAA_TanqueReservaLluvia, p.PUEAA_TanqueReservaLluviaObservaciones)
+                + Score(p.PUEAA_ReciclajeAguas, p.PUEAA_ReciclajeAguasObservaciones)
+                + Score(p.PUEAA_RecirculacionAguas, p.PUEAA_RecirculacionAguasObservaciones)
+                + Score(p.PUEAA_ControlPerdidas, p.PUEAA_ControlPerdidasObservaciones)
+                + Score(p.PUEAA_MantenimientoPiscina, p.PUEAA_MantenimientoPiscinaObservaciones)
+                + Score(p.PUEAA_OtrosProcesos, p.PUEAA_OtrosProcesosObservaciones)) / 7.0;
+
+            topPredios.Add((p.IdPredio, p.ApellidosNombresUsuario ?? "(Sin nombre)", (int)Math.Round(totalScore)));
+        }
+
+        // promedios por categoría
+        var denom = Math.Max(1, totalPredios);
+        scoresAvg = new[] { s1, s2, s3, s4, s5, s6, s7 }.Select(s => Math.Round(s / denom, 2)).ToArray();
+
+        loading = false;
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!loading && !chartsRendered)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("renderPueaaCharts", "pueaaBarGlobal", "pueaaDonutGlobal", labels, scoresAvg, yesGlobal, noGlobal, "Promedio por requisito", "Cumplimiento global");
+                chartsRendered = true;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"PUEAA General charts error: {ex.Message}");
+            }
+        }
+    }
+}

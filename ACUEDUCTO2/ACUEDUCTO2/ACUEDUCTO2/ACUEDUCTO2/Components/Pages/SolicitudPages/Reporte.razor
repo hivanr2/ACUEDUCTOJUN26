@@ -1,0 +1,120 @@
+@page "/solicitud/reporte"
+@page "/proceso/Reporte de Solicitudes"
+@using ACUEDUCTO2.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@rendermode InteractiveServer
+
+<PageTitle>Reporte de solicitudes</PageTitle>
+
+<h3>Reporte de solicitudes</h3>
+<p>Matriz de cantidad de solicitudes por tipo y estado. Útil para analizar la mejora continua.</p>
+
+<button class="btn btn-primary mb-3" @onclick="LoadData">Refrescar</button>
+
+@if (Tipos == null || Estados == null)
+{
+    <p>Cargando...</p>
+}
+else if (!Tipos.Any() || !Estados.Any())
+{
+    <p>No hay tipos o estados definidos.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Tipo \\ Estado</th>
+                    @foreach (var e in Estados)
+                    {
+                        <th>@e.NombreEstadoSolicitud</th>
+                    }
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in Tipos)
+                {
+                    <tr>
+                        <td>@t.NombreTipoSolicitud</td>
+                        @foreach (var e in Estados)
+                        {
+                            <td class="text-center">@GetCount(t.Guid, e.Guid)</td>
+                        }
+                        <td class="text-center fw-bold">@GetRowTotal(t.Guid)</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th>Total</th>
+                    @foreach (var e in Estados)
+                    {
+                        <th class="text-center">@GetColumnTotal(e.Guid)</th>
+                    }
+                    <th class="text-center">@GetGrandTotal()</th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+}
+
+@code {
+    private List<TipoSolicitud>? Tipos;
+    private List<EstadoSolicitud>? Estados;
+    private Dictionary<string, Dictionary<string, int>> counts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        using var db = DbFactory.CreateDbContext();
+        Tipos = await db.TipoSolicitud.AsNoTracking().ToListAsync();
+        Estados = await db.EstadoSolicitud.AsNoTracking().ToListAsync();
+
+        var grouped = await db.Solicitud
+            .AsNoTracking()
+            .GroupBy(s => new { s.IdTipo, s.IdEstado })
+            .Select(g => new { g.Key.IdTipo, g.Key.IdEstado, Count = g.Count() })
+            .ToListAsync();
+
+        // Inicializar matriz con ceros
+        counts = Tipos.ToDictionary(
+            t => t.Guid,
+            t => Estados.ToDictionary(e => e.Guid, e => 0)
+        );
+
+        foreach (var g in grouped)
+        {
+            var tipo = g.IdTipo ?? string.Empty;
+            var estado = g.IdEstado ?? string.Empty;
+            if (!counts.ContainsKey(tipo))
+                counts[tipo] = Estados.ToDictionary(e => e.Guid, e => 0);
+
+            if (!counts[tipo].ContainsKey(estado))
+                counts[tipo][estado] = 0;
+
+            counts[tipo][estado] = g.Count;
+        }
+
+        StateHasChanged();
+    }
+
+    private int GetCount(string tipoGuid, string estadoGuid)
+    {
+        if (counts.TryGetValue(tipoGuid, out var dict) && dict.TryGetValue(estadoGuid, out var v))
+            return v;
+        return 0;
+    }
+
+    private int GetRowTotal(string tipoGuid) => counts.TryGetValue(tipoGuid, out var dict) ? dict.Values.Sum() : 0;
+
+    private int GetColumnTotal(string estadoGuid) => counts.Values.Sum(d => d.TryGetValue(estadoGuid, out var v) ? v : 0);
+
+    private int GetGrandTotal() => counts.Values.Sum(d => d.Values.Sum());
+}

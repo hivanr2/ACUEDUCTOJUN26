@@ -1,0 +1,67 @@
+@page "/procesos/edit/{id}"
+@using ACUEDUCTO2.Share.Models
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@inject ACUEDUCTO2.Services.ProcesoServices.ProcesoService ProcesoService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<h3>Editar proceso</h3>
+
+@if (proceso is null)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <EditForm Model="proceso" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-3">
+            <label class="form-label">Nombre</label>
+            <InputText @bind-Value="proceso.Nombre" class="form-control" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Objeto</label>
+            <InputText @bind-Value="proceso.Objeto" class="form-control" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Tipo de proceso</label>
+            <InputSelect @bind-Value="proceso.IdTipoProceso" class="form-control">
+                @foreach (var tipo in tiposProceso)
+                {
+                    <option value="@tipo.Id">@tipo.Nombre</option>
+                }
+            </InputSelect>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <button type="button" class="btn btn-secondary ms-2" @onclick='() => Navigation.NavigateTo("/procesos")'>Cancelar</button>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public string id { get; set; } = string.Empty;
+
+    private Proceso? proceso;
+    private List<TipoProceso> tiposProceso = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        tiposProceso = await ProcesoService.GetTiposProcesoAsync();
+
+        if (!string.IsNullOrWhiteSpace(id))
+            proceso = await ProcesoService.GetByIdAsync(id);
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (proceso is null) return;
+        await ProcesoService.UpdateAsync(proceso);
+        Navigation.NavigateTo("/procesos");
+    }
+}

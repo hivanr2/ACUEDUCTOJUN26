@@ -1,0 +1,55 @@
+﻿@page "/movimientocajas/details"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Detalles Movimiento de Caja</PageTitle>
+
+<h1>Detalles</h1>
+
+<div>
+    <h2>MovimientoCaja</h2>
+    <hr />
+    @if (movimientocaja is null)
+    {
+        <p><em>Llamando...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">FechaHora</dt>
+            <dd class="col-sm-10">@movimientocaja.FechaHora</dd>
+            <dt class="col-sm-2">Iddocumento</dt>
+            <dd class="col-sm-10">@movimientocaja.Iddocumento</dd>
+            <dt class="col-sm-2">Entrada</dt>
+            <dd class="col-sm-10">@movimientocaja.Entrada</dd>
+            <dt class="col-sm-2">Salida</dt>
+            <dd class="col-sm-10">@movimientocaja.Salida</dd>
+            <dt class="col-sm-2">Saldo</dt>
+            <dd class="col-sm-10">@movimientocaja.Saldo</dd>
+        </dl>
+        <div class="d-flex gap-2 mt-3">
+            <a class="btn btn-primary btn-sm" href="@($"/movimientocajas/edit?idmov={movimientocaja.Idmov}")">Editar</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/movimientocajas" onclick="return cerrarVentana('/movimientocajas');">Cerrar</a>
+        </div>
+    }
+</div>
+
+@code {
+    private MovimientoCaja? movimientocaja;
+
+    [SupplyParameterFromQuery]
+    private int Idmov { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        movimientocaja = await context.MovimientoCajas.FirstOrDefaultAsync(m => m.Idmov == Idmov);
+
+        if (movimientocaja is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+}

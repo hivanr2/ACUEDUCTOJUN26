@@ -1,0 +1,120 @@
+﻿@page "/usuarios/edit"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+@rendermode InteractiveServer
+
+<PageTitle>@(UsuarioVM?.ApellidosNombres ?? "Edita Usuario")</PageTitle>
+
+@if (UsuarioVM is null)
+{
+    <div class="container py-5 text-center text-muted">Cargando...</div>
+}
+else
+{
+    <div class="container-fluid py-2 py-md-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div>
+                <h1 class="h5 mb-0">Editar Usuario</h1>
+                <small class="text-muted">@UsuarioVM.Identificacion</small>
+            </div>
+            <a class="btn btn-outline-secondary btn-sm" href="/usuarios" onclick="return cerrarVentana('/usuarios');">Cerrar</a>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <EditForm method="post" Model="UsuarioVM" OnValidSubmit="UpdateUsuario" FormName="edit" Enhance>
+                    <DataAnnotationsValidator />
+                    <ValidationSummary role="alert" />
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <label for="identificacion" class="form-label">Identificación</label>
+                            <InputText id="identificacion" @bind-Value="UsuarioVM.Identificacion" class="form-control" />
+                        </div>
+                        <div class="col-12 col-md-8">
+                            <label for="apellidosnombres" class="form-label">Apellidos y Nombres</label>
+                            <InputText id="apellidosnombres" @bind-Value="UsuarioVM.ApellidosNombres" class="form-control" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="celular" class="form-label">Celular</label>
+                            <InputText id="celular" @bind-Value="UsuarioVM.Celular" class="form-control" />
+                        </div>
+                        <div class="col-12 col-md-8">
+                            <label for="correoelectronico" class="form-label">Correo Electrónico</label>
+                            <InputText id="correoelectronico" @bind-Value="UsuarioVM.CorreoElectronico" class="form-control" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label for="niveleducativo" class="form-label">Nivel Educativo</label>
+                            <InputText id="niveleducativo" @bind-Value="UsuarioVM.NivelEducativo" class="form-control" />
+                        </div>
+                        <div class="col-12">
+                            <label for="observaciones" class="form-label">Observaciones</label>
+                            <InputTextArea id="observaciones" @bind-Value="UsuarioVM.Observaciones" class="form-control" rows="4"></InputTextArea>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <a class="btn btn-outline-secondary" href="/usuarios">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    private string Identificacion { get; set; }
+
+    private UsuarioEditViewModel? UsuarioVM { get; set; }
+    private Usuario? UsuarioEntity { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        UsuarioEntity = await context.Usuarios
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.Identificacion == Identificacion);
+
+        if (UsuarioEntity is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+            return;
+        }
+
+        UsuarioVM = new UsuarioEditViewModel
+        {
+            Identificacion = UsuarioEntity.Identificacion,
+            ApellidosNombres = UsuarioEntity.ApellidosNombres,
+            Celular = UsuarioEntity.Celular,
+            CorreoElectronico = UsuarioEntity.CorreoElectronico,
+            NivelEducativo = UsuarioEntity.NivelEducativo,
+            Observaciones = UsuarioEntity.Observaciones
+        };
+    }
+
+    private async Task UpdateUsuario()
+    {
+        using var context = DbFactory.CreateDbContext();
+        var usuario = await context.Usuarios.FirstOrDefaultAsync(u => u.Identificacion == UsuarioVM.Identificacion);
+        if (usuario is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+            return;
+        }
+
+        usuario.ApellidosNombres = UsuarioVM.ApellidosNombres;
+        usuario.Celular = UsuarioVM.Celular;
+        usuario.CorreoElectronico = UsuarioVM.CorreoElectronico;
+        usuario.NivelEducativo = UsuarioVM.NivelEducativo;
+        usuario.Observaciones = UsuarioVM.Observaciones;
+
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/usuarios");
+    }
+}

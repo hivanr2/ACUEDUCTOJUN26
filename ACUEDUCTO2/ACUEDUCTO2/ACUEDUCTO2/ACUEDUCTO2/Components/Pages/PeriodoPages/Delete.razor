@@ -1,0 +1,83 @@
+@page "/periodos/eliminar/{id}"
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Eliminar periodo</PageTitle>
+
+<h3>Eliminar periodo</h3>
+<div class="mb-3 d-flex gap-2 flex-wrap">
+    <button type="button" class="btn btn-secondary" @onclick="Volver">Volver al listado</button>
+</div>
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+@if (cargando)
+{
+    <p>Cargando...</p>
+}
+else if (periodo is null)
+{
+    <div class="alert alert-warning">No se encontró el periodo solicitado.</div>
+}
+else
+{
+    <div class="alert alert-warning">
+        <p>¿Seguro que deseas eliminar el periodo <strong>@periodo.Descripcion</strong>?</p>
+        <p>Esta acción no se puede deshacer.</p>
+    </div>
+    <dl class="row">
+        <dt class="col-sm-3">Fecha facturación</dt>
+        <dd class="col-sm-9">@(periodo.FechaHoraFacturacion?.ToString("dd/MM/yyyy") ?? "-")</dd>
+        <dt class="col-sm-3">Estado</dt>
+        <dd class="col-sm-9">@(periodo.Abierta == true ? "Abierta" : "Cerrada")</dd>
+    </dl>
+    <button type="button" class="btn btn-danger me-2" disabled="@procesando" @onclick="EliminarAsync">Eliminar</button>
+    <button type="button" class="btn btn-secondary" @onclick="Volver">Cancelar</button>
+}
+
+@code {
+    [Parameter]
+    public string id { get; set; } = string.Empty;
+
+    private Periodo? periodo;
+    private bool cargando = true;
+    private bool procesando;
+    private string? error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        cargando = true;
+        using var db = DbFactory.CreateDbContext();
+        periodo = await db.Periodos.AsNoTracking().FirstOrDefaultAsync(p => p.Guid == id);
+        cargando = false;
+    }
+
+    private async Task EliminarAsync()
+    {
+        if (periodo is null || procesando)
+        {
+            return;
+        }
+
+        procesando = true;
+        using var db = DbFactory.CreateDbContext();
+        var entity = await db.Periodos.FirstOrDefaultAsync(p => p.Guid == id);
+        if (entity is null)
+        {
+            error = "El periodo ya no existe.";
+            procesando = false;
+            return;
+        }
+
+        db.Periodos.Remove(entity);
+        await db.SaveChangesAsync();
+        Navigation.NavigateTo("/periodos", forceLoad: true, replace: true);
+    }
+
+    void Volver() => Navigation.NavigateTo("/periodos", forceLoad: true);
+}

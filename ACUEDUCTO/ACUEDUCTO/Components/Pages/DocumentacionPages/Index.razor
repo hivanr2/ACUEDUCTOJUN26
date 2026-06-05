@@ -1,0 +1,97 @@
+﻿@page "/documentacions"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Models
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@rendermode InteractiveServer
+
+
+
+<PageTitle>Documentación Acueducto</PageTitle>
+
+<div class="container-fluid py-2 py-md-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Documentación Acueducto</h1>
+            <small class="text-muted">Tabla de Retención Documental (TRD)</small>
+        </div>
+        <!-- Acciones superiores reemplazadas por FAB -->
+    </div>
+
+    <div class="row g-2 align-items-center mb-2">
+        <div class="col-12 col-md-6">
+            <input type="search" class="form-control" @bind=filterText @bind:event="oninput" placeholder="Buscar por código, serie o tipo..." />
+        </div>
+        <div class="col-12 col-md-6 text-md-end text-muted">
+            <span>Items: <span class="badge bg-secondary">@DocumentacionesFiltered.Count()</span></span>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+        <div class="ms-auto d-flex flex-wrap gap-2 small">
+            <a class="btn btn-outline-secondary btn-sm" href="/seriedocumentacions">Series</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/tipodocumentacions">Tipos</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <QuickGrid Class="table table-hover table-sm align-middle mb-0 docu-grid" Items="DocumentacionesFiltered">
+                <PropertyColumn Property="documentacion => documentacion.Codigo" Title="Código" />
+                <PropertyColumn Property="documentacion => documentacion.IdserieNavigation.Nombre" Title="Serie" />
+                <PropertyColumn Property="documentacion => documentacion.IdtipoNavigation.Nombre" Title="Tipo" />
+                <PropertyColumn Property="documentacion => documentacion.TiempoArchivoGestion" Title="Archivo Gestión (Años)" />
+                <PropertyColumn Property="documentacion => documentacion.TiempoArchivoCentral" Title="Archivo Central (Años)" />
+                <PropertyColumn Property="documentacion => documentacion.DisposicionFinal" Title="Disposición Final - Fisica y/o Digital" />
+                <PropertyColumn Property="documentacion => documentacion.Observaciones" Title="Observaciones" />
+
+                <TemplateColumn Context="documentacion" Title="Acciones">
+                    <div class="text-end">
+                        <a class="btn btn-link btn-sm" href="@($"documentacions/edit?id={documentacion.Id}")" target="_blank">Editar</a>
+                        <span class="text-muted">|</span>
+                        <a class="btn btn-link btn-sm" href="@($"documentacions/details?id={documentacion.Id}")" target="_blank">Detalles</a>
+                        <span class="text-muted">|</span>
+                        <a class="btn btn-link btn-sm text-danger" href="@($"documentacions/delete?id={(documentacion.Id ?? "unknown")}")" target="_blank">Borrar</a>
+                    </div>
+                </TemplateColumn>
+            </QuickGrid>
+        </div>
+    </div>
+</div>
+
+<!-- Botón flotante Crear Documento -->
+<a href="/documentacions/create" class="fab-create" title="Crear documento" aria-label="Crear documento">
+    <img src="/img/plus.svg" alt="Crear" onerror="this.onerror=null;this.outerHTML='+';" />
+</a>
+
+<style>
+    /* Reducir un poco el tamaño de fuente de la tabla */
+    .docu-grid { font-size: 0.9rem; }
+    .docu-grid th { font-size: 0.9rem; }
+</style>
+
+@code {
+    private AcueductoContext context = default!;
+    private List<Documentacion> documentaciones = new();
+    private string? filterText = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        context = DbFactory.CreateDbContext();
+        documentaciones = await context.Documentacions.OrderBy(c => c.Codigo)
+            .Include(d => d.IdserieNavigation)
+            .Include(d => d.IdtipoNavigation)
+            .ToListAsync();
+    }
+
+    IQueryable<Documentacion> DocumentacionesFiltered => string.IsNullOrWhiteSpace(filterText)
+        ? documentaciones.AsQueryable()
+        : documentaciones.Where(d => (d.Codigo ?? string.Empty).Contains(filterText!)
+            || (d.IdserieNavigation?.Nombre ?? string.Empty).Contains(filterText!)
+            || (d.IdtipoNavigation?.Nombre ?? string.Empty).Contains(filterText!))
+          .AsQueryable();
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}
+

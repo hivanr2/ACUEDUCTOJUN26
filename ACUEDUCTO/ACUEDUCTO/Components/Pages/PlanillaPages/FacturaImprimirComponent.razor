@@ -1,0 +1,556 @@
+﻿@layout ACUEDUCTO.Components.Layout.PrintLayout
+@page "/factura/imprimir"
+@page "/factura/imprimir/{id}"
+@using ACUEDUCTO.Models
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@using ACUEDUCTO.Services
+@using Microsoft.AspNetCore.WebUtilities
+@using ACUEDUCTO.COMPARTIR.DTO
+@inject NavigationManager NavigationManager
+@inject IDbContextFactory<AcueductoContext> DbFactory
+@inject IJSRuntime JSRuntime
+@inject ACUEDUCTO.Services.IPdfService PdfService
+@inject IWebHostEnvironment Env
+@inject Microsoft.Extensions.Logging.ILogger<FacturaImprimirComponent> Logger
+@using SkiaSharp
+
+@rendermode InteractiveServer
+
+<style>
+  /* Formato ticket térmico continuo 58mm moderno */
+  @@page { size: 58mm auto; margin: 0; }
+  html, body { margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact; }
+  /* Reducir padding lateral para aprovechar más el ancho útil */
+  .ticket { width:58mm;margin:0 auto;padding:2mm 1mm 1.5mm 1mm;font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,'Noto Sans',sans-serif;font-size:12px;line-height:1.35;color:#111;letter-spacing:.15px; }
+  .center{text-align:center;} .right{text-align:right;} .small{font-size:11px;} .xsmall{font-size:10px;} .big{font-size:15px;font-weight:800;} .bold{font-weight:700;}
+  hr{border:none;border-top:1px dashed #555;margin:2mm 0;opacity:.9;}
+  /* Mantener tablas a 100% del contenedor */
+  .kv-table{width:100%;border-collapse:collapse;margin:0;font-size:11px;align-content:center} 
+  .kv-table td{padding:1px 2px;vertical-align:top;border:1px solid #222; text-align:center}
+  .kv-table td.k{text-align:right;padding-right:3px;font-weight:700;background:#f5f5f5;} 
+  .kv-table td.v{text-align:center;}
+  .kv-table td.d{width:50%; text-align:left;background:#f5f5f5;}
+  .kv-table td.e{width:50%; text-align:center;}
+  .section-line {border:1px solid #222;padding:3px 4px;font-size:11px;font-weight:800;text-align:center;background:#f9f9f9;margin-top:1.5mm;}
+  .section-line.inverse{background:#222;color:#fff;font-weight:800;}
+  .notas-box{border:1px solid #222;padding:3px 4px;white-space:pre-wrap;}
+  .blk { background:#000; color:#fff; text-align:center; padding:4px; font-size:13px; font-weight:800; margin-top:2mm; }
+  .no-print { position:sticky; top:0; z-index:1000; }
+  /* Imagen (gráfico/logo) adaptada a 50mm de ancho máximo */
+  .img-50mm { width:52mm; max-width:52mm; height:auto; }
+  .chart-50mm { width:50mm; max-width:50mm; height:22mm; max-height:22mm; display:block; margin:0 auto; }
+  .predio-nombre-row{font-size:13px;font-weight:800;text-align:center;background:#fff;}
+  @@media print { .no-print { display:none !important; } .img-50mm { width:52mm !important; } .chart-50mm { width:50mm !important; height:22mm !important; } }
+</style>
+
+@if (showSavedMsg && !string.IsNullOrWhiteSpace(savedPdfUrl))
+{
+    <div class="no-print alert alert-success py-2 px-3 m-2" role="alert">
+        PDF guardado en <a href="@savedPdfUrl" target="_blank" class="alert-link">@savedPdfUrl</a>
+    </div>
+}
+
+@if (factura is null)
+{
+    <div class="container py-3">
+        <div class="alert alert-info">Cargando factura...</div>
+    </div>
+}
+else
+{
+    <div class="ticket">
+        <div class="center">
+            <div class="big">Factura: @CodigoFactura</div>
+            @if (!string.IsNullOrWhiteSpace(LogoUrl))
+            {
+                <img src="@LogoUrl" alt="Logo" class="img-50mm" style="max-height:22mm;object-fit:contain;margin:4px auto;display:block;" />
+            }
+            <div class="small">JUNTA DE ACCIÓN COMUNAL TOBIA CHICA</div>
+            <div class="small">MUNICIPIO DE NOCAIMA - CUNDINAMARCA</div>
+            <div class="small">NIT: 832.003.939-2</div>
+        </div>
+
+        <div class="blk">@BimestreLargo</div>
+        <table class="kv-table">
+            <tr><td class="k">Reg. Consumo</td><td class="v">@FechaRegistroConsumo</td></tr>
+            <tr><td class="k">Último día para pago</td><td class="v">@FechaUltimoPago</td></tr>
+            <tr><td class="k">Suspensión</td><td class="v">@FechaSuspension</td></tr>
+        </table>
+
+        <div class="section-line">DATOS DEL PREDIO</div>
+        <table class="kv-table">
+            <tr><td colspan="2" class="blk">@PredioNombre</td></tr>
+            <tr><td class="k">Dirección</td><td class="v">@PredioDireccion</td></tr>
+            <tr><td class="k">Ruta</td><td class="v">@PredioRuta</td></tr>
+            <tr><td class="k">Código Usuario</td><td class="v">@CodigoUsuario</td></tr>
+            <tr><td class="k">Medidor #</td><td class="v">@MedidorNumero</td></tr>
+            <tr><td class="k">Marca Medidor</td><td class="v">@MedidorMarca</td></tr>
+            <tr><td class="k">Estado Medidor</td><td class="v">@MedidorEstado</td></tr>
+        </table>
+        <div class="section-line">CONSUMOS EN METROS CUBICOS</div>
+        <table class="kv-table" >
+            <tr><td class="d">Medición Anterior</td><td class="e">@MedicionAnterior</td></tr>
+            <tr><td class="d">Medición Actual</td><td class="e">@MedicionActual</td></tr>
+            <tr><td colspan="2" class="blk">Consumo M3 : @ConsumoM3</td></tr>
+        </table >
+
+        @if (isConsumoAboveAverage)
+        {
+            <div class="blk">ALERTA DESPERDICIO!</div>
+            <div class="blk small">
+                EL BIMESTRE ESTÁ POR ENCIMA DEL PROMEDIO (@PromedioHistorico.ToString("0.##")) Y LLEVA @BimestresEncima BIMESTRE(S) POR ENCIMA. <strong>ALERTA DE DESPERDICIO!</strong>
+            </div>
+        }
+
+        @if (TarifaDesglose?.Count > 0)
+        {
+            <div class="section-line">Desglose Tarifa (rango / uso * valor)</div>
+            <table class="kv-table">
+                @foreach (var row in TarifaDesglose)
+                {
+                    <tr><td class="k">@row.Label</td><td class="v">@row.Total</td></tr>
+                }
+            </table>
+        }
+
+        <div class="section-line">VALORES BIMESTRE</div>
+        <table class="kv-table">
+            <tr><td class="k">Valor Consumo</td><td class="v">@Cur(factura?.ValorConsumo)</td></tr>
+            <tr><td class="k">Cargo Fijo</td><td class="v">@Cur(factura?.CargoFijo)</td></tr>
+            <tr><td class="k">Val. SobreTasa</td><td class="v">@Cur(factura?.ValorSobreTasa) (@Num(factura?.PorcentajeSobreTasa)%)</td></tr>
+            <tr><td class="k">Val. Mora</td><td class="v">@Cur(factura?.ValorMora) (@Num(factura?.PorcentajeMora)%)</td></tr>
+            <tr><td class="k">Val. Subsidio</td><td class="v">@Cur(factura?.ValorSubsidio) (@Num(factura?.PorcentajeSubsidio)%)</td></tr>
+            <tr><td class="k">Otros Valores</td><td class="v">@Cur(factura?.OtrosValores)</td></tr>
+            <tr><td class="blk">VALOR BIMESTRE</td><td class="blk">@Cur(factura?.ValorPeriodo)</td></tr>
+        </table>
+
+        <div class="section-line">ESTADO DE CUENTA</div>
+        <table class="kv-table">
+            <tr><td class="k">Deuda Bimestre Anterior</td><td class="v">@Cur(factura?.DeudaAnterior)</td></tr>
+            <tr><td class="k">Pagos en @PeriodoCorto</td><td class="v">@Cur(factura?.RecaudoPeriodoTotal)</td></tr>
+            <tr><td class="blk" colspan="2">DEUDA TOTAL : @Cur(DeudaTotal)</td></tr>
+        </table>
+
+
+        <div class="section-line">NOTAS</div>
+        <div class="notas-box">@NotasFactura</div>
+
+
+        @if (ConsumosHist?.Count > 0)
+        {
+            <div class="section-line">Consumos Bimestrales Totales</div>
+            <canvas id="consumoChart" class="chart-50mm" width="200" height="85"></canvas>
+        }
+
+        <hr />
+        <div class="center xsmall">
+            CONSIGNAR CUENTA AHORROS BANCOLOMBIA # 89233904466<br />
+            NIT:832003939-2. JUNTA DE ACCIÓN COMUNAL TOBIA<br />
+            HORARIO CASA COMUNAL: MAR, JUE Y SÁB 3:00PM - 5:00PM
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string? id { get; set; }
+
+    private Facturacion? factura;
+    private string? LogoUrl;
+    private bool chartRendered;
+    private bool pdfChartSaved;
+    private bool showSavedMsg;
+    private string? savedPdfUrl;
+
+    private string CodigoFactura => string.IsNullOrWhiteSpace(factura?.CodigoFactura) ? factura?.Idfactura ?? "" : factura!.CodigoFactura!;
+    private string BimestreLargo => factura?.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionLarga
+        ?? factura?.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionCorta
+        ?? "BIMESTRE";
+    private string PeriodoCorto => factura?.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionCorta ?? "";
+
+    private string FechaRegistroConsumo => factura?.IdplanillaNavigation?.FechaHoraRegistroConsumo?.ToString("d", new CultureInfo("es-CO")) ?? "-";
+    private string FechaUltimoPago => factura?.IdplanillaNavigation?.FechaLimitePago?.ToString("D", new CultureInfo("es-CO")) ?? "-";
+    private string FechaSuspension => factura?.IdplanillaNavigation?.FechaSuspension?.ToString("D", new CultureInfo("es-CO")) ?? "-";
+
+    private string PredioNombre => factura?.IdpredioNavigation?.ApellidosNombresUsuario ?? "-";
+    private string PredioDireccion => factura?.IdpredioNavigation?.Direccion ?? "-";
+    private string PredioRuta => factura?.IdpredioNavigation?.Ruta?.ToString() ?? "-";
+    private string CodigoUsuario => factura?.CodigoUsuario ?? factura?.IdpredioNavigation?.CodigoUsuario ?? "-";
+    private string MedidorNumero => factura?.IdpredioNavigation?.NumeroMedidor ?? "-";
+    private string MedidorMarca => factura?.IdpredioNavigation?.MarcaMedidor ?? "-";
+    private string MedidorEstado => factura?.IdpredioNavigation?.EstadoMedidor ?? "-";
+
+    private string MedicionAnterior => Num(factura?.MedicionAnterior);
+    private string MedicionActual => Num(factura?.MedicionActual);
+    private string ConsumoM3 => Num(factura?.ConsumoM3);
+
+    // Mostrar el mensaje de agradecimiento solo si hay texto en NotasFactura
+    // o si efectivamente se registró un recaudo en el bimestre.
+    private string NotasFactura =>
+        !string.IsNullOrWhiteSpace(factura?.NotasFactura)
+            ? factura!.NotasFactura!
+            : ((factura?.RecaudoPeriodoTotal ?? 0) > 0 ? "GRACIAS POR SU ABONO A DEUDA ANTERIOR." : "SIN RECAUDO EN EL BIMESTRE");
+
+    private double? DeudaTotal => factura is null ? 0 : (factura.DeudaPasa ?? Math.Max(0, (factura.DeudaAnterior ?? 0) + (factura.ValorPeriodo ?? 0) - (factura.RecaudoPeriodoTotal ?? 0)));
+
+    private static string Cur(double? v) => (v ?? 0).ToString("C0", CultureInfo.GetCultureInfo("es-CO"));
+    private static string Num(double? v) => v?.ToString("0.##", CultureInfo.InvariantCulture) ?? "0";
+
+    private List<(string Label,string Total)> TarifaDesglose = new();
+
+    private sealed class ConsumoRow { public string Periodo { get; set; } = string.Empty; public double TotalConsumoM3 { get; set; } }
+    private List<ConsumoRow> ConsumosHist = new();
+    private double PromedioHistorico = 0.0;
+    private int BimestresEncima = 0;
+    private bool isConsumoAboveAverage = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Obtener id por ruta o querystring (acepta 'IdFactura' o 'idFactura')
+        var targetId = id;
+        if (string.IsNullOrWhiteSpace(targetId))
+        {
+            var uri = new Uri(NavigationManager.Uri);
+            var qs = QueryHelpers.ParseQuery(uri.Query);
+            targetId = qs.TryGetValue("IdFactura", out var v1) ? v1.ToString()
+                     : qs.TryGetValue("idFactura", out var v2) ? v2.ToString()
+                     : null;
+            if (string.IsNullOrWhiteSpace(targetId)) return;
+        }
+
+        using var context = DbFactory.CreateDbContext();
+        factura = await context.Facturacions
+            .Include(f => f.IdplanillaNavigation)!.ThenInclude(p => p.IdperiodoNavigation)
+            .Include(f => f.IdpredioNavigation)!.ThenInclude(p => p.TipoConsumoNavigation)
+            .Include(f => f.IdpredioNavigation)!.ThenInclude(p => p.IdentificacionFacturacionNavigation)
+            .FirstOrDefaultAsync(f => f.Idfactura == targetId || f.CodigoFactura == targetId);
+
+        // Logo (si existe en wwwroot)
+        var logoPath = System.IO.Path.Combine(Env.WebRootPath, "fondologo-acueducto.jpg");
+        if (System.IO.File.Exists(logoPath))
+        {
+            LogoUrl = "/fondologo-acueducto.jpg";
+        }
+
+        if (factura is not null)
+        {
+            // Cargar datos auxiliares para pantalla
+            await LoadTarifaDesglose(context);
+            await LoadConsumosHistoricos(context);
+
+            // Generar y guardar PDF inmediatamente (sin gráfico, para no bloquear)
+            var tarifasList = await context.Tarifas.AsNoTracking().ToListAsync();
+            // preparar nota de consumo para el PDF si aplica
+            string? consumoNote = null;
+            if (isConsumoAboveAverage)
+            {
+                consumoNote = $"EL BIMESTRE ESTÁ POR ENCIMA DEL PROMEDIO ({PromedioHistorico:0.##}) Y LLEVA {BimestresEncima} BIMESTRE(S) POR ENCIMA. ALERTA DE DESPERDICIO!";
+            }
+            await GenerateAndSavePdfAsync(factura, tarifasList, null, consumoNote);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!chartRendered && ConsumosHist.Count > 0)
+        {
+            await JSRuntime.InvokeVoidAsync("renderConsumoChart", ConsumosHist, "consumoChart", "Consumo M3");
+            chartRendered = true;
+        }
+
+        // Capturar imagen del gráfico y regenerar PDF una sola vez con el gráfico embebido
+        if (chartRendered && !pdfChartSaved && ConsumosHist.Count > 0 && factura is not null)
+        {
+            try
+            {
+                var chartBase64 = await JSRuntime.InvokeAsync<string>("getCanvasPngBase64", "consumoChart");
+                    if (!string.IsNullOrWhiteSpace(chartBase64))
+                    {
+                        using var context = DbFactory.CreateDbContext();
+                        var tarifasList = await context.Tarifas.AsNoTracking().ToListAsync();
+                        string? consumoNote = null;
+                        if (isConsumoAboveAverage)
+                        {
+                            consumoNote = $"EL BIMESTRE ESTÁ POR ENCIMA DEL PROMEDIO ({PromedioHistorico:0.##}) Y LLEVA {BimestresEncima} BIMESTRE(S) POR ENCIMA. ALERTA DE DESPERDICIO!";
+                        }
+                        await GenerateAndSavePdfAsync(factura, tarifasList, chartBase64, consumoNote);
+                        pdfChartSaved = true;
+                    }
+            }
+            catch { /* ignore */ }
+        }
+    }
+
+    private List<(string Label, string Total)> CalcularTarifaDesglose(IList<Tarifa> tarifas, double consumoTotal)
+    {
+        var desglose = new List<(string, string)>();
+        double consumoRestante = consumoTotal;
+        foreach (var tarifa in tarifas.OrderBy(t => t.Desde))
+        {
+            double desde = Convert.ToDouble(tarifa.Desde);
+            double hasta = tarifa.Hasta != null ? Convert.ToDouble(tarifa.Hasta) : double.MaxValue;
+            double uso = 0;
+            if (consumoRestante > 0 && consumoTotal > desde - 1)
+            {
+                double inicioRango = Math.Max(desde, consumoTotal - consumoRestante + 1);
+                double finRango = Math.Min(hasta, consumoTotal);
+                uso = Math.Max(0, finRango - inicioRango + 1);
+                if (consumoRestante < uso) uso = consumoRestante;
+                consumoRestante -= uso;
+            }
+            string label = hasta == double.MaxValue
+                ? $">={desde}: {uso}M3 x {Cur(tarifa.ValorUnidad)}"
+                : $"{desde}-{hasta}: {uso}M3 x {Cur(tarifa.ValorUnidad)}";
+            string total = Cur((tarifa.ValorUnidad ?? 0) * uso);
+            desglose.Add((label, total));
+        }
+        return desglose;
+    }
+
+    private async Task GenerateAndSavePdfAsync(Facturacion f, IList<Tarifa> tarifas, string? chartBase64, string? consumoNote = null)
+    {
+        try
+        {
+            string Sanitize(string input)
+            {
+                if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+                var invalid = System.IO.Path.GetInvalidFileNameChars();
+                var safe = string.Join("_", input.Split(invalid, StringSplitOptions.RemoveEmptyEntries));
+                return safe.Trim();
+            }
+
+            var codigoUsuario = Sanitize(f.CodigoUsuario ?? f.IdpredioNavigation?.CodigoUsuario ?? "usuario");
+            var codigoFactura = Sanitize(f.CodigoFactura ?? f.Idfactura);
+
+            var root = Env.WebRootPath;
+            var dir = System.IO.Path.Combine(root, "imagenes", codigoUsuario);
+            System.IO.Directory.CreateDirectory(dir);
+            var pdfPath = System.IO.Path.Combine(dir, $"{codigoFactura}.pdf");
+
+            string? logoBase64 = null;
+            var logoFile = System.IO.Path.Combine(root, "fondologo-acueducto.jpg");
+            if (System.IO.File.Exists(logoFile))
+            {
+                var lb = await System.IO.File.ReadAllBytesAsync(logoFile);
+                logoBase64 = Convert.ToBase64String(lb);
+            }
+
+            // Calcular desglose dinámico
+            var desglose = CalcularTarifaDesglose(tarifas, f.ConsumoM3 ?? 0);
+
+            var bytes = PdfService.FromFactura(f, tarifas, desglose, logoBase64, chartBase64, consumoNote);
+            await System.IO.File.WriteAllBytesAsync(pdfPath, bytes);
+
+            // Intentar guardar en la BD la nota por abono si no existe
+            try
+            {
+                using var updateCtx = DbFactory.CreateDbContext();
+                var ent = await updateCtx.Facturacions.FirstOrDefaultAsync(x => x.Idfactura == f.Idfactura);
+                if (ent is not null && string.IsNullOrWhiteSpace(ent.NotasFactura) && (ent.RecaudoPeriodoTotal ?? 0) > 0)
+                {
+                    ent.NotasFactura = "GRACIAS POR SU ABONO A DEUDA ANTERIOR.";
+                    await updateCtx.SaveChangesAsync();
+
+                    try
+                    {
+                        f.NotasFactura = ent.NotasFactura;
+                        if (factura is not null && factura.Idfactura == f.Idfactura)
+                        {
+                            factura.NotasFactura = ent.NotasFactura;
+                        }
+                        await InvokeAsync(StateHasChanged);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger?.LogWarning(ex, "No se pudo actualizar la instancia en memoria para factura {Id}", f.Idfactura);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(ex, "Error guardando NotasFactura para la factura {Id}", f.Idfactura);
+            }
+
+            savedPdfUrl = $"/imagenes/{codigoUsuario}/{codigoFactura}.pdf";
+            showSavedMsg = true;
+            await InvokeAsync(StateHasChanged);
+            _ = HideSavedMsgLater();
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Error generando PDF para factura {Id}", f.Idfactura);
+        }
+    }
+
+    private async Task HideSavedMsgLater()
+    {
+        try
+        {
+            await Task.Delay(5000);
+            showSavedMsg = false;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { }
+    }
+
+    private async Task LoadTarifaDesglose(AcueductoContext context)
+    {
+        TarifaDesglose.Clear();
+        var tarifas = await context.Tarifas.AsNoTracking().OrderBy(t => t.Desde).ToListAsync();
+        if (tarifas.Count == 0 || factura?.ConsumoM3 is null) return;
+        double consumo = factura.ConsumoM3.Value;
+        double consumoRestante = consumo;
+        foreach (var tarifa in tarifas)
+        {
+            double desde = Convert.ToDouble(tarifa.Desde);
+            double hasta = tarifa.Hasta != null ? Convert.ToDouble(tarifa.Hasta) : double.MaxValue;
+            double rango = hasta - desde + 1;
+            double uso = 0;
+            if (consumoRestante > 0 && consumo > desde - 1)
+            {
+                // Calcular el consumo en este rango
+                double inicioRango = Math.Max(desde, consumo - consumoRestante + 1);
+                double finRango = Math.Min(hasta, consumo);
+                uso = Math.Max(0, finRango - inicioRango + 1);
+                if (consumoRestante < uso) uso = consumoRestante;
+                consumoRestante -= uso;
+            }
+            string label = hasta == double.MaxValue
+                ? $">={desde}: {uso}M3 x {Cur(tarifa.ValorUnidad)}"
+                : $"{desde}-{hasta}: {uso}M3 x {Cur(tarifa.ValorUnidad)}";
+            string total = Cur((tarifa.ValorUnidad ?? 0) * uso);
+            TarifaDesglose.Add((label, total));
+        }
+    }
+
+    private async Task LoadConsumosHistoricos(AcueductoContext context)
+    {
+        ConsumosHist.Clear();
+        if (factura?.Idpredio is null) return;
+        var list = await context.Facturacions
+            .Where(f => f.Idpredio == factura.Idpredio)
+            .Include(f => f.IdplanillaNavigation)!.ThenInclude(p => p.IdperiodoNavigation)
+            .OrderByDescending(f => f.IdplanillaNavigation!.FechaHoraRegistroConsumo)
+            .Take(12)
+            .ToListAsync();
+        foreach (var f in list.OrderBy(f => f.IdplanillaNavigation!.FechaHoraRegistroConsumo))
+        {
+            var per = f.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionCorta ?? f.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionLarga ?? "-";
+            ConsumosHist.Add(new ConsumoRow { Periodo = per, TotalConsumoM3 = f.ConsumoM3 ?? 0 });
+        }
+
+        // Calcular promedio histórico y cuantos bimestres consecutivos están por encima del promedio
+        try
+        {
+            // helper to normalize date between FechaHoraFacturacion and FechaHoraRegistroConsumo
+            static DateTime? GetFecha(Facturacion f) => f.IdplanillaNavigation?.FechaHoraFacturacion ?? f.IdplanillaNavigation?.FechaHoraRegistroConsumo;
+
+            static string BimestreLabelFromDate(DateTime dt)
+            {
+                // Registration/facturacion dates are recorded in the month AFTER the bimestre,
+                // so shift one month back when deriving the bimestre label from a date.
+                var labels = new[] { "ENE-FEB", "MAR-ABR", "MAY-JUN", "JUL-AGO", "SEP-OCT", "NOV-DIC" };
+                var adjusted = dt.AddMonths(-1);
+                int idx = (adjusted.Month - 1) / 2;
+                idx = Math.Clamp(idx, 0, labels.Length - 1);
+                return labels[idx];
+            }
+
+            // Build recent timeline (most recent first) including one extra so we can inspect the bimestre
+            var timelineDesc = list
+                .Where(f => GetFecha(f) != null)
+                .OrderByDescending(f => GetFecha(f))
+                .Take(DesperdicioConfig.Window + 1)
+                .ToList();
+
+            if (timelineDesc.Count <= 1)
+            {
+                BimestresEncima = 0;
+                isConsumoAboveAverage = false;
+                return;
+            }
+
+            // Now compute the consumos window (last N positive consumos)
+            var consumos = list
+                .Where(f => f.ConsumoM3.HasValue && f.ConsumoM3 > 0 && GetFecha(f) != null)
+                .OrderByDescending(f => GetFecha(f))
+                .Take(DesperdicioConfig.Window)
+                .OrderBy(f => GetFecha(f))
+                .ToList();
+
+            if (consumos.Count == 0)
+            {
+                BimestresEncima = 0;
+                isConsumoAboveAverage = false;
+                return;
+            }
+
+            var promedio = consumos.Average(f => f.ConsumoM3 ?? 0.0);
+            // expose the historical average for display (round to 1 decimal to match other views)
+            PromedioHistorico = Math.Round(promedio, 1);
+            var promedioRedondeado = PromedioHistorico;
+            var umbral = promedioRedondeado + 2.0;
+
+            // find the most recent previous non-zero record within the timeline (skip current)
+            var immediatePrev = timelineDesc.Skip(1).FirstOrDefault(f => (f.ConsumoM3 ?? 0.0) > 0.0);
+            if (immediatePrev == null)
+            {
+                BimestresEncima = 0;
+                isConsumoAboveAverage = false;
+                return;
+            }
+
+            var immediateConsumo = immediatePrev.ConsumoM3 ?? 0.0;
+            if (immediateConsumo <= 0.0 || immediateConsumo < umbral)
+            {
+                BimestresEncima = 0;
+                isConsumoAboveAverage = false;
+                return;
+            }
+
+            // Build distinct bimestre entries ordered from most recent to oldest
+            var timelineOrdered = timelineDesc.OrderByDescending(f => GetFecha(f)).ToList();
+            var bimestreEntries = timelineOrdered
+                .Select(f => {
+                    var fecha = GetFecha(f) ?? DateTime.MinValue;
+                    var bIndex = fecha == DateTime.MinValue ? 0 : (fecha.Month - 1) / 2;
+                    var year = fecha == DateTime.MinValue ? 0 : fecha.Year;
+                    var overall = year * 6 + bIndex;
+                    return new { Fact = f, Fecha = fecha, Consumo = (f.ConsumoM3 ?? 0.0), BIndex = bIndex, Year = year, Overall = overall };
+                })
+                .GroupBy(x => x.Overall)
+                .Select(g => g.First())
+                .OrderByDescending(x => x.Overall)
+                .ToList();
+
+            var prevFecha = GetFecha(immediatePrev) ?? DateTime.MinValue;
+            var prevBIndex = prevFecha == DateTime.MinValue ? 0 : (prevFecha.Month - 1) / 2;
+            var prevYear = prevFecha == DateTime.MinValue ? 0 : prevFecha.Year;
+            var prevOverall = prevYear * 6 + prevBIndex;
+
+            int startIdx = bimestreEntries.FindIndex(x => x.Overall == prevOverall && x.Consumo > 0.0);
+            var consecutiveList = new List<dynamic>();
+            if (startIdx >= 0)
+            {
+                for (int k = 0; ; k++)
+                {
+                    int idx = startIdx + k;
+                    if (idx >= bimestreEntries.Count) break;
+                    var entry = bimestreEntries[idx];
+                    var expectedOverall = prevOverall - k;
+                    if (entry.Overall != expectedOverall) break; // gaps
+                    if (entry.Consumo > 0.0 && entry.Consumo >= umbral)
+                    {
+                        var periodoLabel = BimestreLabelFromDate(entry.Fecha);
+                        consecutiveList.Add(new { Periodo = periodoLabel, Fecha = entry.Fecha, Consumo = entry.Consumo, Fact = entry.Fact });
+                    }
+                    else break;
+                }
+            }
+
+            BimestresEncima = consecutiveList.Count;
+            isConsumoAboveAverage = consecutiveList.Any(c => c.Fact != null && !string.IsNullOrWhiteSpace(c.Fact.Idfactura) && factura is not null && factura.Idfactura == c.Fact.Idfactura);
+        }
+        catch { }
+    }
+}

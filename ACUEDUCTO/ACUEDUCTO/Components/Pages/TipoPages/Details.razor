@@ -1,0 +1,48 @@
+﻿@page "/tipos/details"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Details</PageTitle>
+
+<h1>Details</h1>
+
+<div>
+    <h2>Tipo</h2>
+    <hr />
+    @if (tipo is null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Nombre</dt>
+            <dd class="col-sm-10">@tipo.Nombre</dd>
+            <dt class="col-sm-2">Descripcion</dt>
+            <dd class="col-sm-10">@tipo.Descripcion</dd>
+        </dl>
+        <div>
+            <a href="@($"/tipos/edit?id={tipo.Id}")">Edit</a> |
+            <a href="@($"/tipos")">Back to List</a>
+        </div>
+    }
+</div>
+
+@code {
+    private Tipo? tipo;
+
+    [SupplyParameterFromQuery]
+    private int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        tipo = await context.Tipos.FirstOrDefaultAsync(m => m.Id == Id);
+
+        if (tipo is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+}

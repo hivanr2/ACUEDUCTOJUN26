@@ -1,0 +1,182 @@
+@page "/proceso/Listado de Consumos"
+@page "/proceso/Listado de Consumos por Predio"
+@using ACUEDUCTO2.Components.Shared
+@using ACUEDUCTO2.Data
+@using ACUEDUCTO2.Services.ConsumoServices
+@using ACUEDUCTO2.Share.Models
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject ConsumoService ConsumoService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@attribute [Authorize]
+
+@rendermode InteractiveServer
+
+<PageTitle>Listado de Consumos</PageTitle>
+
+<div class="container-fluid py-2 py-md-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Consumos</h1>
+            <small class="text-muted">Listado de consumos registrados</small>
+        </div>
+    </div>
+
+    <div class="row g-2 align-items-center mb-1">
+        <div class="col-12 col-md-6">
+            <input type="search" class="form-control" autofocus @bind=FilterText @bind:event="oninput" placeholder="Buscar por periodo, predio u observaciones..." />
+        </div>
+        <div class="col-12 col-md-6 text-md-end small text-muted">
+            <span>Items: <span class="badge bg-secondary">@pagination.TotalItems</span></span>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-hover table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Periodo</th>
+                        <th>Predio</th>
+                        <th class="text-end">Medición anterior (m³)</th>
+                        <th class="text-end">Medición actual (m³)</th>
+                        <th class="text-end">M³</th>
+                        <th>Observaciones</th>
+                        <th>Fecha registro</th>
+                        <th>Registrado por</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (isLoading)
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-3">Cargando consumos...</td>
+                        </tr>
+                    }
+                    else if (!visibleConsumos.Any())
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-3">No hay consumos para mostrar.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var c in visibleConsumos)
+                        {
+                            <tr>
+                                <td>@c.NombrePeriodoCorto</td>
+                                <td>@c.NombrePredio</td>
+                                <td class="text-end">@c.MedicionAnteriorM3</td>
+                                <td class="text-end">@c.MedicionActualM3</td>
+                                <td class="text-end">@c.M3Consumidos</td>
+                                <td>@c.Observaciones</td>
+                                <td>@c.FechaHoraCreacionRegistro.ToString("g")</td>
+                                <td>@c.UsuarioSistemaCreaRegistro</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <Paginator State="@pagination" OnPageChanged="HandlePaginationChangedAsync" />
+</div>
+
+@code {
+    private readonly List<ConsumoListItem> consumos = new();
+    private List<ConsumoListItem> visibleConsumos = new();
+    private string filterText = string.Empty;
+    private bool isLoading = true;
+    private bool esAdmin;
+    private readonly PaginationState pagination = new() { ItemsPerPage = 25 };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var claimsPrincipal = authState.User;
+        esAdmin = claimsPrincipal.IsInRole("Administradores");
+
+        if (esAdmin)
+        {
+            consumos.AddRange(await ConsumoService.GetListingAsync(null));
+        }
+        else
+        {
+            await using var context = await DbFactory.CreateDbContextAsync();
+            var userId = UserManager.GetUserId(claimsPrincipal);
+            var usuario = await context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (usuario is not null && !string.IsNullOrWhiteSpace(usuario.Identificacion))
+            {
+                consumos.AddRange(await ConsumoService.GetListingAsync(usuario.Identificacion));
+            }
+        }
+
+        UpdateVisibleConsumos(resetPage: true);
+        isLoading = false;
+    }
+
+    private string FilterText
+    {
+        get => filterText;
+        set
+        {
+            var newValue = value ?? string.Empty;
+            if (filterText == newValue)
+            {
+                return;
+            }
+
+            filterText = newValue;
+            UpdateVisibleConsumos(resetPage: true);
+        }
+    }
+
+    private void UpdateVisibleConsumos(bool resetPage = false)
+    {
+        List<ConsumoListItem> filteredList;
+        if (string.IsNullOrWhiteSpace(filterText))
+        {
+            filteredList = consumos;
+        }
+        else
+        {
+            var filter = filterText.Trim();
+            filteredList = consumos
+                .Where(c => MatchesFilter(c, filter))
+                .ToList();
+        }
+
+        if (resetPage)
+        {
+            pagination.Reset();
+        }
+
+        pagination.UpdateTotals(filteredList.Count);
+        visibleConsumos = filteredList
+            .Skip(pagination.Skip)
+            .Take(pagination.ItemsPerPage)
+            .ToList();
+    }
+
+    private static bool MatchesFilter(ConsumoListItem c, string filter)
+    {
+        return (!string.IsNullOrWhiteSpace(c.NombrePeriodoCorto) && c.NombrePeriodoCorto.Contains(filter, StringComparison.OrdinalIgnoreCase))
+               || (!string.IsNullOrWhiteSpace(c.IdFactura) && c.IdFactura.Contains(filter, StringComparison.OrdinalIgnoreCase))
+               || (!string.IsNullOrWhiteSpace(c.Observaciones) && c.Observaciones.Contains(filter, StringComparison.OrdinalIgnoreCase))
+               || (!string.IsNullOrWhiteSpace(c.UsuarioSistemaCreaRegistro) && c.UsuarioSistemaCreaRegistro.Contains(filter, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private Task HandlePaginationChangedAsync()
+    {
+        UpdateVisibleConsumos();
+        return Task.CompletedTask;
+    }
+}

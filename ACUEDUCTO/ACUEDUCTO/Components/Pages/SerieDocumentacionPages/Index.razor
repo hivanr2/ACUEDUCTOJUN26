@@ -1,0 +1,39 @@
+﻿@page "/seriedocumentacions"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Models
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@rendermode InteractiveServer
+
+<PageTitle>Serie Documentación</PageTitle>
+
+<h1>Serie Documentación</h1>
+
+<p>
+    <a href="seriedocumentacions/create">Crear Nueva Serie</a> - 
+    <a href="documentacions">Volver</a>
+</p>
+
+<QuickGrid Class="table" Items="context.SerieDocumentacions.OrderBy(c => c.Nombre)">
+    <PropertyColumn Property="seriedocumentacion => seriedocumentacion.Nombre" />
+    <PropertyColumn Property="seriedocumentacion => seriedocumentacion.Descripcion" />
+
+    <TemplateColumn Context="seriedocumentacion">
+        <a href="@($"seriedocumentacions/edit?id={seriedocumentacion.Id}")">Edit</a> |
+        <a href="@($"seriedocumentacions/details?id={seriedocumentacion.Id}")">Details</a> |
+        <a href="@($"seriedocumentacions/delete?id={seriedocumentacion.Id}")">Delete</a>
+    </TemplateColumn>
+</QuickGrid>
+
+@code {
+    private AcueductoContext context = default!;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}

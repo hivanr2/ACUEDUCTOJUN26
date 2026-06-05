@@ -1,0 +1,241 @@
+﻿@page "/"
+@layout NavMenuBotones
+@using ACUEDUCTO.Components.Layout
+@using ACUEDUCTO.Components.Pages.IngresoPages
+@using ACUEDUCTO.Components.Pages.PredioPages
+@using ACUEDUCTO.Components.Shared
+@using ACUEDUCTO.Models
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<AcueductoContext> DbFactory
+@inject IJSRuntime JS
+
+@rendermode InteractiveServer
+
+<PageTitle>ACUEDUCTO COMUNITARIO</PageTitle>
+<hr />
+<div class="text-center">
+    <h1>ACUEDUCTO COMUNITARIO</h1>
+    <h1>JAC TOBIA CHICA</h1>
+    <img src="./fondologo-acueducto.jpg" />
+</div>
+<hr />
+@* <div class="text-center">
+    <a href="./planillas/consumoscomponent?id=@id_planilla_actual"><img src="./consumos.jpg" width="100px" height="100px"/></a>
+    <a href="./planillas/recaudocomponent?id=@id_planilla_actual"><img src="./recaudo.jpg" width="100px" height="100px" /></a>
+    <a href="./planillas/facturacioncomponent?id=@id_planilla_actual"><img src="./facturacion.jpg" width="100px" height="100px" /></a>
+    <a href=""><img src="./mantenimiento.jpg" width="100px" height="100px" /></a>
+</div>
+<hr />
+ *@<div class="text-center container-fluid" style="text-align:justify table">
+    <div class="row">
+        <div class="col-lg-3 col-sm-1">
+        </div>
+        <div class="col-lg-2 col-sm-3">
+            <span>
+                Fantan <h2>@CuantosDiasConsumos</h2> días para: <br /><b>Registrar Consumos e Impresión In Situ.</b>
+            </span>
+        </div>
+        <div class="col-lg-2 col-sm-3">
+            <span>
+                Fantan <h2>@CuantosDiasPago</h2> días para:<br /><b>Ultimo día de Pago.</b>
+            </span>
+        </div>
+        <div class="col-lg-2 col-sm-3">
+            <span>
+                Fantan <h2>@CuantosDiasCorte</h2> días para:<br /><b>Corte Servicio.</b>
+            </span>
+        </div>
+        <div class="col-lg-2 col-sm-3">
+            <span>
+                Faltan <h2>@CuantosDiasMantenimiento</h2> días para:<br /><b>Mantenimiento Preventivo.</b>
+            </span>
+        </div>
+        <div class="col-lg-3 col-sm-1">
+        </div>
+    </div>
+</div>
+<hr />
+<ReporteTipoConsumoComponent />
+
+<div class="card mb-3">
+    <div class="card-body d-flex flex-column align-items-center justify-content-center text-center">
+        <div>
+            <span class="fw-medium">Predios en seguimiento de desperdicio:</span>
+            <span class="badge bg-danger ms-2">@desperdicioCount</span>
+            <small class="text-muted ms-2">de @totalActivePredios activos</small>
+        </div>
+        <div class="mt-2">
+            <a href="#" @onclick="async () => await ToggleDesperdicio()" class="btn btn-link">Lista/Quitar alerta desperdicio</a>
+    </div>
+</div>
+</div>
+@if (showDesperdicioDetails)
+{
+    <DesperdicioAlertHome @ref="desperdicioRef" />
+}
+<hr />
+<SeguimientoComponent />
+<hr />
+<h2>Consumos Bimestrales Totales</h2>
+<div class="chart-wrapper" style="height:300px;">
+    <canvas id="consumoChart" name="consumoChart"></canvas>
+</div>
+<hr />
+<h2>Recaudo diario del bimestre</h2>
+@if (id_planilla_siguiente != null) {
+    <RecaudoDiarioBimestreComponent PlanillaId="@id_planilla_siguiente" />
+}
+<hr />
+<br />
+<br />
+<br />
+<br />
+@code {
+    private const int MaxPeriodos = 10; // Limitar a los últimos 10 periodos
+    private int CuantosDiasConsumos = 0;
+    private int CuantosDiasPago = 0;
+    private int CuantosDiasCorte = 0;
+    private int CuantosDiasMantenimiento = 0;
+    private List<ConsumoPorPeriodo> consumosPorPeriodo = new List<ConsumoPorPeriodo>();
+    private string id_planilla_actual;
+    private string id_planilla_siguiente;
+    private int desperdicioCount = 0;
+    private int totalActivePredios = 0;
+    private bool showDesperdicioDetails = false;
+    private DesperdicioAlertHome? desperdicioRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await DeterminarPlanillaActual();
+    }
+
+
+    private async Task DeterminarPlanillaActual()
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        // Obtener la planilla correspondiente al bimestre actual
+        var fechaActual = DateTime.Now;
+        var planillaActual = await context.Planillas
+            .Where(p => p.FechaHoraRegistroConsumo.HasValue &&
+                        p.FechaHoraRegistroConsumo < fechaActual) // Bimestre actual
+            .OrderByDescending(p => p.FechaHoraRegistroConsumo) // Asegurarse de obtener la más reciente
+            .FirstOrDefaultAsync();
+
+        id_planilla_actual = planillaActual?.Idplanilla ?? "No disponible";
+        if (planillaActual != null)
+        {
+            // Obtener la planilla del siguiente período
+            var planillaSiguiente = await context.Planillas
+                .Where(p => p.FechaHoraRegistroConsumo.HasValue &&
+                            p.FechaHoraRegistroConsumo > planillaActual.FechaHoraRegistroConsumo) // Siguiente período
+                .OrderBy(p => p.FechaHoraRegistroConsumo) // Obtener la más cercana
+                .FirstOrDefaultAsync();
+
+            if (planillaSiguiente != null)
+            {
+                id_planilla_siguiente = planillaSiguiente.Idplanilla;
+                var hoy = DateOnly.FromDateTime(fechaActual);
+
+                // Calcular CuantosDiasConsumos
+                if (planillaSiguiente?.FechaHoraRegistroConsumo != null)
+                {
+                    CuantosDiasConsumos = (planillaSiguiente.FechaHoraRegistroConsumo.Value - fechaActual).Days + 1;
+                }
+
+                // Calcular CuantosDiasPago
+                if (planillaSiguiente.FechaLimitePago != null)
+                {
+                    CuantosDiasPago = Math.Max(0, (planillaSiguiente.FechaLimitePago.Value.DayNumber - hoy.DayNumber) + 1);
+                }
+                // Calcular CuantosDiasCorte
+                if (planillaSiguiente.FechaSuspension != null)
+                {
+                    CuantosDiasCorte = Math.Max(0, (planillaSiguiente.FechaSuspension.Value.DayNumber - hoy.DayNumber) + 1);
+                }
+            }
+            else
+            {
+                CuantosDiasConsumos = 0;
+                CuantosDiasPago = 0;
+            }
+
+            // Calcular CuantosDiasMantenimiento: fecha del trabajo más próximo en el futuro
+            var trabajoProximo = await context.Trabajos
+                .Where(t => t.FechaInicio.HasValue && t.FechaInicio > fechaActual)
+                .OrderBy(t => t.FechaInicio)
+                .FirstOrDefaultAsync();
+
+            if (trabajoProximo != null && trabajoProximo.FechaInicio.HasValue)
+            {
+                CuantosDiasMantenimiento = (trabajoProximo.FechaInicio.Value - fechaActual).Days + 1;
+            }
+            else
+            {
+                CuantosDiasMantenimiento = 0; // No hay trabajos próximos
+            }
+        }
+        // Resumen de desperdicio provisto por DesperdicioAlert
+        try
+        {
+            if (desperdicioRef is not null)
+            {
+                var summary = await desperdicioRef.GetSummaryAsync();
+                desperdicioCount = summary.Count;
+                totalActivePredios = summary.Total;
+            }
+        }
+        catch
+        {
+            // keep previous values on error
+        }
+    }
+
+    private async Task ToggleDesperdicio()
+    {
+        showDesperdicioDetails = !showDesperdicioDetails;
+
+        if (showDesperdicioDetails)
+        {
+            await Task.Delay(1); // deja que renderice
+
+            if (desperdicioRef is not null)
+            {
+                var summary = await desperdicioRef.GetSummaryAsync();
+                desperdicioCount = summary.Count;
+                totalActivePredios = summary.Total;
+            }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            using var context = DbFactory.CreateDbContext();
+            consumosPorPeriodo = await context.Facturacions
+                .Include(f => f.IdplanillaNavigation)
+                .ThenInclude(p => p.IdperiodoNavigation)
+                .GroupBy(f => f.IdplanillaNavigation.Descripcion)
+                .Select(g => new ConsumoPorPeriodo
+                    {
+                        Periodo = g.Key,
+                        TotalConsumoM3 = g.Sum(f => f.ConsumoM3 ?? 0)
+                    })
+                .OrderByDescending(c => c.Periodo)
+                .Take(MaxPeriodos)
+                .ToListAsync();
+
+            consumosPorPeriodo.Reverse();
+
+            await JS.InvokeVoidAsync("renderConsumoChart", consumosPorPeriodo);
+        }
+    }
+
+    public class ConsumoPorPeriodo
+    {
+        public string Periodo { get; set; }
+        public double TotalConsumoM3 { get; set; }
+    }
+}
+

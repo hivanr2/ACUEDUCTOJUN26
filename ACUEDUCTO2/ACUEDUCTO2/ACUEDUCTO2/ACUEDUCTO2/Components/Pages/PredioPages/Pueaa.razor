@@ -1,0 +1,232 @@
+@page "/predios/pueaa"
+@layout SimpleLayout
+@using ACUEDUCTO2.Share.Models
+@using System.Text
+@inject ACUEDUCTO2.Services.PredioServices.PredioService PredioService
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@* //@inject EmailService EmailService
+ *@
+@rendermode InteractiveServer
+
+<PageTitle>PUEAA - Evaluación</PageTitle>
+
+@if (predio is null)
+{
+    <div class="container py-5 text-center text-muted">Cargando...</div>
+}
+else
+{
+    <div class="container py-3">
+        <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+            <div>
+                <h1 class="h5 mb-1">PUEAA - Evaluación de cumplimiento</h1>
+                <div class="small text-muted">@predio.ApellidosNombresUsuario</div>
+            </div>
+            <div>
+                <a class="btn btn-outline-secondary btn-sm" href="" onclick="return cerrarVentana('');">Cerrar</a>
+                @if (hasEmail)
+                {
+                    <button class="btn btn-info btn-sm" @onclick="EnviarPorCorreo" disabled="@isSending">@(isSending ? "Enviando..." : "Enviar a correo")</button>
+                }
+                else
+                {
+                    <span class="text-danger small">NO EXISTE CORREO PARA ENVIO DE REPORTE DE PUEAA</span>
+                }
+                <a class="btn btn-primary btn-sm" href="@($"/predios/edit?idpredio={predio.IdPredio}")" target="_blank">Editar Predio</a>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-light"><strong>Resumen de cumplimiento</strong></div>
+                    <div class="card-body">
+                        <canvas id="pueaaBar" height="260"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-light"><strong>Distribución Sí/No</strong></div>
+                    <div class="card-body">
+                        <canvas id="pueaaDonut" height="260"></canvas>
+                        <div class="mt-3 small text-muted">
+                            <div><strong>Total ítems:</strong> @items.Count</div>
+                            <div><strong>Sí:</strong> @_yesCount | <strong>No:</strong> @_noCount</div>
+                            <div><strong>Peso:</strong> Sí=70%, Descripción=30%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-light"><strong>Detalle</strong></div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Ítem</th>
+                                <th class="text-center">Cumple</th>
+                                <th>Descripción</th>
+                                <th class="text-center">Puntaje (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var it in items)
+                            {
+                                <tr>
+                                    <td>@it.Label</td>
+                                    <td class="text-center">
+                                        <span class="badge bg-@(it.Yes ? "success" : "danger")">@(it.Yes ? "Sí" : "No")</span>
+                                    </td>
+                                    <td>@it.Description</td>
+                                    <td class="text-center">@it.ScorePercent</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    private string Idpredio { get; set; } = string.Empty;
+
+    private Predio? predio;
+    private bool hasEmail;
+    private bool isSending = false;
+
+    private record PueaaItem(string Label, bool Yes, string? Description, int ScorePercent);
+    private List<PueaaItem> items = new();
+    private int _yesCount = 0, _noCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        predio = await PredioService.GetByIdAsync(Idpredio, includeUsuarioFacturacion: false);
+        if (predio is null)
+        {
+            Nav.NavigateTo("/predios");
+            return;
+        }
+
+        hasEmail = false;
+
+        // Peso: Sí = 70, Descripción = 30
+        int Score(bool? yes, string? desc)
+        {
+            var s = 0;
+            if (yes == true) s += 70;
+            if (!string.IsNullOrWhiteSpace(desc)) s += 30;
+            return s;
+        }
+
+        items = new()
+        {
+            new("Tanque reserva acueducto", predio.PUEAA_TanqueReservaAcueducto == true, predio.PUEAA_TanqueReservaAcueductoObservaciones, Score(predio.PUEAA_TanqueReservaAcueducto, predio.PUEAA_TanqueReservaAcueductoObservaciones)),
+            new("Tanque reserva lluvia", predio.PUEAA_TanqueReservaLluvia == true, predio.PUEAA_TanqueReservaLluviaObservaciones, Score(predio.PUEAA_TanqueReservaLluvia, predio.PUEAA_TanqueReservaLluviaObservaciones)),
+            new("Reciclaje de aguas", predio.PUEAA_ReciclajeAguas == true, predio.PUEAA_ReciclajeAguasObservaciones, Score(predio.PUEAA_ReciclajeAguas, predio.PUEAA_ReciclajeAguasObservaciones)),
+            new("Recirculación de aguas", predio.PUEAA_RecirculacionAguas == true, predio.PUEAA_RecirculacionAguasObservaciones, Score(predio.PUEAA_RecirculacionAguas, predio.PUEAA_RecirculacionAguasObservaciones)),
+            new("Control de pérdidas", predio.PUEAA_ControlPerdidas == true, predio.PUEAA_ControlPerdidasObservaciones, Score(predio.PUEAA_ControlPerdidas, predio.PUEAA_ControlPerdidasObservaciones)),
+            new("Mantenimiento de piscina", predio.PUEAA_MantenimientoPiscina == true, predio.PUEAA_MantenimientoPiscinaObservaciones, Score(predio.PUEAA_MantenimientoPiscina, predio.PUEAA_MantenimientoPiscinaObservaciones)),
+            new("Otros procesos", predio.PUEAA_OtrosProcesos == true, predio.PUEAA_OtrosProcesosObservaciones, Score(predio.PUEAA_OtrosProcesos, predio.PUEAA_OtrosProcesosObservaciones)),
+        };
+
+        _yesCount = items.Count(i => i.Yes);
+        _noCount = items.Count - _yesCount;
+    }
+
+    private async Task EnviarPorCorreo()
+    {
+        if (string.IsNullOrWhiteSpace(predio?.IdentificacionFacturacion) || isSending)
+            return;
+
+        isSending = true;
+        StateHasChanged();
+
+        try
+        {
+            // Capture chart images
+            var barChartDataUrl = await JS.InvokeAsync<string>("getCanvasDataUrl", "pueaaBar");
+            var donutChartDataUrl = await JS.InvokeAsync<string>("getCanvasDataUrl", "pueaaDonut");
+
+            var html = GenerateReportHtml();
+            var inlineImages = new Dictionary<string, byte[]>();
+            if (!string.IsNullOrEmpty(barChartDataUrl))
+            {
+                var parts = barChartDataUrl.Split(',');
+                if (parts.Length == 2 && parts[0].StartsWith("data:image/"))
+                {
+                    var bytes = Convert.FromBase64String(parts[1]);
+                    inlineImages["barChart"] = bytes;
+                }
+            }
+            if (!string.IsNullOrEmpty(donutChartDataUrl))
+            {
+                var parts = donutChartDataUrl.Split(',');
+                if (parts.Length == 2 && parts[0].StartsWith("data:image/"))
+                {
+                    var bytes = Convert.FromBase64String(parts[1]);
+                    inlineImages["donutChart"] = bytes;
+                }
+            }
+            // await EmailService.SendEmailAsync(predio.IdentificacionFacturacionNavigation.CorreoElectronico, "Reporte PUEAA - Evaluación de cumplimiento", html, inlineImages);
+            await JS.InvokeVoidAsync("alert", "Reporte enviado por correo exitosamente.");
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error al enviar el reporte: {ex.Message}");
+        }
+        finally
+        {
+            isSending = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GenerateReportHtml()
+    {
+        var sb = new StringBuilder();
+        sb.Append("<html><head><title>PUEAA - Evaluación</title><style>body{font-family:Arial,sans-serif;} table{border-collapse:collapse;width:100%;} th,td{border:1px solid #ddd;padding:8px;text-align:left;} th{background-color:#f2f2f2;} img{max-width:100%;height:auto;}</style></head><body>");
+        sb.Append("<h1>PUEAA - Evaluación de cumplimiento</h1>");
+        sb.Append($"<p><strong>Usuario:</strong> {predio?.ApellidosNombresUsuario}</p>");
+        sb.Append("<h2>Resumen de cumplimiento</h2>");
+        sb.Append("<img src=\"cid:barChart\" alt=\"Gráfico de barras\" />");
+        sb.Append("<h2>Distribución Sí/No</h2>");
+        sb.Append("<img src=\"cid:donutChart\" alt=\"Gráfico de dona\" />");
+        sb.Append($"<p><strong>Total ítems:</strong> {items.Count}</p>");
+        sb.Append($"<p><strong>Sí:</strong> {_yesCount} | <strong>No:</strong> {_noCount}</p>");
+        sb.Append("<p><strong>Peso:</strong> Sí=70%, Descripción=30%</p>");
+        sb.Append("<h2>Detalle</h2>");
+        sb.Append("<table><thead><tr><th>Ítem</th><th>Cumple</th><th>Descripción</th><th>Puntaje (%)</th></tr></thead><tbody>");
+        foreach (var it in items)
+        {
+            sb.Append($"<tr><td>{it.Label}</td><td>{(it.Yes ? "Sí" : "No")}</td><td>{it.Description ?? ""}</td><td>{it.ScorePercent}</td></tr>");
+        }
+        sb.Append("</tbody></table>");
+        sb.Append("</body></html>");
+        return sb.ToString();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && predio is not null)
+        {
+            var labels = items.Select(i => i.Label).ToArray();
+            var scores = items.Select(i => (double)i.ScorePercent).ToArray();
+            await JS.InvokeVoidAsync("renderPueaaCharts", "pueaaBar", "pueaaDonut", labels, scores, _yesCount, _noCount, "Puntaje por requisito", "Cumplimiento");
+        }
+    }
+}
+
+<script>
+function getCanvasDataUrl(id) {
+    var canvas = document.getElementById(id);
+    return canvas ? canvas.toDataURL('image/jpeg', 0.5) : '';
+}
+</script>

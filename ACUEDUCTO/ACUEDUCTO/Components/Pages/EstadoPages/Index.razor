@@ -1,0 +1,38 @@
+﻿@page "/estados"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Models
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@rendermode InteractiveServer
+
+<PageTitle>Estado Solicitud</PageTitle>
+
+<h1>Estado Solicitud</h1>
+
+<p>
+    <a href="estados/create">Crear Nuevo Estado</a>
+</p>
+
+<QuickGrid Class="table" Items="context.Estados">
+    <PropertyColumn Property="estado => estado.Nombre" />
+    <PropertyColumn Property="estado => estado.Descripcion" />
+
+    <TemplateColumn Context="estado">
+        <a href="@($"estados/edit?id={estado.Id}")">Editar</a> |
+        <a href="@($"estados/details?id={estado.Id}")">Detalles</a> |
+        <a href="@($"estados/delete?id={estado.Id}")">Eliminar</a>
+    </TemplateColumn>
+</QuickGrid>
+
+@code {
+    private AcueductoContext context = default!;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}

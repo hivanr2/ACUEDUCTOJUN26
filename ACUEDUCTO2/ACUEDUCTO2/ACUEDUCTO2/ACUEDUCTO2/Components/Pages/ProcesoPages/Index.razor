@@ -1,0 +1,110 @@
+@page "/procesos"
+@using ACUEDUCTO2.Share.Models
+@inject ACUEDUCTO2.Services.ProcesoServices.ProcesoService ProcesoService
+@inject NavigationManager Navigation
+
+@rendermode InteractiveServer
+
+<PageTitle>Procesos</PageTitle>
+
+<h1>Procesos</h1>
+
+<p>
+    <a class="btn btn-primary" href="procesos/create">Nuevo proceso</a>
+</p>
+
+@if (procesos is null)
+{
+    <p>Cargando...</p>
+}
+else if (!procesos.Any())
+{
+    <p>No hay procesos.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>
+                    <button type="button" class="btn btn-link p-0" @onclick="() => ApplySort(SortColumn.Nombre)">
+                        Nombre @GetSortIndicator(SortColumn.Nombre)
+                    </button>
+                </th>
+                <th>
+                    <button type="button" class="btn btn-link p-0" @onclick="() => ApplySort(SortColumn.Objeto)">
+                        Objeto @GetSortIndicator(SortColumn.Objeto)
+                    </button>
+                </th>
+                <th>
+                    <button type="button" class="btn btn-link p-0" @onclick="() => ApplySort(SortColumn.Tipo)">
+                        Tipo @GetSortIndicator(SortColumn.Tipo)
+                    </button>
+                </th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+@foreach (var p in SortedProcesos)
+{
+    <tr>
+        <td>@p.Nombre</td>
+        <td>@p.Objeto</td>
+        <td>@p.IdTipoProceso</td>
+        <td>
+            <a href="@($"procesos/edit/{p.Id}")">Editar</a> |
+            <a href="@($"procesos/delete/{p.Id}")">Eliminar</a>
+        </td>
+    </tr>
+}
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Proceso>? procesos;
+    private SortColumn sortBy = SortColumn.Nombre;
+    private bool sortAscending = true;
+
+    private IEnumerable<Proceso> SortedProcesos
+        => sortBy switch
+        {
+            SortColumn.Nombre => sortAscending
+                ? (procesos ?? []).OrderBy(p => p.Nombre)
+                : (procesos ?? []).OrderByDescending(p => p.Nombre),
+            SortColumn.Objeto => sortAscending
+                ? (procesos ?? []).OrderBy(p => p.Objeto)
+                : (procesos ?? []).OrderByDescending(p => p.Objeto),
+            SortColumn.Tipo => sortAscending
+                ? (procesos ?? []).OrderBy(p => p.IdTipoProceso)
+                : (procesos ?? []).OrderByDescending(p => p.IdTipoProceso),
+            _ => procesos ?? []
+        };
+
+    protected override async Task OnInitializedAsync()
+    {
+        procesos = await ProcesoService.GetAllAsync();
+    }
+
+    private void ApplySort(SortColumn column)
+    {
+        if (sortBy == column)
+        {
+            sortAscending = !sortAscending;
+            return;
+        }
+
+        sortBy = column;
+        sortAscending = true;
+    }
+
+    private string GetSortIndicator(SortColumn column)
+        => sortBy == column ? (sortAscending ? "↑" : "↓") : string.Empty;
+
+    private enum SortColumn
+    {
+        Nombre,
+        Objeto,
+        Tipo
+    }
+}

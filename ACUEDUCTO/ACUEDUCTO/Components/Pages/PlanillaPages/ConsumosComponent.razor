@@ -1,0 +1,2152 @@
+﻿@page "/planillas/consumoscomponent"
+@layout SimpleLayout
+@using System
+@using System.IO
+@using System.Net.Http
+@using System.Net.Http.Json
+@using System.Text
+@using System.Text.Json
+@using System.Text.RegularExpressions
+@using System.Threading.Tasks
+@using System.Linq
+@using System.Collections.Generic
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using ACUEDUCTO.Components.Layout
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Services
+@using SkiaSharp
+@inject IDbContextFactory<AcueductoContext> DbFactory
+@inject IJSRuntime JSRuntime
+@inject NavigationManager nav
+@inject EmailService EmailService
+@inject IWhatsAppService WhatsAppService
+@inject ACUEDUCTO.Services.IPdfService PdfService
+@inject IWebHostEnvironment Env
+
+@rendermode InteractiveServer
+
+<style>
+    @@media (max-width: 768px) {
+        .table-container.table-responsive table {
+            min-width: 860px;
+        }
+
+        .table-container input.form-control-lg {
+            padding-top: .35rem;
+            padding-bottom: .35rem;
+            font-size: 1.1rem;
+        }
+
+        /* Mobile capture mode: keep header/footer visible, scroll list in the center */
+        .consumos-mobile-shell {
+            height: calc(100svh - 220px);
+            min-height: 220px;
+        }
+        .consumos-mobile-list {
+            height: 100%;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .consumos-mobile-card-a {
+            border-left: 6px solid #6ea8fe;
+            border-top-left-radius: .5rem;
+            border-bottom-left-radius: .5rem;
+        }
+
+        .consumos-mobile-card-b {
+            border-left: 6px solid #a3cfbb;
+            border-top-left-radius: .5rem;
+            border-bottom-left-radius: .5rem;
+        }
+
+        .consumos-mobile-list .card.consumos-mobile-card-a {
+            background-color: #e7f1ff !important;
+        }
+
+        .consumos-mobile-list .card.consumos-mobile-card-b {
+            background-color: #eaf7f0 !important;
+        }
+
+        .consumos-mobile-list .consumos-mobile-card-a > .card-body,
+        .consumos-mobile-list .consumos-mobile-card-b > .card-body {
+            background-color: rgba(255, 255, 255, 0.55) !important;
+        }
+        /* Make note areas full width on mobile for better UX */
+        .notes-col, .note-block {
+            width: 100% !important;
+            max-width: none !important;
+            min-width: 0 !important;
+            display: block;
+        }
+        /* Center control checkboxes and actions on mobile to avoid overflow.
+           Show checkboxes side-by-side by using inline-flex and auto width. */
+        .controls-row {
+            justify-content: center !important;
+        }
+        .controls-row .form-check {
+            display: inline-flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            width: auto !important;
+            margin: .25rem !important;
+        }
+        /* smaller filter link on mobile */
+        .btn-link.small {
+            font-size: .85rem;
+            padding: 0;
+        }
+    }
+
+
+    /* Fixed width for observation/notes columns so both occupy the same space on desktop */
+    .notes-col { width: 220px; max-width: 220px; }
+    .note-block { min-width: 220px; max-width: 220px; }
+
+    /* Responsive: override fixed widths on small screens */
+    @@media (max-width: 768px) {
+        .notes-col, .note-block {
+            width: 100% !important;
+            max-width: none !important;
+            min-width: 0 !important;
+            display: block;
+        }
+    }
+</style>
+
+
+<!-- Encabezado moderno con navegación -->
+<div class="container-fluid @(tomaDatos ? "p-0" : "py-2 py-md-3")">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div class="d-flex align-items-center gap-2">
+            @if (facturacion != null && facturacion.Count == 1)
+            {
+                @if (@id_planilla_anterior != "No disponible")
+                {
+                    <a class="btn btn-outline-secondary btn-sm" href="/planillas/consumoscomponent?id=@id_planilla_anterior" target="_self" title="Anterior">
+                        <i class="bi bi-arrow-left"></i>
+                    </a>
+                }
+            }
+            <h3 class="h5 mb-0">CONSUMOS :: @str_planilla</h3>
+            @if (facturacion != null && facturacion.Count == 1)
+            {
+                @if (@id_planilla_siguiente != "No disponible")
+                {
+                    <a class="btn btn-outline-secondary btn-sm" href="/planillas/consumoscomponent?id=@id_planilla_siguiente" target="_self" title="Siguiente">
+                        <i class="bi bi-arrow-right"></i>
+                    </a>
+                }
+            }
+        </div>
+        <div class="text-nowrap">
+            <span class="badge bg-primary-subtle text-primary border">Periodo: <strong>@str_periodo_largo</strong></span>
+        </div>
+    </div>
+
+    @if (!editaPlanilla)
+    {
+        <div class="alert alert-warning py-2 mb-2 text-center">
+            La planilla está cerrada. La edición está deshabilitada.
+        </div>
+    }
+
+    @if (mostrar && !tomaDatos)
+    {
+        <div class="alert alert-info py-2 mb-2 d-flex flex-wrap gap-2 align-items-center">
+            <div>
+                <strong>Fecha Toma de Consumos:</strong>
+                <span>@(FechaTomaConsumoPlanilla.HasValue? FechaTomaConsumoPlanilla.Value.ToString("D", new CultureInfo("es-CO")) : "")</span>
+            </div>
+            <div>
+                <strong>Último día de Pago:</strong>
+                <span>@(FechaUltimoPagoPlanilla.HasValue? FechaUltimoPagoPlanilla.Value.ToString("D", new CultureInfo("es-CO")) : "")</span>
+            </div>
+            <div>
+                <strong>Fecha de Suspensión:</strong>
+                <span>@(FechaSuspensionPlanilla.HasValue? FechaSuspensionPlanilla.Value.ToString("D", new CultureInfo("es-CO")) : "")</span>
+            </div>
+            <div class="ms-auto">
+                <a class="btn btn-outline-primary btn-sm" href="/planillas/edit?idplanilla=@id" title="Editar planilla" target="_blank">
+                    <i class="bi bi-pencil-square"></i> Edita
+                </a>
+            </div>
+        </div>
+    }
+
+    <!-- Controles principales -->
+    @if (facturacion is not null && facturacion.Count > 0)
+    {
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex flex-wrap align-items-center justify-content-center gap-2">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-12 col-lg-auto d-flex justify-content-center align-items-center gap-2">
+                            <InputFile OnChange="OnImageSelected" accept="image/*" class="form-control form-control-sm" style="width: 200px;" />
+                            <button class="btn btn-primary btn-sm" @onclick="RegistroAutomatico" disabled="@(!editaPlanilla || _registroAutomaticoEnProceso)">
+                                @if (_registroAutomaticoEnProceso)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                    <span>@_registroAutomaticoEstado</span>
+                                }
+                                else
+                                {
+                                    <span>Registro Automático</span>
+                                }
+                            </button>
+                            @if (!tomaDatos)
+                            {
+                                <button class="btn btn-secondary btn-sm d-none d-md-inline-block" @onclick="PrintTextOnlyVersion">
+                                    <i class="bi bi-printer"></i> Formato de Impresión de Consumos
+                                </button>
+                            }
+                        </div>
+                        <div class="col-12 col-lg d-flex flex-wrap align-items-center gap-3 justify-content-lg-end controls-row">
+                            <div class="d-flex align-items-center gap-3 flex-wrap">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" id="tomaDatos" class="form-check-input" @bind="tomaDatos" @bind:after="OnTomaDatosToggled" disabled="@(!editaPlanilla)" />
+                                    <label for="tomaDatos" class="form-check-label">Toma Datos</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" id="editarRuta" class="form-check-input" @bind="editarRuta" disabled="@(!editaPlanilla)" />
+                                    <label for="editarRuta" class="form-check-label">Editar Ruta</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" id="editarObservaciones" class="form-check-input" @bind="editarObservaciones" disabled="@(!editaPlanilla)" />
+                                    <label for="editarObservaciones" class="form-check-label">Editar Observaciones Predio</label>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <div class="input-group input-group-sm" style="width: 180px;">
+                                    <input id="filtroNombrePredio" class="form-control" placeholder="Filtrar predio" @bind="filtroNombrePredio" @bind:event="oninput" @bind:after="OnFiltroNombrePredioChanged" />
+                                    <button class="btn btn-outline-secondary" type="button" @onclick="ClearFiltroNombrePredio" title="Limpiar filtro">×</button>
+                                </div>
+                                <div class="input-group input-group-sm" style="width: 140px;">
+                                    <input id="filtroCodigoUsuario" class="form-control" placeholder="Filtrar código" @bind="filtroCodigoUsuario" @bind:event="oninput" @bind:after="OnFiltroCodigoUsuarioChanged" />
+                                    <button class="btn btn-outline-secondary" type="button" @onclick="ClearFiltroCodigoUsuario" title="Limpiar filtro">×</button>
+                                </div>
+                                <div class="input-group input-group-sm" style="width: 170px;">
+                                    <input id="filtroNumeroContador" class="form-control" placeholder="Filtrar contador" @bind="filtroNumeroContador" @bind:event="oninput" @bind:after="OnFiltroNumeroContadorChanged" />
+                                    <button class="btn btn-outline-secondary" type="button" @onclick="ClearFiltroNumeroContador" title="Limpiar filtro">×</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* Tabla principal *@
+    @if (facturacion == null)
+    {
+        <div>Cargando...</div>
+    }
+    else if (facturacion.Count > 0)
+    {
+        @* Mobile: when data capture is enabled, use a card layout for easier input.
+           The list scrolls in the center so header and footer remain visible. *@
+        <div class="d-md-none">
+            <div class="consumos-mobile-shell">
+                <div class="consumos-mobile-list">
+                    @{ var facturacionFiltradaMobile = GetFacturacionFiltrada().ToList(); }
+                    @for (int i = 0; i < facturacionFiltradaMobile.Count; i++)
+                    {
+                        var factura = facturacionFiltradaMobile[i];
+                        <div class="card shadow-sm mb-2">
+                            <div class="card-body py-2">
+                                <div class="d-flex justify-content-between gap-2">
+                                    @if (editarRuta)
+                                    {
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="small text-muted">Ruta: <strong>@factura.IdpredioNavigation.Ruta</strong></div>
+                                            <div class="d-flex gap-1">
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => MoveUp(factura)" title="Subir" disabled="@(!editaPlanilla)">
+                                                    <i class="bi bi-arrow-up"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => MoveDown(factura)" title="Bajar" disabled="@(!editaPlanilla)">
+                                                    <i class="bi bi-arrow-down"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="small text-muted">Ruta: <strong>@factura.IdpredioNavigation.Ruta</strong></div>
+                                    }
+                                    <div class="small text-muted">Medidor: <strong>@factura.IdpredioNavigation.NumeroMedidor</strong></div>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-2 mt-1">
+                                    <div class="fw-semibold">@factura.IdpredioNavigation.ApellidosNombresUsuario</div>
+                                        <a class="small" href="/predios/details?idpredio=@factura.Idpredio" target="_blank">Ver</a>
+                                    <button type="button" class="btn btn-link p-0 text-decoration-underline small" title="Filtrar por código" @onclick="() => FiltrarPorCodigo(factura.CodigoUsuario ?? string.Empty)">@factura.CodigoUsuario</button>
+                                </div>
+                                <div class="small text-muted">@factura.IdpredioNavigation.Direccion</div>
+
+                                @* Mostrar observaciones del predio solo cuando se está editando observaciones *@
+                                @if (editarObservaciones)
+                                {
+
+                                    <div class="mt-2">EN SEGUIMIENTO?
+                                    @if(editaPlanilla){
+                                        <input type="checkbox" @bind="factura.IdpredioNavigation.ContadorEnSeguimiento" tabindex="@((i * 1000) + 3)" disabled="@(!editaPlanilla)" />
+                                    }else{
+                                        <input type="checkbox" readonly @bind="factura.IdpredioNavigation.ContadorEnSeguimiento" tabindex="@((i * 1000) + 3)" disabled="@(!editaPlanilla)" />
+                                    }
+                                    </div>
+                                    <div class="mt-2">
+                                        <div class="small text-muted">Observaciones</div>
+                                        @if (editaPlanilla && editarObservaciones)
+                                        {
+                                            <textarea class="form-control form-control-sm mt-1 note-block" value="@factura.IdpredioNavigation.Observaciones" @onchange="async (e) => await OnObservacionesPredioChanged(factura, e)"></textarea>
+                                        }
+                                        else
+                                        {
+                                            <div class="small text-muted mt-1 note-block">@(!string.IsNullOrWhiteSpace(factura.IdpredioNavigation.Observaciones) ? factura.IdpredioNavigation.Observaciones : "N/A")</div>
+                                        }
+                                    </div>
+                                    @* Notas Factura: mostrar solo cuando se activa Ver Observaciones Predio *@
+                                    <div class="mt-2">
+                                        <div class="small text-muted">Notas Factura</div>
+                                        @if (editaPlanilla)
+                                        {
+                                            <textarea class="form-control form-control-sm mt-1 note-block" @bind="factura.NotasFactura" @bind:after="async () => await OnNotasFacturaChanged(factura)"></textarea>
+                                        }
+                                        else
+                                        {
+                                            <div class="small text-muted mt-1 note-block">@(!string.IsNullOrWhiteSpace(factura.NotasFactura) ? factura.NotasFactura : "N/A")</div>
+                                        }
+                                    </div>
+                                }
+
+                                <div class="row g-2 mt-2 align-items-end">
+                                    <div class="col-6">
+                                        <label class="form-label small mb-1">Anterior</label>
+                                        <input type="number" inputmode="numeric" pattern="[0-9]*"
+                                               class="form-control"
+                                               value="@factura.MedicionAnterior"
+                                               @onchange="async (e) => await OnMedicionAnteriorChanged(factura, e)"
+                                               disabled="@(!(editaPlanilla && tomaDatos && editarObservaciones ))" />
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small mb-1">Actual</label>
+                                        <input type="number" inputmode="numeric" pattern="[0-9]*"
+                                               class="form-control form-control-lg"
+                                               value="@factura.MedicionActual"
+                                               @onfocus="() => OnFocusedFacturaChanged(factura.Idfactura)"
+                                               @onchange="async (e) => await OnMedicionActualChanged(factura, e)"
+                                               tabindex="@((i * 1000) + 1)"
+                                               disabled="@(!(editaPlanilla && tomaDatos))" />
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-between mt-2">
+                                    <div class="small">Consumo: <strong>@factura.ConsumoM3</strong></div>
+                                    <div class="small">Valor: <strong>@FormatCurrency(factura.ValorConsumo)</strong></div>
+                                </div>
+
+                                @if (factura.MedicionActual.HasValue && factura.MedicionAnterior.HasValue && factura.MedicionActual.Value >= factura.MedicionAnterior.Value)
+                                {
+                                    <div class="d-flex justify-content-end mt-2">
+                                        @if (factura.IdpredioNavigation.ImprimeFactura ?? false)
+                                        {
+                                            @if (!editaPlanilla)
+                                            {
+                                                <a class="btn btn-outline-primary btn-sm" title="Ver Factura (PDF)" href="@($"/imagenes/{factura.IdpredioNavigation.CodigoUsuario}/{factura.CodigoFactura}.pdf")" target="_blank">
+                                                    <i class="bi bi-printer"></i>
+                                                </a>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-outline-primary btn-sm" title="Imprimir / Ver Factura" @onclick="() => OpenPrintWindow(factura.Idfactura)">
+                                                    <i class="bi bi-printer"></i>
+                                                </button>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="small text-muted">Factura</span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* Desktop/tablet: keep the original table *@
+        <div class="d-none d-md-block">
+            <div class="table-container table-responsive">
+                <table class="table table-sm table-hover table-striped align-middle fixed-header">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col" role="button" title="Ordenar" @onclick='() => OnHeaderClick("Ruta")'>Ruta</th>
+                        <th scope="col" role="button" title="Ordenar" @onclick='() => OnHeaderClick("Predio")'>Predio</th>
+                        <th scope="col" role="button" title="Ordenar" @onclick='() => OnHeaderClick("Anterior")'>Anterior</th>
+                        <th scope="col" role="button" title="Ordenar" @onclick='() => OnHeaderClick("Actual")' class="border-blue">Actual</th>
+                        <th scope="col" role="button" title="Ordenar" @onclick='() => OnHeaderClick("ConsumoM3")' class="border-blue">ConsumoM3</th>
+                        <th scope="col" role="button" title="Ordenar" @onclick='() => OnHeaderClick("Valor Consumo")'>Valor Consumo</th>
+                        @if(!tomaDatos)
+                        {
+                            <th scope="col">Seguimiento</th>
+                        }
+                        @if (editarObservaciones)
+                        {
+                            <th scope="col" class="notes-col">Notas Predio</th>
+                        }
+                        @if (editarObservaciones)
+                        {
+                            <th scope="col" class="notes-col">Notas Factura</th>
+                        }
+                        <th scope="col">Factura</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{ var facturacionFiltrada = GetFacturacionFiltrada().ToList(); }
+                    @for (int i = 0; i < facturacionFiltrada.Count; i++)
+                    {
+                        var factura = facturacionFiltrada[i];
+                        <tr>
+                            <td class="text-center">
+                                @if (editarRuta)
+                                {
+                                    <div>@factura.IdpredioNavigation.Ruta</div>
+                                    <div class="d-flex justify-content-center gap-1 mt-1">
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => MoveUp(factura)" title="Subir" disabled="@(!editaPlanilla)">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => MoveDown(factura)" title="Bajar" disabled="@(!editaPlanilla)">
+                                            <i class="bi bi-arrow-down"></i>
+                                        </button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    @factura.IdpredioNavigation.Ruta
+                                }
+                            </td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="fw-semibold">@factura.IdpredioNavigation.ApellidosNombresUsuario</div>
+                                        <a class="small" href="/predios/details?idpredio=@factura.Idpredio" target="_blank">Ver</a>
+                                <button type="button" class="small ms-2 btn btn-link p-0 text-decoration-underline" title="Filtrar por código" @onclick="() => FiltrarPorCodigo(factura.CodigoUsuario ?? factura.IdpredioNavigation?.CodigoUsuario ?? string.Empty)">@((factura.CodigoUsuario ?? factura.IdpredioNavigation?.CodigoUsuario) ?? string.Empty)</button>
+                                    </div>
+                                    <div class="small text-muted">@factura.IdpredioNavigation.Direccion - #@factura.IdpredioNavigation.NumeroMedidor</div>
+                                </td>
+                            <td class="text-center">
+                                <div>@factura.MedicionAnterior</div>
+                                @if (editaPlanilla && tomaDatos && editarObservaciones)
+                                {
+                                    <input type="number" inputmode="numeric" pattern="[0-9]*"
+                                           class="form-control @(tomaDatos ? "form-control-lg" : "form-control-sm") mt-1"
+                                           style="min-width: 7.5rem;"
+                                           value="@factura.MedicionAnterior"
+                                           @onchange="async (e) => await OnMedicionAnteriorChanged(factura, e)"
+                                           tabindex="@((i * 1000) + 0)"
+                                           disabled="@(!editaPlanilla)" />
+                                }
+                            </td>
+                            <td class="text-center border-blue">
+                                <div>@factura.MedicionActual</div>
+                                @if (editaPlanilla && tomaDatos)
+                                {
+                                    <input type="number" inputmode="numeric" pattern="[0-9]*"
+                                           class="form-control @(tomaDatos ? "form-control-lg" : "form-control-sm") mt-1"
+                                           style="min-width: 7.5rem;"
+                                           value="@factura.MedicionActual"
+                                           @onchange="async (e) => await OnMedicionActualChanged(factura, e)"
+                                           tabindex="@((i * 1000) + 1)"
+                                           disabled="@(!editaPlanilla)" />
+                                }
+                            </td>
+                            <td class="text-center border-blue"><span class="h6 mb-0">@factura.ConsumoM3</span></td>
+                            <td class="text-center">
+                                <div>@FormatCurrency(factura.ValorConsumo)</div>
+                            </td>
+                            @if (editarObservaciones)
+                                {
+                                <td class="text-center">
+                                    @if(editaPlanilla){
+                                        <input type="checkbox" @bind="factura.IdpredioNavigation.ContadorEnSeguimiento" tabindex="@((i * 1000) + 3)" disabled="@(!editaPlanilla)" />
+                                    }else{
+                                        <input type="checkbox" readonly @bind="factura.IdpredioNavigation.ContadorEnSeguimiento" tabindex="@((i * 1000) + 3)" disabled="@(!editaPlanilla)" />
+                                    }
+                                </td>
+                                <td>
+                                    @if (editaPlanilla && editarObservaciones)
+                                    {
+                                        <textarea class="form-control form-control-sm mt-1 note-block" value="@factura.IdpredioNavigation.Observaciones" @onchange="async (e) => await OnObservacionesPredioChanged(factura, e)" tabindex="@((i * 1000) + 4)"></textarea>
+                                    }
+                                    else
+                                    {
+                                        <div class="small text-muted note-block">@(!string.IsNullOrWhiteSpace(factura.IdpredioNavigation.Observaciones) ? factura.IdpredioNavigation.Observaciones : "N/A")</div>
+                                    }
+                                </td>
+                            }
+                            @if (editarObservaciones)
+                            {
+                                <td>
+                                    <div class="small note-block">@factura.NotasFactura</div>
+                                    @if (editaPlanilla)
+                                    {
+                                        <textarea class="form-control form-control-sm mt-1 note-block" @bind="factura.NotasFactura" @bind:after="async () => await OnNotasFacturaChanged(factura)" tabindex="@((i * 1000) + 4)" disabled="@(!editaPlanilla)"></textarea>
+                                    }
+                                </td>
+                            }
+                            <td>
+                                @if (factura.MedicionActual.HasValue && factura.MedicionAnterior.HasValue && factura.MedicionActual.Value >= factura.MedicionAnterior.Value)
+                                {
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        @if (factura.IdpredioNavigation.ImprimeFactura ?? false)
+                                        {
+                                            @* If planilla closed show static pdf from wwwroot/imagenes/{codigoUsuario}/{codigoDocumento}.pdf, otherwise keep current behavior *@
+                                            @if (!editaPlanilla)
+                                            {
+                                                <a class="btn btn-outline-primary" title="Ver Factura (PDF)" href="@($"/imagenes/{factura.IdpredioNavigation.CodigoUsuario}/{factura.CodigoFactura}.pdf")" target="_blank"><i class="bi bi-printer"></i></a>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-outline-primary" title="Imprimir / Ver Factura" @onclick="() => OpenPrintWindow(factura.Idfactura)"><i class="bi bi-printer"></i></button>
+                                            }
+                                        }
+                                        @if (factura.IdpredioNavigation.EnviaWhatsapp ?? false)
+                                        {
+                                            <button class="btn btn-success" title="WhatsApp" @onclick="() => EnviarPorWhatsApp(factura)"><i class="bi bi-whatsapp"></i></button>
+                                        }
+                                        @if (factura.IdpredioNavigation.EnviaCorreo ?? false)
+                                        {
+                                            @if (PuedeEnviarCorreo(factura) && !sentEmails.Contains(factura.Idfactura))
+                                            {
+                                                <button class="btn btn-info" title="Correo" @onclick="() => EnviarPorCorreo(factura)"><i class="bi bi-envelope"></i></button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-info" title="@GetCorreoDisabledTitle(factura)" disabled><i class="bi bi-envelope"></i></button>
+                                            }
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">Consumo no Registrado</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    <tr class="table-secondary fw-semibold">
+                        <td colspan="5" class="text-end">Total ConsumoM3</td>
+                        <td class="text-center border-blue">@totalConsumoM3</td>
+                    </tr>
+                    <tr>
+                        <td colspan="6">
+                            <input type="text" id="nombreRegistrador" class="form-control" placeholder="Nombre de quien registra los consumos" value="@nombreRegistrador"
+                                   @onchange="OnNombreRegistradorChanged" disabled="@(!editaPlanilla)" />
+                        </td>
+                    </tr>
+                </tbody>
+                </table>
+            </div>
+        </div>
+
+        <style>
+            .table-container {
+                max-height: @(tomaDatos ? "100vh" : "70vh"); /* altura visible */
+                overflow: auto;    /* scroll vertical y horizontal si aplica */
+            }
+            .fixed-header thead th, .fixed-header thead td {
+                position: sticky;
+                top: 0;
+                background-color: var(--bs-light);
+                z-index: 5;
+            }
+            .border-blue {
+                border: 1px solid #007bff;
+                border-radius: 4px;
+            }
+            /* Equal width for Predio Observaciones and Notas Factura */
+            .notes-col {
+                max-width: 220px;
+                width: 220px;
+                vertical-align: top;
+                white-space: normal;
+            }
+            .note-block {
+                max-width: 220px;
+                width: 220px;
+                overflow: auto;
+                word-break: break-word;
+            }
+        </style>
+    }
+    else
+    {
+        <div class="alert alert-info">SE DEBE CREAR EN FACTURACIÓN LA PLANILLA por cada Predio Existente</div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-2">@errorMessage</div>
+    }
+
+    @if (_lastOcrResult is not null)
+    {
+        <div class="card mt-2">
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2 align-items-end">
+                    <div>
+                        <label class="form-label mb-1">Serial</label>
+                        <input class="form-control form-control-sm" @bind="_correctionSerial" @bind:event="oninput" @bind:after="OnSerialChanged" />
+                    </div>
+                    <div>
+                        <label class="form-label mb-1">Lectura (m³)</label>
+                        <input class="form-control form-control-sm" type="number" @bind="_correctionLectura" />
+                    </div>
+                    <button class="btn btn-success btn-sm" @onclick="SaveOcrCorrectionAsync" disabled="@(_lastImageBytes is null)">
+                        Save correction
+                    </button>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(_correctionStatus))
+                {
+                    <div class="small text-muted mt-2">@_correctionStatus</div>
+                }
+            </div>
+        </div>
+    }
+</div>
+@code {
+    //  ... codigo cs ....
+    [SupplyParameterFromQuery]
+    private string id { get; set; }
+    [SupplyParameterFromQuery]
+    private string? codigo { get; set; }
+
+    [SupplyParameterFromQuery(Name = "focus")]
+    private string? focus { get; set; }
+
+    private string? _focusedFacturaId;
+    private string logoDataUri; // logo embebido sin URL pública
+    private IList<Facturacion> facturacion;
+    private string str_planilla;
+    private string id_planilla_siguiente;
+    private string id_planilla_anterior;
+    private string str_periodo_corto;
+    private string str_periodo_largo;
+    private string errorMessage;
+    private bool sortAscending = true;
+    private double totalConsumoM3;
+    private bool showModal = false;
+    private Facturacion selectedFactura;
+    private string nombreRegistrador;
+    private string currentSortHeader = "Predio"; // Valor predeterminado
+    private string facturaHtml = string.Empty;
+    private bool editarRuta = false;
+    private bool tomaDatos = false;
+    private bool actualizaAnterior = false;
+    private bool editarObservaciones = false;
+    private Tarifa[] tarifas;
+    private bool mostrar = true;
+    private DateTime? FechaTomaConsumoPlanilla;
+    private DateOnly? FechaUltimoPagoPlanilla;
+    private DateOnly? FechaSuspensionPlanilla;
+
+    private bool bol_termino = true;
+    private bool editaPlanilla = false; // controla si se puede editar según Planilla.Abierta
+
+    private string filtroNombrePredio = string.Empty;
+    private string filtroCodigoUsuario = string.Empty;
+    private System.Threading.CancellationTokenSource? _filtroCts;
+
+    private HashSet<string> sentEmails = new();
+
+    private bool _registroAutomaticoEnProceso;
+    private string _registroAutomaticoEstado = "";
+
+
+
+    // ... código existente ...
+
+    [Inject] private ConsumoOcrAppService OcrApp { get; set; } = default!;
+
+    private IBrowserFile? selectedImage;
+    private byte[]? _lastImageBytes;
+    private OcrScanResult? _lastOcrResult;
+    private string? _correctionSerial;
+    private double? _correctionLectura;
+    private string? _correctionStatus;
+    private int _errorMessageVersion = 0;
+
+    private CancellationTokenSource? _serialDebounceCts;
+
+    private string? filtroNumeroContador;
+
+    protected override async Task OnInitializedAsync()
+    {
+        logoDataUri = GetLogoDataUri();
+        _focusedFacturaId = string.IsNullOrWhiteSpace(focus) ? null : focus;
+        await LoadData();
+        CalcularTotalConsumoM3();
+    }
+
+private void OnFocusedFacturaChanged(string idFactura)
+    {
+        _focusedFacturaId = idFactura;
+        var uri = nav.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["id"] = id,
+            ["focus"] = idFactura
+        });
+        nav.NavigateTo(uri, replace: true);
+    }
+
+    private async Task OnTomaDatosToggled()
+    {
+        if (!tomaDatos) return;
+        await ScrollToFocusedAsync();
+    }
+
+    private async Task ScrollToFocusedAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_focusedFacturaId)) return;
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("scrollToElement", $"factura-{_focusedFacturaId}");
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private void CalcularValorPeriodo(Facturacion factura)
+    {
+        if (factura.PorcentajeSubsidio != null && factura.PorcentajeSubsidio > 0)
+        {
+            factura.ValorSubsidio = -((double)(((factura.CargoFijo ?? 0)
+                            + (factura.ValorConsumo ?? 0)) * factura.PorcentajeSubsidio) / 100);
+        }
+        else
+            factura.PorcentajeSubsidio = 0;
+
+        double valorPeriodo = (double)((factura.CargoFijo ?? 0)
+                            + (factura.ValorConsumo ?? 0)
+                            + (factura.ValorSobreTasa ?? 0)
+                            + (factura.ValorMora ?? 0)
+                            + (factura.ValorSubsidio ?? 0)
+                            + (factura.OtrosValores ?? 0));
+
+        factura.ValorPeriodo = RedondearValor(valorPeriodo);
+    }
+
+    private void CalcularValorSobreTasa(Facturacion factura)
+    {
+        if (factura.CargoFijo.HasValue && factura.PorcentajeSobreTasa.HasValue)
+        {
+            double valorSobreTasa = (double)(factura.CargoFijo.Value + (factura.ValorConsumo ?? 0)) * (factura.PorcentajeSobreTasa.Value / 100);
+            factura.ValorSobreTasa = RedondearValor(valorSobreTasa);
+        }
+    }
+
+    private async Task CalcularConsumo(Facturacion factura)
+    {
+        if ((factura.MedicionActual ?? 0) >= (factura.MedicionAnterior ?? 0))
+        {
+            factura.ConsumoM3 = (factura.MedicionActual ?? 0) - (factura.MedicionAnterior ?? 0);
+        }
+        else
+        {
+            factura.ConsumoM3 = 0;
+        }
+
+        await CalcularValorConsumo(factura);
+        CalcularValorSobreTasa(factura);
+        CalcularValorPeriodo(factura);
+    }
+
+    private async Task CalcularValorConsumo(Facturacion factura)
+    {
+        using var context = DbFactory.CreateDbContext();
+        var tarifasDb = await context.Tarifas.ToListAsync();
+
+        double valorConsumo = 0;
+        double consumoRestante = factura.ConsumoM3 ?? 0;
+
+        foreach (var tarifa in tarifasDb.OrderBy(t => t.Desde))
+        {
+            if (tarifa.Desde.HasValue && tarifa.Hasta.HasValue && tarifa.ValorUnidad.HasValue)
+            {
+                double rango = Math.Max(0, tarifa.Hasta.Value - (tarifa.Desde.Value - 1));
+                double rangoConsumo = Math.Min(consumoRestante, rango);
+                valorConsumo += rangoConsumo * tarifa.ValorUnidad.Value;
+                consumoRestante -= rangoConsumo;
+
+                if (consumoRestante <= 0) break;
+            }
+        }
+
+        factura.ValorConsumo = valorConsumo;
+        await ActualizarMedicionAnteriorEnSiguienteFactura(factura);
+    }
+
+    private void CalcularTotalConsumoM3()
+    {
+        totalConsumoM3 = facturacion?.Sum(f => f.ConsumoM3 ?? 0) ?? 0;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+    }
+
+    private bool YaEnvioCorreoHoy(Facturacion factura)
+    {
+        try
+        {
+            var notas = factura?.NotasFactura;
+            if (string.IsNullOrWhiteSpace(notas)) return false;
+
+            var todayTag = "[MAIL:" + DateTime.Today.ToString("yyyy-MM-dd") + "]";
+            if (notas.Contains(todayTag, StringComparison.OrdinalIgnoreCase)) return true;
+
+            // Buscar fecha en las notas cerca de palabras clave de correo
+            var pattern = @"(ENV.?O\s+CORREO|CORREO|MAIL)[^0-9]*(?<date>(\d{1,2}/\d{1,2}/\d{2,4}|\d{4}-\d{2}-\d{2}))";
+            var matches = Regex.Matches(notas, pattern, RegexOptions.IgnoreCase);
+            foreach (Match m in matches)
+            {
+                var s = m.Groups["date"].Value;
+                string[] fmts = new[] { "dd/MM/yyyy", "d/M/yyyy", "MM/dd/yyyy", "M/d/yyyy", "yyyy-MM-dd", "dd/MM/yy", "MM/dd/yy" };
+                if (DateTime.TryParseExact(s, fmts, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                {
+                    if (dt.Date == DateTime.Today) return true;
+                }
+                else if (DateTime.TryParse(s, out var dt2))
+                {
+                    if (dt2.Date == DateTime.Today) return true;
+                }
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    private bool PuedeEnviarCorreo(Facturacion factura)
+    {
+        // Permitido solo si no se está enviando actualmente y no se envió ya hoy
+        return bol_termino && !YaEnvioCorreoHoy(factura);
+    }
+
+    private string GetCorreoDisabledTitle(Facturacion factura)
+    {
+        if (!bol_termino) return "Enviando correo...";
+        if (YaEnvioCorreoHoy(factura)) return "Ya se envió un correo para esta factura hoy";
+        return "Correo deshabilitado";
+    }
+
+    private async Task EnviarPorCorreo(Facturacion factura)
+    {
+        if (sentEmails.Contains(factura.Idfactura)) return;
+
+        try
+        {
+            var email = factura.IdpredioNavigation.IdentificacionFacturacionNavigation?.CorreoElectronico;
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "No se encontró el correo electrónico del usuario.");
+                return;
+            }
+
+            var subject = $"Factura {factura.CodigoFactura} - {factura.IdpredioNavigation.ApellidosNombresUsuario}";
+            var body = $"Adjunto encuentra la factura correspondiente para {factura.IdpredioNavigation.ApellidosNombresUsuario}. Valor a pagar: {FormatCurrency(factura.ValorPeriodo)}.";
+
+            var chartBase64 = await BuildConsumoChartDataUri(factura.Idpredio);
+
+                        // Calcular desglose dinámico
+            var desglose = CalcularTarifaDesglose(tarifas, factura.ConsumoM3 ?? 0);
+
+            var pdfBytes = PdfService.FromFactura(factura, tarifas, desglose, logoDataUri,  chartBase64);
+
+            await EmailService.SendEmailAsync(email, subject, body, attachment: pdfBytes, attachmentName: $"{factura.CodigoFactura}.pdf");
+
+            sentEmails.Add(factura.Idfactura);
+            StateHasChanged();
+
+            await JSRuntime.InvokeVoidAsync("alert", "Factura enviada por correo electrónico.");
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error enviando correo: {ex.Message}");
+        }
+    }
+
+    private List<(string Label, string Total)> CalcularTarifaDesglose(IList<Tarifa> tarifas, double consumoTotal)
+    {
+        var desglose = new List<(string, string)>();
+        double consumoRestante = consumoTotal;
+        foreach (var tarifa in tarifas.OrderBy(t => t.Desde))
+        {
+            double desde = Convert.ToDouble(tarifa.Desde);
+            double hasta = tarifa.Hasta != null ? Convert.ToDouble(tarifa.Hasta) : double.MaxValue;
+            double uso = 0;
+            if (consumoRestante > 0 && consumoTotal > desde - 1)
+            {
+                double inicioRango = Math.Max(desde, consumoTotal - consumoRestante + 1);
+                double finRango = Math.Min(hasta, consumoTotal);
+                uso = Math.Max(0, finRango - inicioRango + 1);
+                if (consumoRestante < uso) uso = consumoRestante;
+                consumoRestante -= uso;
+            }
+            string label = hasta == double.MaxValue
+                ? $">={desde}: {uso}M3 x {Cur(tarifa.ValorUnidad)}"
+                : $"{desde}-{hasta}: {uso}M3 x {Cur(tarifa.ValorUnidad)}";
+            string total = Cur((tarifa.ValorUnidad ?? 0) * uso);
+            desglose.Add((label, total));
+        }
+        return desglose;
+    }
+
+    private static string Cur(double? v) => (v ?? 0).ToString("C0", CultureInfo.GetCultureInfo("es-CO"));
+
+    private async Task<string> BuildFacturaEmailHtml(Facturacion factura)
+    {
+        var sb = new System.Text.StringBuilder();
+        var culture = new CultureInfo("es-CO");
+        string L(DateOnly? d) => d.HasValue ? d.Value.ToString("D", culture) : string.Empty;
+        var chart = await BuildConsumoChartDataUri(factura.Idpredio);
+
+        sb.Append("<html><head><meta charset='UTF-8'>");
+        sb.Append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+        sb.Append("<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>");
+        sb.Append("<style>.print-container{width:100%;margin:0 auto;padding:20px;box-sizing:border-box;font-family:Arial,sans-serif}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #000;padding:8px;text-align:left;vertical-align:top}th{background-color:#f2f2f2}.text-info{color:#0d6efd}</style>");
+        sb.Append("</head><body><div class='modal-content text-center' id='printableArea'>");
+        sb.Append("<div class='modal-header'><h3 class='modal-title'>Factura: ");
+        sb.Append(System.Net.WebUtility.HtmlEncode(factura.CodigoFactura ?? string.Empty));
+        sb.Append("</h3></div><div class='modal-body'><div class='print-container'>");
+        sb.Append("<div class='text-center'>");
+        sb.Append($"<img src='{logoDataUri}' class='text-center' />");
+        sb.Append("<h2 class='text-center'><b>JUNTA DE ACCIÓN COMUNAL TOBIA CHICA</b></h2>");
+        sb.Append("<h2 class='text-center'><b>MUNICIPIO DE NOCAIMA - CUNDINAMARCA</b></h2>");
+        sb.Append("<h2 class='text-center'><b>NIT: 832.003.939-2</b></h2></div>");
+        sb.Append("<h2 class='text-center'><b>SERVICIO DE ACUEDUCTO</b></h2>");
+        sb.Append("<h2 class='text-center'><b>JAC TOBIA CHICA</b></h2>");
+        sb.Append($"<h4><b>BIMESTRE: {System.Net.WebUtility.HtmlEncode(factura.IdplanillaNavigation.IdperiodoNavigation.DescripcionLarga ?? string.Empty)}</b></h4>");
+        sb.Append($"<h6>Fecha Hora Elabora Factura: {factura.FechaHoraRegistro}</h6>");
+        sb.Append($"<h6>Fecha Hora Registro Consumo: {factura.IdplanillaNavigation.FechaHoraRegistroConsumo}</h6>");
+        sb.Append("<h5>Último día Pago: </h5>");
+        sb.Append($"<h4><b>{L(factura.IdplanillaNavigation.FechaLimitePago)}</b></h4>");
+        sb.Append("<h4>Fecha Suspensión: </h4>");
+        sb.Append($"<h4><b>{L(factura.IdplanillaNavigation.FechaSuspension)}</b></h4><hr />");
+        sb.Append("<table class='table table-bordered' style='font-size:10px'><tbody>");
+        void Row(string k, string v, bool big=false)
+        {
+            sb.Append("<tr><td><strong>"); 
+            sb.Append(k);
+            sb.Append(":</strong></td><td");
+            if(big) sb.Append(" class='text-info h2'"); 
+            sb.Append("><strong>"); 
+            sb.Append(System.Net.WebUtility.HtmlEncode(v));
+            sb.Append("</strong></td></tr>");
+        }
+        Row("Predio", factura.IdpredioNavigation.ApellidosNombresUsuario ?? string.Empty, true);
+        Row("Dirección", factura.IdpredioNavigation.Direccion ?? string.Empty);
+        Row("Código Usuario", factura.CodigoUsuario ?? string.Empty);
+        Row("Id o Cédula", factura.IdpredioNavigation.IdentificacionFacturacion ?? string.Empty);
+        Row("Ruta", (factura.IdpredioNavigation.Ruta ?? 0).ToString(culture));
+        Row("Medidor Número", factura.IdpredioNavigation.NumeroMedidor ?? string.Empty);
+        Row("Medidor Marca", factura.IdpredioNavigation.MarcaMedidor ?? string.Empty);
+        Row("Medidor Estado", factura.IdpredioNavigation.EstadoMedidor ?? string.Empty);
+        Row("Medición Anterior M3", (factura.MedicionAnterior ?? 0).ToString(culture));
+        Row("Medición Actual M3", (factura.MedicionActual ?? 0).ToString(culture));
+        Row("Consumo M3", (factura.ConsumoM3 ?? 0).ToString(culture));
+        Row("Valor Consumo", FormatCurrency(factura.ValorConsumo));
+        Row("Cargo Fijo", FormatCurrency(factura.CargoFijo));
+        Row("Porcentaje SobreTasa", (factura.PorcentajeSobreTasa ?? 0).ToString(culture));
+        Row("Valor SobreTasa", FormatCurrency(factura.ValorSobreTasa));
+        Row("Porcentaje Mora", (factura.PorcentajeMora ?? 0).ToString(culture));
+        Row("Valor Mora", FormatCurrency(factura.ValorMora));
+        Row("Porcentaje Subsidio", (factura.PorcentajeSubsidio ?? 0).ToString(culture));
+        Row("Valor Subsidio", FormatCurrency(factura.ValorSubsidio));
+        Row("Otros Valores", FormatCurrency(factura.OtrosValores));
+        Row("VALOR BIMESTRE A PAGAR", FormatCurrency(factura.ValorPeriodo));
+        Row("Notas", factura.NotasFactura ?? string.Empty);
+        sb.Append("<tr><td colspan='2' class='text-center'><h3>REPORTE CUENTA</h3></td></tr>");
+        Row("Deuda Bimestre Anterior", FormatCurrency(factura.DeudaAnterior));
+        Row("Pagos Realizados Bimestre", FormatCurrency(factura.RecaudoPeriodoTotal));
+        Row("Deuda Total", FormatCurrency(factura.DeudaPasa));
+        sb.Append("<tr><td colspan='2'><h2>Consumos Bimestrales Totales</h2>");
+        if(!string.IsNullOrEmpty(chart)) sb.Append($"<img src='{chart}' style='display:block;margin:6px auto 0;max-height:180px;max-width:80%' />");
+        sb.Append("<hr /></td></tr>");
+        sb.Append("</tbody><tfoot>");
+        sb.Append("<tr><td colspan='2' class='h6'>CONSIGNAR CUENTA AHORROS BANCOLOMBIA # 89233904466. NIT:832003939-2. JUNTA DE ACCIÓN COMUNAL TOBIA</td></tr>");
+        sb.Append("<tr><td colspan='1' class='h6'>HORARIO DE ATENCIÓN CASA COMUNAL:</td><td colspan='1' class='h6'>MARTES, JUEVES Y SABADO DE 2:30PM A 5:00PM:</td></tr>");
+        sb.Append("</tfoot></table></div></div></div></body></html>");
+        return sb.ToString();
+    }
+
+    private string BuildFacturaHtml(Facturacion f)
+    {
+        var culture = new CultureInfo("es-CO");
+        string Format(double? v) => v.HasValue ? v.Value.ToString("C0", culture) : "$0";
+        var logoSrc = GetLogoDataUri();
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<html><head><meta charset='utf-8'>");
+        sb.Append(@"<style>
+@page{size:58mm auto;margin:0}
+html,body{margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.ticket{width:58mm;margin:0 auto;padding:2mm 2mm 1mm 2mm;font-family:'Courier New',Courier,monospace;font-size:11px;line-height:1.25;color:#000}
+.center{text-align:center}.right{text-align:right}.small{font-size:10px}.big{font-size:13px;font-weight:700}
+hr{border:none;border-top:1px dashed #000;margin:2mm 0}
+.table{width:100%;border-collapse:collapse}
+.table td{padding:1px 0;vertical-align:top}
+.k{width:48%;text-align:right;padding-right:3px}
+.v{width:52%}
+</style>");
+        sb.Append("</head><body>");
+        sb.Append("<div id='printableArea' class='ticket'>");
+        sb.Append($"<div class='center big'>Factura # {System.Net.WebUtility.HtmlEncode(f.CodigoFactura ?? "")}</div>");
+        sb.Append($"<img src='{logoSrc}' style='display:block;margin:2mm auto;max-width:48mm;width:48mm;height:auto' />");
+        sb.Append("<div class='center'><div><b>JUNTA DE ACCIÓN COMUNAL TOBIA CHICA</b></div><div><b>MUNICIPIO DE NOCAIMA - CUNDINAMARCA</b></div><div><b>NIT: 832.003.939-2</b></div></div>");
+        sb.Append("<hr/>");
+        sb.Append("<table class='table'><tbody>");
+        void Row(string k, string v) => sb.Append($"<tr><td class='k'><strong>{k}:</strong></td><td class='v'>{System.Net.WebUtility.HtmlEncode(v)}</td></tr>");
+        Row("Bimestre", f.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionLarga ?? "");
+        Row("Reg.Consumo", f.IdplanillaNavigation?.FechaHoraRegistroConsumo?.ToString("d", culture) ?? "");
+        Row("Último Pago", f.IdplanillaNavigation?.FechaLimitePago?.ToString("d", culture) ?? "");
+        Row("Suspensión", f.IdplanillaNavigation?.FechaSuspension?.ToString("d", culture) ?? "");
+        Row("Predio", f.IdpredioNavigation?.ApellidosNombresUsuario ?? "");
+        Row("Dirección", f.IdpredioNavigation?.Direccion ?? "");
+        Row("Ruta", (f.IdpredioNavigation?.Ruta ?? 0).ToString(culture));
+        Row("Código Usuario", f.CodigoUsuario ?? "");
+        Row("Medidor #", f.IdpredioNavigation?.NumeroMedidor ?? "");
+        Row("Marca", f.IdpredioNavigation?.MarcaMedidor ?? "");
+        Row("Estado", f.IdpredioNavigation?.EstadoMedidor ?? "");
+        Row("M3 Anterior", (f.MedicionAnterior ?? 0).ToString(culture));
+        Row("M3 Actual", (f.MedicionActual ?? 0).ToString(culture));
+        Row("Consumo M3", (f.ConsumoM3 ?? 0).ToString(culture));
+        Row("Valor Consumo", Format(f.ValorConsumo));
+        Row("Cargo Fijo", Format(f.CargoFijo));
+        Row("SobreTasa", Format(f.ValorSobreTasa));
+        Row("Mora", Format(f.ValorMora));
+        Row("Subsidio", Format(f.ValorSubsidio));
+        Row("Otros", Format(f.OtrosValores));
+        sb.Append($"<tr><td class='k'><strong>VALOR A PAGAR:</strong></td><td class='v'><strong>{Format(f.ValorPeriodo)}</strong></td></tr>");
+        Row("Notas", f.NotasFactura ?? "");
+        sb.Append("</tbody></table>");
+        sb.Append("<hr/>");
+        sb.Append("<div class='small center'>CONSIGNAR CUENTA AHORROS BANCOLOMBIA # 89233904466</div>");
+        sb.Append("<div class='small center'>HORARIO: MAR, JUE, SÁB 2:30pm - 5:00pm</div>");
+        sb.Append("</div></body></html>");
+        return sb.ToString();
+    }
+
+    private async Task PonerEnlacesAntesDespues(List<Planilla> planillaActual)
+    {
+        if (planillaActual == null || !planillaActual.Any())
+        {
+            id_planilla_anterior = "No disponible";
+            id_planilla_siguiente = "No disponible";
+            return;
+        }
+
+        var fechaActual = planillaActual.FirstOrDefault()?.FechaHoraRegistroConsumo ?? DateTime.Now.Date;
+
+        using var context = DbFactory.CreateDbContext();
+
+        var planillaAnterior = await context.Planillas
+            .Where(p => p.FechaHoraRegistroConsumo < fechaActual)
+            .OrderByDescending(p => p.FechaHoraRegistroConsumo)
+            .FirstOrDefaultAsync();
+
+        var planillaSiguiente = await context.Planillas
+            .Where(p => p.FechaHoraRegistroConsumo > fechaActual)
+            .OrderBy(p => p.FechaHoraRegistroConsumo)
+            .FirstOrDefaultAsync();
+
+        id_planilla_anterior = planillaAnterior?.Idplanilla ?? "No disponible";
+        id_planilla_siguiente = planillaSiguiente?.Idplanilla ?? "No disponible";
+    }
+
+    private async Task PrintTextOnlyVersion()
+    {
+        var url = $"/planillas/consumosimprimircomponent?id={id}";
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+    }
+
+    private double RedondearValor(double valor)
+    {
+        int centenas = (int)(valor / 100);
+        int decenas = (int)((valor % 100) / 10);
+
+        if (decenas <= 5)
+        {
+            return centenas * 100;
+        }
+        else
+        {
+            return (centenas + 1) * 100;
+        }
+    }
+
+    private async Task RecalcularValores(Facturacion factura)
+    {
+        CalcularValorPeriodo(factura);
+        factura.DeudaPasa = (factura.ValorPeriodo ?? 0) + (factura.DeudaAnterior ?? 0) - (factura.RecaudoPeriodoTotal ?? 0);
+    }
+
+    private async Task UpdateFactura(Facturacion factura)
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Facturacions.Update(factura);
+        await context.SaveChangesAsync();
+    }
+
+    private async Task UpdatePlanilla()
+    {
+        using var context = DbFactory.CreateDbContext();
+        var planilla = await context.Planillas.FirstOrDefaultAsync(p => p.Idplanilla == id);
+        if (planilla != null)
+        {
+            planilla.CantidadConsumoM3total = totalConsumoM3;
+            context.Planillas.Update(planilla);
+            await context.SaveChangesAsync();
+        }
+    }
+
+    private async Task ActualizarMedicionAnteriorEnSiguienteFactura(Facturacion facturaActual)
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        var planillaActual = await context.Planillas.FirstOrDefaultAsync(p => p.Idplanilla == facturaActual.Idplanilla);
+        if (planillaActual == null) return;
+
+        var planillaSiguiente = await context.Planillas
+            .Where(p => p.FechaHoraRegistroConsumo > planillaActual.FechaHoraRegistroConsumo)
+            .OrderBy(p => p.FechaHoraRegistroConsumo)
+            .FirstOrDefaultAsync();
+
+        if (planillaSiguiente == null) return;
+
+        var facturaSiguiente = await context.Facturacions
+            .FirstOrDefaultAsync(f => f.Idplanilla == planillaSiguiente.Idplanilla && f.Idpredio == facturaActual.Idpredio);
+
+        if (facturaSiguiente == null) return;
+
+        facturaSiguiente.MedicionAnterior = facturaActual.MedicionActual;
+
+        context.Facturacions.Update(facturaSiguiente);
+        await context.SaveChangesAsync();
+    }
+
+    private async Task PropagarDeudaPasa(Facturacion facturaActual)
+    {
+        if (facturaActual == null) return;
+
+        try
+        {
+            using var context = DbFactory.CreateDbContext();
+
+            var planillaActual = await context.Planillas.FirstOrDefaultAsync(p => p.Idplanilla == facturaActual.Idplanilla);
+            if (planillaActual == null) return;
+
+            var subsequentPlanillas = await context.Planillas
+                .Where(p => p.FechaHoraRegistroConsumo > planillaActual.FechaHoraRegistroConsumo)
+                .OrderBy(p => p.FechaHoraRegistroConsumo)
+                .ToListAsync();
+
+            double deudaPasaAnterior = facturaActual.DeudaPasa ?? 0;
+
+            foreach (var planilla in subsequentPlanillas)
+            {
+                var facturaSiguiente = await context.Facturacions.FirstOrDefaultAsync(f => f.Idplanilla == planilla.Idplanilla && f.Idpredio == facturaActual.Idpredio);
+                if (facturaSiguiente == null) break;
+
+                var ingresos = await context.Ingresos.Where(i => i.Idfactura == facturaSiguiente.Idfactura).ToListAsync();
+                facturaSiguiente.RecaudoPeriodoTotal = ingresos.Sum(i => i.Valor ?? 0);
+
+                facturaSiguiente.DeudaAnterior = deudaPasaAnterior;
+                var valorPeriodo = facturaSiguiente.ValorPeriodo ?? 0;
+                facturaSiguiente.DeudaPasa = RedondearValor((facturaSiguiente.DeudaAnterior ?? 0) + valorPeriodo - (facturaSiguiente.RecaudoPeriodoTotal ?? 0));
+
+                context.Facturacions.Update(facturaSiguiente);
+                await context.SaveChangesAsync();
+
+                deudaPasaAnterior = facturaSiguiente.DeudaPasa ?? 0;
+            }
+        }
+        catch
+        {
+            // Registrar o ignorar errores para no bloquear captura de consumos
+        }
+    }
+
+    private async Task ActualizaTodosFactuaAnterioraActual(string idPlanilla)
+    {
+        using var context = DbFactory.CreateDbContext();
+        var planillaActual = await context.Planillas.Where(f => f.Idplanilla == idPlanilla).FirstOrDefaultAsync();
+        if (planillaActual == null) return;
+
+        var facturasActuales = await context.Facturacions.Where(f => f.Idplanilla == planillaActual.Idplanilla).ToListAsync();
+
+        var planillaAnterior = await context.Planillas
+            .Where(p => p.FechaHoraRegistroConsumo < planillaActual.FechaHoraRegistroConsumo)
+            .OrderByDescending(p => p.FechaHoraRegistroConsumo)
+            .FirstOrDefaultAsync();
+
+        if (planillaAnterior == null) return;
+
+        foreach (var factura in facturasActuales)
+        {
+            var facturaAnterior = await context.Facturacions
+                .FirstOrDefaultAsync(f => f.Idplanilla == planillaAnterior.Idplanilla && f.Idpredio == factura.Idpredio);
+            if (facturaAnterior != null)
+            {
+                factura.MedicionAnterior = facturaAnterior.MedicionActual;
+                context.Facturacions.Update(factura);
+                await context.SaveChangesAsync();
+            }
+        }
+    }
+
+    private string GetLogoDataUri()
+    {
+        try
+        {
+            var imgPath = Path.Combine(Env.WebRootPath, "fondologo-acueducto.jpg");
+            if (File.Exists(imgPath))
+            {
+                var bytes = File.ReadAllBytes(imgPath);
+                var b64 = Convert.ToBase64String(bytes);
+                return $"data:image/jpeg;base64,{b64}";
+            }
+        }
+        catch { }
+        return "/fondologo-acueducto.jpg";
+    }
+
+    private async Task<string> BuildConsumoChartDataUri(string idPredio)
+    {
+        try
+        {
+            using var context = DbFactory.CreateDbContext();
+            var rows = await context.Facturacions
+                .Where(f => f.Idpredio == idPredio)
+                .Join(context.Planillas, f => f.Idplanilla, p => p.Idplanilla, (f, p) => new { f.ConsumoM3, p.FechaHoraRegistroConsumo })
+                .OrderByDescending(x => x.FechaHoraRegistroConsumo)
+                .Take(12)
+                .ToListAsync();
+
+            rows.Reverse();
+
+            int width = 600, height = 200, padding = 30;
+            using var bitmap = new SKBitmap(width, height);
+            using var canvas = new SKCanvas(bitmap);
+            canvas.Clear(SKColors.White);
+            using var paintAxis = new SKPaint { Color = SKColors.Gray, StrokeWidth = 1, IsAntialias = true };
+            using var paintBar = new SKPaint { Color = new SKColor(13, 110, 253), IsAntialias = true };
+
+            float chartLeft = padding;
+            float chartBottom = height - padding;
+            float chartRight = width - padding;
+            float chartTop = padding;
+            canvas.DrawLine(chartLeft, chartBottom, chartRight, chartBottom, paintAxis);
+            canvas.DrawLine(chartLeft, chartBottom, chartLeft, chartTop, paintAxis);
+
+            var valores = rows.Select(r => (float)(r.ConsumoM3 ?? 0)).ToArray();
+            float max = valores.Length > 0 ? Math.Max(1f, valores.Max()) : 1f;
+            int n = Math.Max(1, valores.Length);
+            float barWidth = (chartRight - chartLeft) / n * 0.6f;
+            float step = (chartRight - chartLeft) / n;
+
+            for (int i = 0; i < n; i++)
+            {
+                float x = chartLeft + i * step + (step - barWidth) / 2f;
+                float h = (valores[i] / max) * (chartBottom - chartTop);
+                canvas.DrawRect(new SKRect(x, chartBottom - h, x + barWidth, chartBottom), paintBar);
+            }
+
+            using var img = SKImage.FromBitmap(bitmap);
+            using var data = img.Encode(SKEncodedImageFormat.Png, 90);
+            var b64 = Convert.ToBase64String(data.ToArray());
+            return $"data:image/png;base64,{b64}";
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+
+
+
+    private async Task SaveFacturaPdf(string idFactura)
+    {
+        try
+        {
+            using var context = DbFactory.CreateDbContext();
+            var f = await context.Facturacions.FirstOrDefaultAsync(x => x.Idfactura == idFactura);
+            if (f == null) return;
+
+            f.IdplanillaNavigation = await context.Planillas.Include(p => p.IdperiodoNavigation).FirstOrDefaultAsync(p => p.Idplanilla == f.Idplanilla);
+            f.IdpredioNavigation = await context.Predios.FirstOrDefaultAsync(p => p.Idpredio == f.Idpredio);
+
+            string html = BuildFacturaHtml(f);
+            var bytes = PdfService.FromHtml(html);
+
+            var dir = Path.Combine(Env.WebRootPath, "facturas");
+            Directory.CreateDirectory(dir);
+            var fileName = Sanitize(f.CodigoFactura ?? f.Idfactura) + ".pdf";
+            var fullPath = Path.Combine(dir, fileName);
+            await File.WriteAllBytesAsync(fullPath, bytes);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al generar PDF: {ex.Message}";
+        }
+    }
+
+    private static string Sanitize(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+        var invalid = System.IO.Path.GetInvalidFileNameChars();
+        var safe = string.Join("_", input.Split(invalid, StringSplitOptions.RemoveEmptyEntries));
+        return safe.Trim();
+    }
+
+    private string FormatCurrency(double? value)
+    {
+        if (value.HasValue)
+        {
+            return $"${value.Value:N0}";
+        }
+        return "$0";
+    }
+
+    private async Task ImprimirYCerrar()
+    {
+        await JSRuntime.InvokeVoidAsync("imprimirYCerrarModal", "printableArea");
+    }
+
+    private async Task LoadData()
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        var query = context.Facturacions.Where(p => p.Idplanilla == id);
+
+        // If opened with ?codigo=... filter the DB query to that usuario
+        if (!string.IsNullOrWhiteSpace(codigo))
+        {
+            var codigoTrim = codigo.Trim();
+            query = query.Where(f => f.CodigoUsuario != null && f.CodigoUsuario == codigoTrim);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filtroNombrePredio))
+        {
+            var pattern = $"%{filtroNombrePredio}%";
+            query = query.Where(f => context.Predios.Any(p => p.Idpredio == f.Idpredio && p.ApellidosNombresUsuario != null && EF.Functions.Like(p.ApellidosNombresUsuario, pattern)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filtroCodigoUsuario))
+        {
+            var patternCode = $"%{filtroCodigoUsuario}%";
+            query = query.Where(f => f.CodigoUsuario != null && EF.Functions.Like(f.CodigoUsuario, patternCode));
+        }
+
+        facturacion = await query.Include(f => f.IdpredioNavigation)
+            .ThenInclude(c => c.IdentificacionFacturacionNavigation)
+            .OrderBy(c => c.IdpredioNavigation.Ruta)
+            .ToListAsync();
+
+        var planilla1 = await context.Planillas.Where(p => p.Idplanilla == id).Include(c => c.IdperiodoNavigation).ToListAsync();
+        await PonerEnlacesAntesDespues(planilla1);
+
+        // Use a single planilla reference to avoid multiple FirstOrDefault() calls and null dereferences
+        var planilla = planilla1.FirstOrDefault();
+
+        if (!editaPlanilla && actualizaAnterior)
+        {
+            await ActualizaTodosFactuaAnterioraActual(id);
+            StateHasChanged();
+        }
+
+        editaPlanilla = planilla?.Abierta ?? false;
+
+        // If opened via ?codigo=... and there is a matching factura, prepare tomaDatos behavior
+        if (!string.IsNullOrWhiteSpace(codigo) && facturacion?.Count > 0)
+        {
+            filtroCodigoUsuario = codigo;
+            // prefer the focused factura when provided, otherwise fallback to first
+            Facturacion f = null;
+            if (!string.IsNullOrWhiteSpace(focus))
+            {
+                f = facturacion.FirstOrDefault(x => string.Equals(x.Idfactura, focus, StringComparison.OrdinalIgnoreCase));
+            }
+            if (f == null) f = facturacion.First();
+
+            var medActual = f.MedicionActual ?? 0;
+            var medAnterior = f.MedicionAnterior ?? 0;
+
+            if (medActual == 0)
+            {
+                // Pre-fill MedicionActual with MedicionAnterior for capture session (in-memory only)
+                f.MedicionActual = medAnterior;
+                // Enable data capture only if planilla allows editing
+                if (editaPlanilla)
+                {
+                    tomaDatos = true;
+                }
+            }
+            else
+            {
+                // If actual already greater than anterior, ensure capture mode is off
+                tomaDatos = false;
+            }
+        }
+
+        if (planilla == null)
+        {
+            str_planilla = "No hay planilla";
+        }
+        else
+        {
+            str_planilla = planilla.Descripcion ?? "No hay planilla";
+            str_periodo_corto = planilla.IdperiodoNavigation?.DescripcionCorta ?? "N/A";
+            str_periodo_largo = planilla.IdperiodoNavigation?.DescripcionLarga ?? "N/A";
+            nombreRegistrador = planilla.EncargadoRegistroConsumos ?? "N/A";
+
+            FechaTomaConsumoPlanilla = planilla.FechaHoraRegistroConsumo;
+            FechaUltimoPagoPlanilla = planilla.FechaLimitePago;
+            FechaSuspensionPlanilla = planilla.FechaSuspension;
+        }
+        tarifas = await context.Tarifas.OrderBy(c => c.Desde).ToArrayAsync();
+    }
+
+    private async Task OpenPrintWindow(string idFactura)
+    {
+        // En Consumos no generamos PDF previo; solo abrimos la vista de impresión
+        var url = $"/factura/imprimir?IdFactura={idFactura}";
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+    }
+
+    private async Task OnContadorEnSeguimientoChanged(Facturacion factura, ChangeEventArgs e)
+    {
+        if (!editaPlanilla) return;
+        bool nuevoValor = (bool)((ChangeEventArgs)e).Value;
+        using var context = DbFactory.CreateDbContext();
+        var predioActual = await context.Predios.FirstOrDefaultAsync(p => p.Idpredio == factura.Idpredio);
+        if (predioActual != null)
+        {
+            predioActual.ContadorEnSeguimiento = nuevoValor;
+            context.Predios.Update(predioActual);
+            await context.SaveChangesAsync();
+        }
+        factura.IdpredioNavigation.ContadorEnSeguimiento = nuevoValor;
+        StateHasChanged();
+    }
+
+    private async Task OnNotasFacturaChanged(Facturacion factura)
+    {
+        if (!editaPlanilla) return;
+        using var context = DbFactory.CreateDbContext();
+        context.Facturacions.Update(factura);
+        await context.SaveChangesAsync();
+    }
+
+    private async Task OnHeaderClick(string header)
+    {
+        currentSortHeader = header;
+
+        if (header == "Ruta")
+        {
+            if (sortAscending)
+                facturacion = facturacion.OrderBy(f => f.IdpredioNavigation.Ruta).ToList();
+            else
+                facturacion = facturacion.OrderByDescending(f => f.IdpredioNavigation.Ruta).ToList();
+            sortAscending = !sortAscending;
+        }
+        if (header == "Predio")
+        {
+            if (sortAscending)
+                facturacion = facturacion.OrderBy(f => f.IdpredioNavigation.ApellidosNombresUsuario).ToList();
+            else
+                facturacion = facturacion.OrderByDescending(f => f.IdpredioNavigation.ApellidosNombresUsuario).ToList();
+            sortAscending = !sortAscending;
+        }
+    }
+
+    private async Task OnObservacionesPredioChanged(Facturacion factura, ChangeEventArgs e)
+    {
+        if (!editaPlanilla) return;
+        factura.IdpredioNavigation.Observaciones = e.Value?.ToString();
+        await UpdateFactura(factura);
+    }
+
+    private async Task OnRutaChanged(Facturacion factura, ChangeEventArgs e)
+    {
+        if (!editaPlanilla) return;
+        if (currentSortHeader != "Ruta") return;
+
+        if (double.TryParse(e.Value?.ToString(), out double nuevaRuta))
+        {
+            bool currentSortAscending = sortAscending;
+            using var context = DbFactory.CreateDbContext();
+            var predioActual = await context.Predios.FirstOrDefaultAsync(p => p.Idpredio == factura.Idpredio);
+            if (predioActual != null)
+            {
+                predioActual.Ruta = nuevaRuta;
+                context.Predios.Update(predioActual);
+            }
+
+            var prediosConMismaRuta = await context.Predios.Where(p => p.Ruta >= nuevaRuta).ToListAsync();
+            var i = 1;
+            foreach (var predio in prediosConMismaRuta)
+            {
+                predio.Ruta = nuevaRuta + i;
+                context.Predios.Update(predio);
+                i++;
+            }
+
+            await context.SaveChangesAsync();
+            await LoadData();
+
+            if (currentSortAscending)
+                facturacion = facturacion.OrderByDescending(f => f.IdpredioNavigation.Ruta).ToList();
+            else
+                facturacion = facturacion.OrderBy(f => f.IdpredioNavigation.Ruta).ToList();
+
+            sortAscending = currentSortAscending;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnMedicionAnteriorChanged(Facturacion factura, ChangeEventArgs e)
+    {
+        if (!editaPlanilla) return;
+        if (double.TryParse(e.Value?.ToString(), out double medicionAnterior))
+        {
+            factura.MedicionAnterior = medicionAnterior;
+
+            // Persist only the MedicionAnterior change immediately
+            using var context = DbFactory.CreateDbContext();
+            context.Facturacions.Update(factura);
+            await context.SaveChangesAsync();
+
+            // Recalculate display fields and dependent values
+            await CalcularConsumo(factura);
+            CalcularTotalConsumoM3();
+            await UpdatePlanilla();
+            await RecalcularValores(factura);
+            await UpdateFactura(factura);
+
+            // Keep next factura in sync
+            await ActualizarMedicionAnteriorEnSiguienteFactura(factura);
+            StateHasChanged();
+        }
+    }
+
+
+
+    private async Task OnMedicionActualChanged(Facturacion factura, ChangeEventArgs e)
+    {
+        if (!editaPlanilla) return;
+        if (double.TryParse(e.Value?.ToString(), out double medicionActual))
+        {
+            factura.MedicionActual = medicionActual;
+            await CalcularConsumo(factura);
+            // Persistir cambios de medición y notas de factura si aplica
+            using var context = DbFactory.CreateDbContext();
+
+            // Si no hay notas y no hay recaudo, colocar placeholder de "SIN RECAUDO..."
+            if (string.IsNullOrWhiteSpace(factura.NotasFactura) && (factura.RecaudoPeriodoTotal ?? 0) == 0)
+            {
+                factura.NotasFactura += "SIN RECAUDO EN EL BIMESTRE " + (str_periodo_corto ?? string.Empty);
+                factura.NotasRecaudo += "SIN RECAUDO EN EL BIMESTRE " + (str_periodo_corto ?? string.Empty);
+            }
+
+            // Si no hay notas y ya existe recaudo, agradecer abono
+            if (string.IsNullOrWhiteSpace(factura.NotasFactura) && (factura.RecaudoPeriodoTotal ?? 0) > 0)
+            {
+                factura.NotasFactura += "GRACIAS POR SU ABONO A DEUDA ANTERIOR.";
+                factura.NotasRecaudo += "GRACIAS POR SU ABONO A DEUDA ANTERIOR.";
+            }
+
+            context.Facturacions.Update(factura);
+            await context.SaveChangesAsync();
+            CalcularTotalConsumoM3();
+            await UpdatePlanilla();
+            await RecalcularValores(factura);
+            await UpdateFactura(factura);
+            await ActualizarMedicionAnteriorEnSiguienteFactura(factura);
+            // Propagar cambios de saldos a facturas de planillas posteriores
+            try
+            {
+                await PropagarDeudaPasa(factura);
+            }
+            catch
+            {
+                // no bloquear la captura de consumos si la propagación falla
+            }
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnValorConsumoChanged(Facturacion factura, ChangeEventArgs e)
+    {
+        if (!editaPlanilla) return;
+        if (double.TryParse(e.Value?.ToString(), out double valorConsumo))
+        {
+            factura.ValorConsumo = valorConsumo;
+            using var context = DbFactory.CreateDbContext();
+            context.Facturacions.Update(factura);
+            await context.SaveChangesAsync();
+            CalcularTotalConsumoM3();
+            await UpdatePlanilla();
+        }
+    }
+
+    private async Task OnNombreRegistradorChanged(ChangeEventArgs e)
+    {
+        if (!editaPlanilla) return;
+        nombreRegistrador = e.Value?.ToString();
+        using var context = DbFactory.CreateDbContext();
+        var planilla = await context.Planillas.FirstOrDefaultAsync(p => p.Idplanilla == id);
+        if (planilla != null)
+        {
+            planilla.EncargadoRegistroConsumos = nombreRegistrador;
+            context.Planillas.Update(planilla);
+            await context.SaveChangesAsync();
+        }
+    }
+
+    private void OpenModal(Facturacion factura)
+    {
+        selectedFactura = factura;
+        showModal = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _ = Task.Delay(5000).ContinueWith(_ =>
+            {
+                mostrar = false;
+                InvokeAsync(StateHasChanged);
+            });
+
+            if (tomaDatos)
+            {
+                await ScrollToFocusedAsync();
+            }
+        }
+        await JSRuntime.InvokeVoidAsync("setPageTitle", "CON:" + str_periodo_corto);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadData();
+        CalcularTotalConsumoM3();
+    }
+
+    private async Task EnviarPorWhatsApp(Facturacion factura)
+    {
+        try
+        {
+            var telefono = factura?.IdpredioNavigation?.IdentificacionFacturacionNavigation?.Celular;
+            if (!string.IsNullOrWhiteSpace(telefono))
+            {
+                var mensaje = $"Factura: {factura.CodigoFactura}\nValor a pagar: {FormatCurrency(factura.ValorPeriodo)}";
+                await WhatsAppService.SendMessageAsync(telefono, mensaje);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al enviar por WhatsApp: {ex.Message}");
+        }
+    }
+
+    private async Task OnFiltroNombrePredioChanged()
+    {
+        _filtroCts?.Cancel();
+        var cts = new System.Threading.CancellationTokenSource();
+        _filtroCts = cts;
+        try { await Task.Delay(250, cts.Token); await LoadData(); StateHasChanged(); } catch (TaskCanceledException) { }
+    }
+
+    private async Task OnFiltroCodigoUsuarioChanged()
+    {
+        _filtroCts?.Cancel();
+        var cts = new System.Threading.CancellationTokenSource();
+        _filtroCts = cts;
+        try { await Task.Delay(250, cts.Token); await LoadData(); StateHasChanged(); } catch (TaskCanceledException) { }
+    }
+
+    private async Task ClearFiltroNombrePredio()
+    {
+        filtroNombrePredio = string.Empty;
+        await LoadData();
+    }
+
+    private async Task ClearFiltroCodigoUsuario()
+    {
+        filtroCodigoUsuario = string.Empty;
+        await LoadData();
+    }
+
+    private async Task SetFiltroCodigoUsuario(string? codigoUsuario)
+    {
+        if (string.IsNullOrWhiteSpace(codigoUsuario)) return;
+        filtroCodigoUsuario = codigoUsuario;
+        await LoadData();
+        StateHasChanged();
+    }
+
+
+    private IEnumerable<Facturacion> GetFacturacionFiltrada()
+    {
+        if (facturacion is null) return Array.Empty<Facturacion>();
+
+        IEnumerable<Facturacion> q = facturacion;
+
+        if (!string.IsNullOrWhiteSpace(filtroNombrePredio))
+        {
+            var term = filtroNombrePredio.Trim();
+            q = q.Where(f => (f.IdpredioNavigation?.ApellidosNombresUsuario ?? string.Empty)
+                .Contains(term, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filtroCodigoUsuario))
+        {
+            var term = filtroCodigoUsuario.Trim();
+            q = q.Where(f => (f.IdpredioNavigation?.CodigoUsuario ?? string.Empty)
+                .Contains(term, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // If page was opened with 'codigo' query param, filter to that usuario only
+        if (!string.IsNullOrWhiteSpace(codigo))
+        {
+            var term = codigo.Trim();
+            q = q.Where(f => (f.IdpredioNavigation?.CodigoUsuario ?? string.Empty)
+                .Equals(term, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filtroNumeroContador))
+        {
+            var termDigits = OnlyDigits(filtroNumeroContador);
+            if (!string.IsNullOrWhiteSpace(termDigits) && termDigits.Length >= 4 && termDigits.Trim('0').Length > 0)
+            {
+                q = q.Where(f =>
+                {
+                    var digits = OnlyDigits(f.IdpredioNavigation?.NumeroMedidor);
+                    if (string.IsNullOrWhiteSpace(digits)) return false;
+                    if (digits.Length < 4) return false;
+                    if (digits.Trim('0').Length == 0) return false; // evita "0", "00", etc.
+                    return digits.Contains(termDigits) || termDigits.Contains(digits);
+                });
+            }
+        }
+
+        return q;
+    }
+
+    private sealed class OcrScanResult
+    {
+        public string? NumeroMedidor { get; set; }
+        public double? LecturaActual { get; set; }
+        public double? Confianza { get; set; }
+    }
+
+    private async Task SetErrorMessageAsync(string? message)
+    {
+        errorMessage = message;
+        _errorMessageVersion++;
+        var version = _errorMessageVersion;
+        StateHasChanged();
+
+        if (string.IsNullOrWhiteSpace(message)) return;
+
+        try { await Task.Delay(5000); } catch { }
+
+        if (version != _errorMessageVersion) return;
+
+        errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void OnImageSelected(InputFileChangeEventArgs e)
+    {
+        selectedImage = e.File;
+        _lastImageBytes = null;
+        _lastOcrResult = null;
+        _correctionSerial = null;
+        _correctionLectura = null;
+        _correctionStatus = null;
+        _ = Task.Run(() => SaveUploadedImageAsync(selectedImage));
+        StateHasChanged();
+    }
+
+    private async Task SaveUploadedImageAsync(IBrowserFile? file)
+    {
+        if (file is null) return;
+
+        try
+        {
+            var factura = GetFacturacionFiltrada().FirstOrDefault();
+            var predio = factura?.IdpredioNavigation;
+            var codigoUsuario = predio?.CodigoUsuario;
+            if (string.IsNullOrWhiteSpace(codigoUsuario)) return;
+
+            var predioNombre = predio?.ApellidosNombresUsuario ?? predio?.Direccion ?? "Predio";
+            predioNombre = SanitizeFileName(predioNombre);
+
+            var dateStamp = DateTime.Now.ToString("d", CultureInfo.GetCultureInfo("es-CO"));
+            dateStamp = dateStamp.Replace("/", string.Empty).Replace("-", string.Empty).Replace(" ", string.Empty);
+
+            var ext = Path.GetExtension(file.Name);
+            if (string.IsNullOrWhiteSpace(ext)) ext = ".jpg";
+            ext = ext.StartsWith('.') ? ext : "." + ext;
+
+            var safeFileName = $"{predioNombre}_{dateStamp}{ext}";
+
+            var folder = Path.Combine(Env.WebRootPath, "imagenes", codigoUsuario);
+            Directory.CreateDirectory(folder);
+
+            var fullPath = Path.Combine(folder, safeFileName);
+            await using var read = file.OpenReadStream(maxAllowedSize: 15_000_000);
+            await using var write = File.Create(fullPath);
+            await read.CopyToAsync(write);
+        }
+        catch
+        {
+            // best-effort save; OCR flow must continue even if file I/O fails
+        }
+    }
+
+    private static string SanitizeFileName(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return "";
+        var invalid = Path.GetInvalidFileNameChars();
+        var cleaned = string.Join("_", input.Split(invalid, StringSplitOptions.RemoveEmptyEntries)).Trim();
+        return string.IsNullOrWhiteSpace(cleaned) ? "Predio" : cleaned;
+    }
+
+    private async Task OnSerialChanged()
+    {
+        _serialDebounceCts?.Cancel();
+        _serialDebounceCts?.Dispose();
+        _serialDebounceCts = new CancellationTokenSource();
+        var ct = _serialDebounceCts.Token;
+
+        // Espera un poco a que el usuario termine de escribir
+        try { await Task.Delay(600, ct); } catch { return; }
+
+        // Setear filtro de contador automáticamente con el serial (tal como lo escribió el usuario)
+        if (!string.IsNullOrWhiteSpace(_correctionSerial))
+        {
+            await InvokeAsync(() =>
+            {
+                filtroNumeroContador = _correctionSerial;
+                StateHasChanged();
+            });
+        }
+
+        var serialDigits = OnlyDigits(_correctionSerial);
+        if (string.IsNullOrWhiteSpace(serialDigits) || serialDigits.Length < 4) return;
+
+        // Requiere lectura para poder aplicar el valor automáticamente
+        if (_correctionLectura is null) return;
+
+        var match = FindFacturaByMeterDigits(serialDigits);
+        if (match is null) return;
+
+        match.MedicionActual = _correctionLectura;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnFiltroNumeroContadorChanged()
+    {
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void ClearFiltroNumeroContador()
+    {
+        filtroNumeroContador = null;
+        StateHasChanged();
+    }
+
+    private static string OnlyDigits(string? input)
+        => string.IsNullOrWhiteSpace(input) ? string.Empty : Regex.Replace(input, "\\D+", string.Empty);
+
+
+    private Facturacion? FindFacturaByMeterDigits(string serialDigits)
+    {
+        if (facturacion is null || facturacion.Count == 0) return null;
+
+        Facturacion? bestFactura = null;
+        var bestScore = 0;
+
+        foreach (var f in facturacion)
+        {
+            var digits = OnlyDigits(f.IdpredioNavigation?.NumeroMedidor);
+            if (string.IsNullOrWhiteSpace(digits)) continue;
+
+            var score = LongestCommonEdgeMatch(digits, serialDigits);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestFactura = f;
+            }
+        }
+
+        // mínimo 4 dígitos para evitar falsos positivos
+        return bestScore >= 4 ? bestFactura : null;
+    }
+
+    private static int LongestCommonEdgeMatch(string a, string b)
+    {
+        if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return 0;
+
+        var max = Math.Min(a.Length, b.Length);
+        var best = 0;
+        for (var len = 1; len <= max; len++)
+        {
+            if (a.EndsWith(b[^len..], StringComparison.Ordinal)) best = Math.Max(best, len);
+            if (a.StartsWith(b[..len], StringComparison.Ordinal)) best = Math.Max(best, len);
+            if (b.EndsWith(a[^len..], StringComparison.Ordinal)) best = Math.Max(best, len);
+            if (b.StartsWith(a[..len], StringComparison.Ordinal)) best = Math.Max(best, len);
+        }
+        return best;
+    }
+
+    public async Task RegistroAutomatico()
+    {
+        if (_registroAutomaticoEnProceso)
+        {
+            return;
+        }
+
+        if (selectedImage == null)
+        {
+            await SetErrorMessageAsync("Por favor, selecciona una imagen.");
+            return;
+        }
+
+        try
+        {
+            _registroAutomaticoEnProceso = true;
+            _registroAutomaticoEstado = "Processing...";
+            await InvokeAsync(StateHasChanged);
+
+            _registroAutomaticoEstado = "Reading image...";
+            await InvokeAsync(StateHasChanged);
+
+            await using var stream = selectedImage.OpenReadStream(maxAllowedSize: 15_000_000);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            _lastImageBytes = ms.ToArray();
+
+            _registroAutomaticoEstado = "Running OCR...";
+            await InvokeAsync(StateHasChanged);
+
+            var scan = await OcrApp.ScanAsync(new MemoryStream(_lastImageBytes), CancellationToken.None);
+
+            var result = new OcrScanResult
+            {
+                NumeroMedidor = scan.NumeroMedidor,
+                LecturaActual = scan.LecturaActual,
+                Confianza = scan.Confianza
+            };
+
+            _lastOcrResult = result;
+            _correctionSerial = result.NumeroMedidor;
+            _correctionLectura = result.LecturaActual;
+            _correctionStatus = null;
+            filtroNumeroContador = _correctionSerial;
+
+            _registroAutomaticoEstado = "Applying results...";
+            await InvokeAsync(StateHasChanged);
+
+            if (result.LecturaActual is null)
+            {
+                await SetErrorMessageAsync("No fue posible detectar la lectura del medidor en la imagen.");
+                return;
+            }
+
+            var serial = string.IsNullOrWhiteSpace(result.NumeroMedidor) ? "N/A" : result.NumeroMedidor;
+            var confTxt = result.Confianza is null ? "N/A" : result.Confianza.Value.ToString("N0", CultureInfo.InvariantCulture) + "%";
+            await SetErrorMessageAsync($"Lectura: {result.LecturaActual:0} | Serial: {serial} | Confianza: {confTxt}");
+        }
+        catch (Exception ex)
+        {
+            await SetErrorMessageAsync($"Error: {ex.Message}");
+        }
+        finally
+        {
+            _registroAutomaticoEnProceso = false;
+            _registroAutomaticoEstado = "";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private sealed class OcrCorrectionRequest
+    {
+        public required string ImageBase64 { get; set; }
+        public string? NumeroMedidor { get; set; }
+        public double? LecturaM3 { get; set; }
+
+        public string? IdPlanilla { get; set; }
+    }
+
+    private async Task SaveOcrCorrectionAsync()
+    {
+        if (_lastImageBytes is null)
+        {
+            _correctionStatus = "No image data to save.";
+            return;
+        }
+
+        var req = new OcrCorrectionRequest
+        {
+            ImageBase64 = Convert.ToBase64String(_lastImageBytes),
+            NumeroMedidor = string.IsNullOrWhiteSpace(_correctionSerial) ? null : _correctionSerial.Trim(),
+            LecturaM3 = _correctionLectura,
+            IdPlanilla = id
+        };
+
+        try
+        {
+            var save = await OcrApp.SaveCorrectionAsync(
+                imageBytes: _lastImageBytes,
+                numeroMedidor: req.NumeroMedidor,
+                lecturaM3: req.LecturaM3,
+                idPlanilla: req.IdPlanilla,
+                cancellationToken: CancellationToken.None);
+
+            _correctionStatus = $"Correction {save.Status}.";
+        }
+        catch (Exception ex)
+        {
+            _correctionStatus = $"Failed to save: {ex.Message}";
+        }
+    }
+
+    private async Task MoveUp(Facturacion factura)
+    {
+        if (!editaPlanilla) return;
+        using var context = DbFactory.CreateDbContext();
+        // Get all facturas in the planilla ordered
+        var allFacturas = await context.Facturacions
+            .Where(f => f.Idplanilla == id)
+            .Include(f => f.IdpredioNavigation)
+            .OrderBy(f => f.IdpredioNavigation.Ruta)
+            .ToListAsync();
+        // Find the index of the current factura
+        int index = allFacturas.FindIndex(f => f.Idfactura == factura.Idfactura);
+        if (index <= 0) return; // cannot move up
+        // Swap routes with the previous one
+        var current = allFacturas[index];
+        var previous = allFacturas[index - 1];
+        double temp = current.IdpredioNavigation.Ruta ?? 0;
+        current.IdpredioNavigation.Ruta = previous.IdpredioNavigation.Ruta;
+        previous.IdpredioNavigation.Ruta = temp;
+        // Save changes
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            await SetErrorMessageAsync($"Error moving up: {ex.Message}");
+            return;
+        }
+        // Renumber all routes consecutively
+        var allPredios = allFacturas.Select(f => f.IdpredioNavigation).OrderBy(p => p.Ruta).ToList();
+        double routeNumber = 1;
+        foreach (var predio in allPredios)
+        {
+            predio.Ruta = routeNumber;
+            routeNumber++;
+        }
+        await context.SaveChangesAsync();
+        // Update the local list
+        foreach (var f in facturacion)
+        {
+            var updated = allFacturas.FirstOrDefault(af => af.Idfactura == f.Idfactura);
+            if (updated != null)
+            {
+                f.IdpredioNavigation.Ruta = updated.IdpredioNavigation.Ruta;
+            }
+        }
+        StateHasChanged();
+    }
+
+    private async Task MoveDown(Facturacion factura)
+    {
+        if (!editaPlanilla) return;
+        using var context = DbFactory.CreateDbContext();
+        // Get all facturas in the planilla ordered by route
+        var allFacturas = await context.Facturacions
+            .Where(f => f.Idplanilla == id)
+            .Include(f => f.IdpredioNavigation)
+            .OrderBy(f => f.IdpredioNavigation.Ruta)
+            .ToListAsync();
+        // Find the index of the current factura
+        int index = allFacturas.FindIndex(f => f.Idfactura == factura.Idfactura);
+        if (index >= allFacturas.Count - 1 || index < 0) return; // cannot move down
+        // Swap routes with the next one
+        var current = allFacturas[index];
+        var next = allFacturas[index + 1];
+        double temp = current.IdpredioNavigation.Ruta ?? 0;
+        current.IdpredioNavigation.Ruta = next.IdpredioNavigation.Ruta;
+        next.IdpredioNavigation.Ruta = temp;
+        // Save changes
+        try
+        {
+            await context.SaveChangesAsync();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await SetErrorMessageAsync($"Error moving down: {ex.Message}");
+            return;
+        }
+        // Renumber all routes consecutively
+        var allPredios = allFacturas.Select(f => f.IdpredioNavigation).OrderBy(p => p.Ruta).ToList();
+        double routeNumber = 1;
+        foreach (var predio in allPredios)
+        {
+            predio.Ruta = routeNumber;
+            routeNumber++;
+        }
+        await context.SaveChangesAsync();
+        // Update the local list
+        foreach (var f in facturacion)
+        {
+            var updated = allFacturas.FirstOrDefault(af => af.Idfactura == f.Idfactura);
+            if (updated != null)
+            {
+                f.IdpredioNavigation.Ruta = updated.IdpredioNavigation.Ruta;
+            }
+        }
+        StateHasChanged();
+    }
+
+    private async Task FiltrarPorCodigo(string codigo)
+    {
+        filtroCodigoUsuario = codigo ?? string.Empty;
+        // if opening from Facturacion link and planilla is editable, enable tomaDatos
+        if (!string.IsNullOrWhiteSpace(codigo) && editaPlanilla)
+        {
+            // enable tomaDatos so the user can edit the consumo
+            tomaDatos = true;
+        }
+        await LoadData();
+        // StateHasChanged();
+    }
+
+}

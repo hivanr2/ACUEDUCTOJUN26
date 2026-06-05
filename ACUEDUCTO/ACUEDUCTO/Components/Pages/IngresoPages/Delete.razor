@@ -1,0 +1,77 @@
+﻿@page "/ingresos/delete"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Delete</PageTitle>
+
+<h1>Delete</h1>
+
+<p>Are you sure you want to delete this?</p>
+<div>
+    <h2>Ingreso</h2>
+    <hr />
+    @if (ingreso is null)
+    {
+        <p><em>Llamando...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">FechaHora</dt>
+            <dd class="col-sm-10">@ingreso.FechaHora</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Idcliente</dt>
+            <dd class="col-sm-10">@ingreso.Idcliente</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Idfactura</dt>
+            <dd class="col-sm-10">@ingreso.Idfactura</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Idcxc</dt>
+            <dd class="col-sm-10">@ingreso.Idcxc</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Concepto</dt>
+            <dd class="col-sm-10">@ingreso.Concepto</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Valor</dt>
+            <dd class="col-sm-10">@ingreso.Valor</dd>
+        </dl>
+        <EditForm method="post" Model="ingreso" OnValidSubmit="DeleteIngreso" FormName="delete" Enhance>
+            <button type="submit" class="btn btn-danger" disabled="@(ingreso is null)">Delete</button> |
+            <a href="/ingresos" onclick="return cerrarVentana('/ingresos');">Cerrar</a>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private Ingreso? ingreso;
+
+    [SupplyParameterFromQuery]
+    private string Idingreso { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        ingreso = await context.Ingresos.FirstOrDefaultAsync(m => m.Idingreso == Idingreso);
+
+        if (ingreso is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    private async Task DeleteIngreso()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Ingresos.Remove(ingreso!);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/ingresos");
+    }
+}

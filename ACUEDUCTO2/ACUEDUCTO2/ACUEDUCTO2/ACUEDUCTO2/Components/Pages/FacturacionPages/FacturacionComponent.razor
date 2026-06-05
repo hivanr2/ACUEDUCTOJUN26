@@ -1,0 +1,519 @@
+@page "/periodos/facturacioncomponent"
+@layout SimpleLayout
+@rendermode InteractiveServer
+
+<PageTitle>@(string.IsNullOrWhiteSpace(str_periodo_corto) ? "FACTURACIÓN" : $"FAC:{str_periodo_corto}")</PageTitle>
+@using ACUEDUCTO2.Share.Models
+@using ACUEDUCTO2.Data
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+<style>
+ .bg-green-white { background-color: #28a745 !important; color: #fff !important; }
+ .progress-thin { height:6px; }
+ .progress-container { min-width:160px; }
+ .table-container { max-height:70vh; overflow: auto; }
+ .fixed-header thead th, .fixed-header thead td { position: sticky; top:0; background-color: var(--bs-light); z-index:5; }
+</style>
+
+<div class="container-fluid py-2 py-md-3">
+ <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+ <div class="d-flex align-items-center gap-2">
+ @if (id_planilla_anterior != "No disponible")
+ {
+ <a class="btn btn-outline-secondary btn-sm" href="/periodos/facturacioncomponent?id=@id_planilla_anterior&codigo=@Uri.EscapeDataString(filtroCodigoUsuario)&predio=@Uri.EscapeDataString(filtroNombrePredio)" target="_self" title="Anterior">
+ <i class="bi bi-arrow-left"></i>
+ </a>
+ }
+ <h3 class="h5 mb-0">FACTURACIÓN :: @str_planilla</h3>
+ @if (id_planilla_siguiente != "No disponible")
+ {
+ <a class="btn btn-outline-secondary btn-sm" href="/periodos/facturacioncomponent?id=@id_planilla_siguiente&codigo=@Uri.EscapeDataString(filtroCodigoUsuario)&predio=@Uri.EscapeDataString(filtroNombrePredio)" target="_self" title="Siguiente">
+ <i class="bi bi-arrow-right"></i>
+ </a>
+ }
+ </div>
+ <div class="text-nowrap">
+ <span class="badge bg-primary-subtle text-primary border">Periodo: <strong>@str_periodo_largo</strong></span>
+ </div>
+ </div>
+
+ @if (facturacion != null && facturacion.Count > 0)
+ {
+ <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+ <button class="btn btn-outline-danger btn-sm" @onclick="PrintTextOnlyVersion">
+ <i class="bi bi-printer"></i> Impresión formato
+ </button>
+ <div class="form-check form-switch">
+     <input type="checkbox" id="editarFactura" class="form-check-input" @bind="editarFactura" />
+     <label for="editarFactura" class="form-check-label">EDITAR</label>
+ </div>
+ <div class="input-group input-group-sm" style="width: 180px;">
+ <input id="filtroNombrePredio" class="form-control" placeholder="Filtrar predio" @bind="filtroNombrePredio" @bind:event="oninput" @bind:after="OnFiltroNombrePredioChanged" />
+ <button class="btn btn-outline-secondary" type="button" @onclick="ClearFiltroNombrePredio" title="Limpiar filtro">×</button>
+ </div>
+ <div class="input-group input-group-sm" style="width: 140px;">
+ <input id="filtroCodigoUsuario" class="form-control" placeholder="Filtrar código" @bind="filtroCodigoUsuario" @bind:event="oninput" @bind:after="OnFiltroCodigoUsuarioChanged" />
+ <button class="btn btn-outline-secondary" type="button" @onclick="ClearFiltroCodigoUsuario" title="Limpiar filtro">×</button>
+ </div>
+ </div>
+ }
+
+ @if (mostrar)
+ {
+ <div class="alert alert-info py-2 mb-2 d-flex flex-wrap gap-2 align-items-center">
+ <div>
+ <strong>Fecha Inicio Periodo:</strong>
+ <span>@periodo?.FechaHoraIniciaPeriodo.ToString("D", new CultureInfo("es-CO"))</span>
+ </div>
+ <div>
+ <strong>Último día de Pago:</strong>
+ <span>@(periodo?.FechaLimitePago?.ToString("D", new CultureInfo("es-CO")) ?? "")</span>
+ </div>
+ <div>
+ <strong>Fecha de Suspensión:</strong>
+ <span>@(periodo?.FechaSuspension?.ToString("D", new CultureInfo("es-CO")) ?? "")</span>
+ </div>
+ <div class="ms-auto">
+ <a class="btn btn-outline-primary btn-sm" href="/periodos/edit?idplanilla=@id" target="_blank" title="Editar periodo">
+ <i class="bi bi-pencil-square"></i> Edita
+ </a>
+ </div>
+ </div>
+ }
+
+ @if (facturacion == null)
+ {
+ <div>Cargando...</div>
+ }
+ else
+ {
+ if (facturacion.Count > 0)
+ {
+ if (!string.IsNullOrWhiteSpace(facturacion.FirstOrDefault()?.CodigoFactura))
+ {
+ HayFacturas = true;
+ }
+ <div class="table-container table-responsive">
+ <table class="table table-sm table-hover table-striped align-middle fixed-header">
+ <thead class="table-light">
+ <tr>
+ <th scope="col">It</th>
+ <th scope="col">Factura</th>
+ @foreach (var header in new[] { "Predio", "Codigo", "Medición Anterior", "Medición Actual",
+ "ConsumoM3", "Valor Consumo", "Cargo Fijo", "Porcentaje SobreTasa",
+ "Valor SobreTasa", "Porcentaje Mora", "Valor Mora",
+ "Porcentaje Subsidio", "Valor Subsidio", "Otros Valores",
+ "Valor Periodo", "Deuda Anterior", "Recaudo Bimestre",
+ "Deuda Pasa" })
+ {
+ <th scope="col">@header</th>
+ }
+ <th scope="col">Notas Factura</th>
+ <th scope="col">Notas Recaudo</th>
+ </tr>
+ </thead>
+ <tbody>
+ @for (int i = 0; i < facturacion.Count; i++)
+ {
+ var factura = facturacion[i];
+ <tr>
+ <td>@(i + 1)</td>
+ <td class="text-center">
+     <div class="fw-semibold">@factura.CodigoFactura</div>
+     @if (HayFacturas)
+     {
+         <div class="btn-group btn-group-sm mt-1" role="group">
+             <a class="btn btn-outline-secondary" title="Editar" href="@($"/facturacion/edit?id={factura.Guid}")" target="_blank"><i class="bi bi-pencil"></i></a>
+         </div>
+     }
+ </td>
+ <td>
+     @factura.IdPredioNavigation?.ApellidosNombresUsuario -
+     <a href="/predios/details?idpredio=@factura.IdPredio" target="_blank">Ver</a>
+ </td>
+ <td>
+     <a href="/periodos/facturacioncomponent?id=@id&codigo=@Uri.EscapeDataString(factura.CodigoUsuario ?? string.Empty)" class="text-decoration-underline" title="Filtrar por código en Facturación">@factura.CodigoUsuario</a>
+ </td>
+ <td>@factura.MedicionAnterior</td>
+ <td class="bg-green-white">
+     @if ((factura.ConsumoM3 ?? 0) == 0)
+     {
+         <a href="/periodos/consumoscomponent?id=@id&codigo=@Uri.EscapeDataString(factura.CodigoUsuario ?? string.Empty)" class="text-decoration-underline text-white" title="Ir a Consumos">@factura.MedicionActual</a>
+     }
+     else
+     {
+         <a href="/periodos/consumoscomponent?id=@id&codigo=@Uri.EscapeDataString(factura.CodigoUsuario ?? string.Empty)" class="text-decoration-underline text-white" title="Ver Consumos">@factura.MedicionActual</a>
+     }
+ </td>
+ <td class="text-center">@factura.ConsumoM3</td>
+ <td class="text-center">@FormatCurrency(factura.ValorConsumo)</td>
+ <td class="text-center">@FormatCurrency(factura.CargoFijo)</td>
+ <td class="text-center">@factura.PorcentajeSobreTasa</td>
+ <td class="text-center">@FormatCurrency(factura.ValorSobreTasa)</td>
+ <td class="text-center">@factura.PorcentajeMora</td>
+ <td class="text-center">@FormatCurrency(factura.ValorMora)</td>
+ <td class="text-center">@factura.PorcentajeSubsidio</td>
+ <td class="text-center">@FormatCurrency(factura.ValorSubsidio)</td>
+ <td class="bg-green-white">@FormatCurrency(factura.OtrosValores)</td>
+ <td class="text-center">@FormatCurrency(factura.ValorPeriodo)</td>
+ <td class="text-center">@FormatCurrency(factura.DeudaAnterior)</td>
+ <td class="bg-green-white">
+     @{
+         var recaudoVal = factura.RecaudoPeriodoTotal ?? 0;
+         var deudaPrev = factura.DeudaAnterior ?? 0;
+         var codigoEsc = Uri.EscapeDataString(factura.CodigoUsuario ?? string.Empty);
+     }
+     @if (recaudoVal == 0 || recaudoVal < deudaPrev)
+     {
+         <a class="text-decoration-underline" style="color: white;" href="/periodos/recaudocomponent?id=@id&codigo=@codigoEsc">
+             @FormatCurrency(factura.RecaudoPeriodoTotal)
+         </a>
+     }
+     else
+     {
+         <a class="text-decoration-underline" style="color: white;" href="/periodos/recaudocomponent?id=@id&usuario=@codigoEsc">
+             @FormatCurrency(factura.RecaudoPeriodoTotal)
+         </a>
+     }
+ </td>
+ <td class="text-center">@FormatCurrency(factura.DeudaPasa)</td>
+ <td><div class="small">@factura.NotaDeFactura</div></td>
+ <td><div class="small">@factura.NotaDeRecaudo</div></td>
+ </tr>
+ }
+ <tr class="table-secondary fw-semibold">
+ <td class="text-end" colspan="7">Total Consumo M3: @FormatCurrency(totalConsumoM3)</td>
+ <td colspan="8">Promedio: <strong>@totalpromedio m3</strong></td>
+ <td class="text-center">@totalOtrosValores.ToString("C0")</td>
+ <td class="text-center">@totalValorPeriodo.ToString("C0")</td>
+ <td class="text-center">@totalDeudaAnterior.ToString("C0")</td>
+ <td class="text-center">@totalRecaudoPeriodoTotal.ToString("C0")</td>
+ <td class="text-center">@totalDeudaPasa.ToString("C0")</td>
+ <td colspan="2"></td>
+ </tr>
+ </tbody>
+ </table>
+ </div>
+ }
+ else
+ {
+ <div>Se crea facturación según Periodo por cada Predio Existente</div>
+ <button class="btn btn-danger" @onclick="ConfirmarFacturacion" disabled="@(isProcessing || facturacionConfirmada)">Estoy seguro</button>
+ }
+ }
+
+ @if (!string.IsNullOrEmpty(errorMessage))
+ {
+ <div class="alert alert-danger mt-2">@errorMessage</div>
+ }
+</div>
+
+@code {
+    [Parameter, SupplyParameterFromQuery]
+    public string? id { get; set; }
+    [SupplyParameterFromQuery]
+    private string? codigo { get; set; }
+    [SupplyParameterFromQuery]
+    private string? predio { get; set; }
+
+    private bool HayFacturas { get; set; } = false;
+    private IList<Factura> facturacion = new List<Factura>();
+    private string? str_planilla;
+    private string? id_planilla_siguiente;
+    private string? id_planilla_anterior;
+    private string? str_periodo_corto;
+    private string? str_periodo_largo;
+    private string? errorMessage;
+    private bool isProcessing = false;
+    private bool facturacionConfirmada = false;
+    private Periodo? periodo;
+    private bool mostrar = false;
+    private double totalOtrosValores;
+    private double totalValorPeriodo;
+    private double totalDeudaAnterior;
+    private double totalRecaudoPeriodoTotal;
+    private double totalDeudaPasa;
+    private int totalConsumoM3;
+    private int totalpromedio = 0;
+    private bool editarFactura = false;
+
+    private string filtroNombrePredio = string.Empty;
+    private string filtroCodigoUsuario = string.Empty;
+    private CancellationTokenSource? _filtroCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        filtroCodigoUsuario = codigo ?? string.Empty;
+        filtroNombrePredio = predio ?? string.Empty;
+        await LoadData();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        filtroCodigoUsuario = codigo ?? string.Empty;
+        filtroNombrePredio = predio ?? string.Empty;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            using var context = DbFactory.CreateDbContext();
+
+            periodo = await context.Periodos
+                .FirstOrDefaultAsync(p => p.Guid == id);
+
+            facturacion = new List<Factura>();
+            mostrar = false;
+            id_planilla_anterior = "No disponible";
+            id_planilla_siguiente = "No disponible";
+
+            if (periodo != null)
+            {
+                str_planilla = periodo.Descripcion;
+                str_periodo_corto = periodo.NombreCortoPeriodo;
+                str_periodo_largo = periodo.NombreLargoPeriodo;
+
+                var fechaActual = periodo.FechaHoraIniciaPeriodo;
+                var periodoAnterior = await context.Periodos
+                    .Where(p => p.FechaHoraIniciaPeriodo < fechaActual)
+                    .OrderByDescending(p => p.FechaHoraIniciaPeriodo)
+                    .FirstOrDefaultAsync();
+                var periodoSiguiente = await context.Periodos
+                    .Where(p => p.FechaHoraIniciaPeriodo > fechaActual)
+                    .OrderBy(p => p.FechaHoraIniciaPeriodo)
+                    .FirstOrDefaultAsync();
+                id_planilla_anterior = periodoAnterior?.Guid ?? "No disponible";
+                id_planilla_siguiente = periodoSiguiente?.Guid ?? "No disponible";
+
+                var query = context.Facturacions.Where(f => f.IdPeriodo == id);
+                if (!string.IsNullOrWhiteSpace(filtroNombrePredio))
+                {
+                    var pattern = $"%{filtroNombrePredio}%";
+                    query = query.Where(f => context.Predio.Any(p => p.IdPredio == f.IdPredio && p.ApellidosNombresUsuario != null && EF.Functions.Like(p.ApellidosNombresUsuario, pattern)));
+                }
+                if (!string.IsNullOrWhiteSpace(filtroCodigoUsuario))
+                {
+                    var patternCode = $"%{filtroCodigoUsuario}%";
+                    query = query.Where(f => f.CodigoUsuario != null && EF.Functions.Like(f.CodigoUsuario, patternCode));
+                }
+                facturacion = await query
+                    .Include(f => f.IdPredioNavigation)
+                    .OrderBy(f => f.IdPredioNavigation.ApellidosNombresUsuario)
+                    .ToListAsync();
+
+                mostrar = true;
+                CalcularTotales();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error cargando datos: {ex.Message}";
+        }
+    }
+
+    private void CalcularTotales()
+    {
+        try
+        {
+            totalOtrosValores = facturacion.Sum(f => f.OtrosValores ?? 0);
+            totalValorPeriodo = facturacion.Sum(f => f.ValorPeriodo ?? 0);
+            totalDeudaAnterior = facturacion.Sum(f => f.DeudaAnterior ?? 0);
+            totalRecaudoPeriodoTotal = facturacion.Sum(f => f.RecaudoPeriodoTotal ?? 0);
+            totalDeudaPasa = facturacion.Sum(f => f.DeudaPasa ?? 0);
+            totalConsumoM3 = facturacion.Sum(f => (int)(f.ConsumoM3 ?? 0));
+            totalpromedio = facturacion.Count > 0 ? (int)Math.Round(facturacion.Average(f => f.ConsumoM3 ?? 0)) : 0;
+        }
+        catch { }
+    }
+
+    private async Task ConfirmarFacturacion()
+    {
+        isProcessing = true;
+        StateHasChanged();
+        try
+        {
+            using var context = DbFactory.CreateDbContext();
+
+            if (periodo == null)
+            {
+                errorMessage = "El periodo no se encuentra.";
+                return;
+            }
+
+            var predios = await context.Predio.Where(c => c.Activo == true)
+                .OrderBy(p => p.ApellidosNombresUsuario)
+                .Include(d => d.EstratoNavigation)
+                .ToListAsync();
+
+            int ultimoNumeroFacturado = 0;
+            if (!string.IsNullOrEmpty(periodo.UltimaFacturaRegistrada))
+            {
+                int.TryParse(periodo.UltimaFacturaRegistrada, out ultimoNumeroFacturado);
+            }
+            else
+            {
+                // Get from previous period
+                if (id_planilla_anterior != "No disponible")
+                {
+                    var periodoAnt = await context.Periodos.FirstOrDefaultAsync(p => p.Guid == id_planilla_anterior);
+                    if (periodoAnt != null && !string.IsNullOrEmpty(periodoAnt.UltimaFacturaRegistrada))
+                    {
+                        int.TryParse(periodoAnt.UltimaFacturaRegistrada, out ultimoNumeroFacturado);
+                    }
+                }
+            }
+
+            string year = periodo.FechaHoraIniciaPeriodo.Year.ToString().Substring(2, 2);
+            string codigoFacturaPrefix = periodo.Orden switch
+            {
+                1 => "02-",
+                2 => "04-",
+                3 => "06-",
+                4 => "08-",
+                5 => "10-",
+                6 => "12-",
+                _ => "02-"
+            };
+
+            foreach (var predioItem in predios)
+            {
+                var facturaExistente = await context.Facturacions
+                    .FirstOrDefaultAsync(f => f.IdPeriodo == id && f.IdPredio == predioItem.IdPredio);
+
+                if (facturaExistente == null)
+                {
+                    var facturacionAnterior = id_planilla_anterior != "No disponible"
+                        ? await context.Facturacions.FirstOrDefaultAsync(f => f.IdPeriodo == id_planilla_anterior && f.IdPredio == predioItem.IdPredio)
+                        : null;
+
+                    int medicion = (int)(facturacionAnterior?.MedicionActual ?? 0);
+                    float cargoFijo = (float)(predioItem.EstratoNavigation?.CargoFijo ?? 0);
+                    float porcentajeSubsidio = 0;
+                    float porcentajeMora = (float)(periodo.PorcentajeMora ?? 0);
+                    float valorSubsidio = 0;
+                    float valorPeriodo = cargoFijo;
+
+                    if (predioItem.TieneSubsidio ?? false)
+                    {
+                        porcentajeSubsidio = (float)(periodo.PorcentajeSubsidio ?? 0);
+                        valorSubsidio = (valorPeriodo * porcentajeSubsidio) / 100;
+                        valorPeriodo += valorSubsidio;
+                    }
+
+                    ultimoNumeroFacturado++;
+                    string codigoFactura = $"{codigoFacturaPrefix}{year}-{ultimoNumeroFacturado:D4}";
+
+                    var periodoCorto = periodo.NombreCortoPeriodo ?? str_periodo_corto ?? string.Empty;
+                    var placeholderNotas = string.IsNullOrWhiteSpace(periodoCorto) ? "SIN RECAUDO EN EL BIMESTRE" : $"SIN RECAUDO EN EL BIMESTRE {periodoCorto}";
+
+                    var nuevaFactura = new Factura
+                    {
+                        Guid = Guid.NewGuid().ToString(),
+                        CodigoFactura = codigoFactura,
+                        IdPeriodo = periodo.Guid,
+                        IdPredio = predioItem.IdPredio,
+                        CodigoUsuario = predioItem.CodigoUsuario,
+                        FechaHoraRegistro = DateTime.Now,
+                        MedicionAnterior = medicion,
+                        MedicionActual = 0,
+                        ConsumoM3 = 0,
+                        CargoFijo = cargoFijo,
+                        ValorConsumo = 0,
+                        PorcentajeSobreTasa = predioItem.EstratoNavigation?.SobreTasa ?? 0,
+                        ValorSobreTasa = (valorPeriodo * (predioItem.EstratoNavigation?.SobreTasa ?? 0)) / 100,
+                        PorcentajeSubsidio = porcentajeSubsidio,
+                        ValorSubsidio = valorSubsidio,
+                        PorcentajeMora = porcentajeMora,
+                        ValorMora = 0,
+                        OtrosValores = 0,
+                        ValorPeriodo = RedondearValor(valorPeriodo),
+                        DeudaAnterior = facturacionAnterior?.DeudaPasa ?? 0,
+                        RecaudoPeriodoTotal = 0,
+                        DeudaPasa = RedondearValor(valorPeriodo + (facturacionAnterior?.DeudaPasa ?? 0)),
+                        NotaDeFactura = placeholderNotas,
+                        NotaDeRecaudo = placeholderNotas
+                    };
+
+                    context.Facturacions.Add(nuevaFactura);
+                }
+            }
+
+            periodo.UltimaFacturaRegistrada = ultimoNumeroFacturado.ToString();
+            context.Periodos.Update(periodo);
+            await context.SaveChangesAsync();
+
+            facturacion = await context.Facturacions
+                .Where(p => p.IdPeriodo == id)
+                .Include(f => f.IdPredioNavigation)
+                .OrderBy(f => f.IdPredioNavigation.ApellidosNombresUsuario)
+                .ToListAsync();
+
+            CalcularTotales();
+            facturacionConfirmada = true;
+            await JSRuntime.InvokeVoidAsync("alert", $"Facturación confirmada exitosamente. Se crearon {predios.Count} facturas.");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ocurrió un error al crear la facturación: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private string FormatCurrency(double? value)
+    {
+        return value.HasValue ? value.Value.ToString("C0", new CultureInfo("es-CO")) : "";
+    }
+
+    private double RedondearValor(double valor)
+    {
+        int centenas = (int)(valor / 100);
+        int decenas = (int)((valor % 100) / 10);
+        return decenas <= 5 ? centenas * 100 : (centenas + 1) * 100;
+    }
+
+    private async Task PrintTextOnlyVersion()
+    {
+        var url = $"/periodos/facturacionimprimircomponent?id={id}";
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+    }
+
+    private async Task OnFiltroNombrePredioChanged()
+    {
+        _filtroCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _filtroCts = cts;
+        try { await Task.Delay(250, cts.Token); await LoadData(); StateHasChanged(); } catch (TaskCanceledException) { }
+    }
+
+    private async Task OnFiltroCodigoUsuarioChanged()
+    {
+        _filtroCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _filtroCts = cts;
+        try { await Task.Delay(250, cts.Token); await LoadData(); StateHasChanged(); } catch (TaskCanceledException) { }
+    }
+
+    private async Task ClearFiltroNombrePredio()
+    {
+        filtroNombrePredio = string.Empty;
+        await LoadData();
+        StateHasChanged();
+    }
+
+    private async Task ClearFiltroCodigoUsuario()
+    {
+        filtroCodigoUsuario = string.Empty;
+        await LoadData();
+        StateHasChanged();
+    }
+}

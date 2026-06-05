@@ -1,0 +1,72 @@
+@page "/consumo"
+@page "/consumos"
+@page "/proceso/Registro de Consumo"
+@page "/proceso/Registro de Consumos"
+@page "/proceso/Registrar Consumo de Servicio de Acueducto Bimestral"
+@attribute [Authorize]
+@rendermode InteractiveWebAssembly
+@inject IServiceProvider ServiceProvider
+
+<PageTitle>Registro de Consumos</PageTitle>
+
+<h3>Registro de Consumos Bimestrales</h3>
+
+@if (!(_onlineStatusService?.IsOnline ?? true))
+{
+    <div class="alert alert-warning">
+        Estás offline. Los cambios se guardarán localmente y se sincronizarán cuando vuelvas a estar online.
+    </div>
+}
+
+<div class="form-group">
+    <label for="predioId">ID del Predio</label>
+    <input type="text" class="form-control" id="predioId" @bind="consumptionData.PredioId" />
+</div>
+
+<div class="form-group">
+    <label for="medicionActual">Medición Actual</label>
+    <input type="number" class="form-control" id="medicionActual" @bind="consumptionData.MedicionActual" />
+</div>
+
+<button class="btn btn-primary" @onclick="RegisterConsumption">Registrar Consumo</button>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-info">@message</div>
+}
+
+@code {
+    private ConsumptionData consumptionData = new();
+    private string message = "";
+    private OnlineStatusService? _onlineStatusService;
+    private ConsumptionService? _consumptionService;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _onlineStatusService = ServiceProvider.GetService<OnlineStatusService>();
+        _consumptionService = ServiceProvider.GetService<ConsumptionService>();
+        if (_onlineStatusService != null)
+        {
+            await _onlineStatusService.InitializeAsync();
+        }
+    }
+
+    private async Task RegisterConsumption()
+    {
+        if (_consumptionService == null)
+        {
+            message = "Servicio no disponible.";
+            return;
+        }
+        try
+        {
+            await _consumptionService.RegisterConsumptionAsync(consumptionData);
+            message = (_onlineStatusService?.IsOnline ?? true) ? "Consumo registrado exitosamente." : "Consumo guardado localmente. Se sincronizará cuando estés online.";
+            consumptionData = new ConsumptionData(); // Reset form
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+        }
+    }
+}

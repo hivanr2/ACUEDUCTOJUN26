@@ -1,0 +1,326 @@
+﻿@page "/predios"
+@page "/proceso/Listado de Predios"
+@using ACUEDUCTO2.Share.Models
+@using ACUEDUCTO2.Services.PredioServices
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO2.Data
+@inject PredioService PredioService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject ILogger<ACUEDUCTO2.Services.PredioServices.PredioService> Logger
+@attribute [Authorize]
+
+@rendermode InteractiveServer
+
+<PageTitle>Predios Servicio Acueducto</PageTitle>
+
+<div class="container-fluid py-2 py-md-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Predios</h1>
+            <small class="text-muted">Servicio Acueducto</small>
+        </div>
+    </div>
+
+    <div class="row g-2 align-items-center mb-1">
+        <div class="col-12 col-md-6">
+            <input type="search" class="form-control" autofocus @bind=FilterText @bind:event="oninput" placeholder="Buscar por usuario, dirección, cedcatastral o ruta..." />
+        </div>
+        <div class="col-12 col-md-6 text-md-end small text-muted">
+            <span>Items: <span class="badge bg-secondary">@pagination.TotalItems</span></span>
+        </div>
+    </div>
+
+    @if (!isLoading && predios.Count == 0)
+    {
+        <div class="alert alert-warning">No se encontraron predios para este usuario.
+            <div class="small text-muted mt-1">Puede ser porque usted no es administrador, no tiene una identificación configurada o no existe autorización para ver predios de otros usuarios.</div>
+            @if (!string.IsNullOrWhiteSpace(detectedUserId) || !string.IsNullOrWhiteSpace(detectedIdentificacion))
+            {
+                <div class="small mt-2">Detalles: <strong>userId:</strong> @(detectedUserId ?? "(no)") — <strong>identificación:</strong> @(detectedIdentificacion ?? "(no)")</div>
+            }
+            @if (detectedPrediosCount.HasValue)
+            {
+                <div class="small mt-1">Registros en tabla <strong>Predio</strong>: @detectedPrediosCount</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(detectedPrediosError))
+            {
+                <div class="small mt-1 text-danger">Error al consultar tabla Predio: @detectedPrediosError</div>
+            }
+        </div>
+    }
+
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="editarObservaciones" @bind="editarObservaciones">
+            <label class="form-check-label" for="editarObservaciones">Ver Observaciones Predio</label>
+        </div>
+        @if (esAdmin)
+        {
+            <div class="ms-auto d-flex flex-wrap gap-2 small">
+                <a class="btn btn-outline-primary btn-sm" href="/predios/pueaa-general" target="_blank">PUEAA GENERAL</a>
+                <a class="btn btn-outline-secondary btn-sm" href="/estratos" target="_self">Estratos</a>
+                <a class="btn btn-outline-secondary btn-sm" href="/tarifas" target="_self">Tarifas</a>
+                <a class="btn btn-outline-secondary btn-sm" href="/periodos" target="_self">Periodos</a>
+                <a class="btn btn-outline-secondary btn-sm" href="/tipoconsumos" target="_self">Tipo Consumo</a>
+            </div>
+        }
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-hover table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Predio</th>
+                        <th>Ruta</th>
+                        <th>Dirección</th>
+                        <th>En Seguimiento</th>
+                        <th>Activo</th>
+                        <th>Tipo Consumo</th>
+                        <th>PUEAA</th>
+                        @if (editarObservaciones)
+                        {
+                            <th>Observaciones</th>
+                        }
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+            @foreach (var predio in visiblePredios)
+                    {
+                        <tr class="@(GetRowClass(predio))">
+                            <td>@predio.ApellidosNombresUsuario</td>
+                            <td>@predio.Ruta</td>
+                            <td>@predio.Direccion</td>
+                            <td>@(predio.ContadorEnSeguimiento == true ? "Sí" : "No")</td>
+                            <td>@(predio.Activo == true ? "Sí" : "No")</td>
+                            <td>@predio.TipoConsumoCategoria</td>
+                            <td>
+                                <a class="btn btn-outline-primary btn-sm" href="/predios/pueaa?idpredio=@predio.IdPredio" target="_blank">PUEAA</a>
+                            </td>
+                            @if (editarObservaciones)
+                            {
+                                <td>@predio.Observaciones</td>
+                            }
+                            <td class="text-end">
+                                @if (esAdmin)
+                                {
+                                    <a class="btn btn-link btn-sm" href="/predios/edit?idpredio=@predio.IdPredio" target="_blank">Editar</a>
+                                    <span class="text-muted">|</span>
+                                }
+                                <a class="btn btn-link btn-sm" href="/predios/details?idpredio=@predio.IdPredio" target="_blank">Detalles</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <Paginator State="@pagination" OnPageChanged="HandlePaginationChangedAsync" />
+</div>
+
+@if (esAdmin)
+{
+    <!-- Botón flotante Crear Predio -->
+    <a href="/predios/create" class="fab-create" title="Crear predio" aria-label="Crear predio">
+        <img src="/img/plus.svg" alt="Crear" onerror="this.onerror=null;this.outerHTML='+';" />
+    </a>
+}
+
+@code {
+    private readonly List<PredioListItem> predios = new();
+    private List<PredioListItem> visiblePredios = new();
+    private string filterText = string.Empty;
+    private bool editarObservaciones = false;
+    private bool isLoading = true;
+    private bool esAdmin;
+    private readonly PaginationState pagination = new() { ItemsPerPage = 25 };
+    private string? detectedUserId;
+    private string? detectedIdentificacion;
+    private int? detectedPrediosCount;
+    private string? detectedPrediosError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var claimsPrincipal = authState.User;
+
+        // Determine user id early from claims and record for diagnostics
+        var userId = claimsPrincipal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                     ?? UserManager.GetUserId(claimsPrincipal);
+        detectedUserId = userId;
+
+        // Use a dedicated DbContext to check roles and read the user record to avoid
+        // sharing DbContext instances across awaits and to ensure the role check
+        // reflects database state (not just claims).
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            await using var ctx = await DbFactory.CreateDbContextAsync();
+
+            var userRoles = ctx.Set<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>();
+            var dbIsAdmin = await (from ur in userRoles
+                                   join r in ctx.Roles on ur.RoleId equals r.Id
+                                   where ur.UserId == userId && r.Name == "Administradores"
+                                   select ur).AnyAsync();
+
+            if (dbIsAdmin)
+            {
+                esAdmin = true;
+            }
+
+            // Read usuario only if needed to obtain identificacion
+            var usuario = await ctx.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+            var identificacion = usuario?.Identificacion;
+
+            if (string.IsNullOrWhiteSpace(identificacion))
+            {
+                identificacion = claimsPrincipal.Claims.FirstOrDefault(c =>
+                    string.Equals(c.Type, "identificacion", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(c.Type, "identidad", StringComparison.OrdinalIgnoreCase))?.Value;
+            }
+
+            detectedIdentificacion = identificacion;
+
+            if (esAdmin)
+            {
+                var all = await PredioService.GetListingAsync(null);
+                predios.AddRange(all);
+            // If PredioService returned no items for an admin, probe the DB directly
+            // to check whether the Predio table contains rows or if an error occurs.
+            if (!predios.Any())
+            {
+                try
+                {
+                    await using var probeCtx = await DbFactory.CreateDbContextAsync();
+                    detectedPrediosCount = await probeCtx.Predio.AsNoTracking().CountAsync();
+                    // If PredioService failed but the table contains rows, attempt a raw SQL
+                    // reader to build PredioListItem objects directly and avoid EF projection
+                    // issues that may be caused by schema mismatches.
+                    if (detectedPrediosCount.GetValueOrDefault() > 0)
+                    {
+                        var conn = probeCtx.Database.GetDbConnection();
+                        await conn.OpenAsync();
+                        try
+                        {
+                            using var cmd = conn.CreateCommand();
+                            cmd.CommandText = @"SELECT IdPredio, ApellidosNombresUsuario, Ruta, Direccion, ContadorEnSeguimiento, Activo, IdTipoConsumo, Observaciones
+                                                FROM Predio
+                                                ORDER BY ApellidosNombresUsuario, Direccion";
+                            using var reader = await cmd.ExecuteReaderAsync();
+                            while (await reader.ReadAsync())
+                            {
+                                var item = new PredioListItem
+                                {
+                                    IdPredio = reader["IdPredio"]?.ToString() ?? string.Empty,
+                                    ApellidosNombresUsuario = reader["ApellidosNombresUsuario"]?.ToString(),
+                                    Ruta = reader["Ruta"] != DBNull.Value ? Convert.ToDouble(reader["Ruta"]) : (double?)null,
+                                    Direccion = reader["Direccion"]?.ToString(),
+                                    ContadorEnSeguimiento = reader["ContadorEnSeguimiento"] != DBNull.Value ? (bool?)Convert.ToBoolean(reader["ContadorEnSeguimiento"]) : null,
+                                    Activo = reader["Activo"] != DBNull.Value ? (bool?)Convert.ToBoolean(reader["Activo"]) : null,
+                                    Observaciones = reader["Observaciones"]?.ToString(),
+                                    IdTipoConsumo = reader["IdTipoConsumo"] != DBNull.Value ? (int?)Convert.ToInt32(reader["IdTipoConsumo"]) : null
+                                };
+                                predios.Add(item);
+                            }
+                        }
+                        finally
+                        {
+                            await conn.CloseAsync();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    detectedPrediosError = ex.InnerException?.Message ?? ex.Message;
+                    Logger.LogError(ex, "Error counting Predio rows for diagnostics");
+                }
+            }
+            }
+            else if (!string.IsNullOrWhiteSpace(identificacion))
+            {
+                var list = await PredioService.GetListingForAuthorizedUserAsync(identificacion);
+                predios.AddRange(list);
+            }
+        }
+        else
+        {
+            // No user id available (anonymous or unexpected). Fallback: try claims-based role.
+            esAdmin = claimsPrincipal.IsInRole("Administradores");
+            if (esAdmin)
+            {
+                var all = await PredioService.GetListingAsync(null);
+                predios.AddRange(all);
+            }
+        }
+
+        Logger.LogDebug("Predio listado inicial: esAdmin={EsAdmin} userId={UserId} identificacion={Identificacion} totalPredios={Count}", esAdmin, detectedUserId, detectedIdentificacion, predios.Count);
+        UpdateVisiblePredios(resetPage: true);
+        isLoading = false;
+    }
+
+    private string FilterText
+    {
+        get => filterText;
+        set
+        {
+            var newValue = value ?? string.Empty;
+            if (filterText == newValue)
+            {
+                return;
+            }
+
+            filterText = newValue;
+            UpdateVisiblePredios(resetPage: true);
+        }
+    }
+
+    private void UpdateVisiblePredios(bool resetPage = false)
+    {
+        List<PredioListItem> filteredList;
+        if (string.IsNullOrWhiteSpace(filterText))
+        {
+            filteredList = predios;
+        }
+        else
+        {
+            var filter = filterText.Trim();
+            filteredList = predios
+                .Where(p => MatchesFilter(p, filter))
+                .ToList();
+        }
+
+        if (resetPage)
+        {
+            pagination.Reset();
+        }
+
+        pagination.UpdateTotals(filteredList.Count);
+        visiblePredios = filteredList
+            .Skip(pagination.Skip)
+            .Take(pagination.ItemsPerPage)
+            .ToList();
+    }
+
+    private static bool MatchesFilter(PredioListItem predio, string filter)
+    {
+        return (!string.IsNullOrWhiteSpace(predio.ApellidosNombresUsuario) && predio.ApellidosNombresUsuario.Contains(filter, StringComparison.OrdinalIgnoreCase))
+               || (!string.IsNullOrWhiteSpace(predio.Direccion) && predio.Direccion.Contains(filter, StringComparison.OrdinalIgnoreCase))
+               || (!string.IsNullOrWhiteSpace(predio.Observaciones) && predio.Observaciones.Contains(filter, StringComparison.OrdinalIgnoreCase))
+               || (!string.IsNullOrWhiteSpace(predio.TipoConsumoCategoria) && predio.TipoConsumoCategoria.Contains(filter, StringComparison.OrdinalIgnoreCase))
+               || (!string.IsNullOrWhiteSpace(filter) && predio.Ruta?.ToString().Contains(filter, StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    private static string? GetRowClass(PredioListItem p)
+        => p.Activo == true ? null : "predio-inactivo";
+
+    private Task HandlePaginationChangedAsync()
+    {
+        UpdateVisiblePredios();
+        return Task.CompletedTask;
+    }
+}

@@ -1,0 +1,76 @@
+﻿@page "/indicadors"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Models
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+<PageTitle>Indicadores</PageTitle>
+
+<div class="container-fluid py-2 py-md-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Indicadores</h1>
+            <small class="text-muted">Seguimiento de indicadores</small>
+        </div>
+    </div>
+
+    <div class="row g-2 align-items-center mb-2">
+        <div class="col-12 col-md-6">
+            <input type="search" class="form-control" @bind=filterText @bind:event="oninput" placeholder="Buscar por categoría, responsable o descripción..." />
+        </div>
+        <div class="col-12 col-md-6 text-md-end text-muted">
+            <span>Items: <span class="badge bg-secondary">@IndicadoresFiltered.Count()</span></span>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <QuickGrid Class="table table-hover table-sm align-middle mb-0" Items="IndicadoresFiltered">
+                <PropertyColumn Property="indicador => indicador.Categoría" Title="Categoría" />
+                <PropertyColumn Property="indicador => indicador.Responsable" />
+                <PropertyColumn Property="indicador => indicador.Descripcion" Title="Descripcion" />
+                <PropertyColumn Property="indicador => indicador.FórmulaUnidad" Title="Fórmula/Unidad" />
+                <PropertyColumn Property="indicador => indicador.Frecuencia" />
+                <PropertyColumn Property="indicador => indicador.MetaUmbral" Title="Meta/Umbral" />
+                <PropertyColumn Property="indicador => indicador.SemáforoGestión" Title="Semáforo" />
+
+                <TemplateColumn Context="indicador" Title="Acciones">
+                    <div class="text-end">
+                        <a class="btn btn-link btn-sm" href="@($"indicadors/edit?idindicador={indicador.Idindicador}")">Editar</a>
+                        <span class="text-muted">|</span>
+                        <a class="btn btn-link btn-sm" href="@($"indicadors/details?idindicador={indicador.Idindicador}")">Detalles</a>
+                        <span class="text-muted">|</span>
+                        <a class="btn btn-link btn-sm text-danger" href="@($"indicadors/delete?idindicador={indicador.Idindicador}")">Borrar</a>
+                    </div>
+                </TemplateColumn>
+            </QuickGrid>
+        </div>
+    </div>
+</div>
+
+<!-- Botón flotante Crear -->
+<a href="/indicadors/create" class="fab-create" title="Crear indicador" aria-label="Crear indicador">
+    <img src="/img/plus.svg" alt="Crear" onerror="this.onerror=null;this.outerHTML='+';" />
+</a>
+
+@code {
+    private AcueductoContext context = default!;
+    private string? filterText = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+
+    IQueryable<Indicador> IndicadoresFiltered => string.IsNullOrWhiteSpace(filterText)
+        ? context.Indicadores.OrderBy(c => c.Categoría).ThenBy(c => c.Responsable)
+        : context.Indicadores
+            .Where(i => ((i.Categoría ?? string.Empty).Contains(filterText!)
+                      || (i.Responsable ?? string.Empty).Contains(filterText!)
+                      || (i.Descripcion ?? string.Empty).Contains(filterText!)))
+            .OrderBy(c => c.Categoría).ThenBy(c => c.Responsable);
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}

@@ -1,0 +1,50 @@
+﻿@page "/cuentaporcobrars"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Models
+@implements IAsyncDisposable
+
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+<PageTitle>Cuentas por Cobrar</PageTitle>
+
+<h1>Cuentas por Cobrar</h1>
+
+<p>
+    <a href="cuentaporcobrars/create">Create New</a>
+</p>
+
+<QuickGrid Class="table" Items="context.CuentaPorCobrars.Include(C => C.IdentificacionNavigation)" Pagination="@pagination">
+    <PropertyColumn Property="cuentaporcobrar => cuentaporcobrar.Numero" Sortable="true"/>
+    <PropertyColumn Property="cuentaporcobrar => cuentaporcobrar.Identificacion" Sortable="true"/>
+    <PropertyColumn Property="cuentaporcobrar => cuentaporcobrar.Descripcion" Sortable="true" />
+    <PropertyColumn Property="cuentaporcobrar => cuentaporcobrar.IdFactura" Sortable="true" />
+    <PropertyColumn Property="cuentaporcobrar => cuentaporcobrar.FechaHora" />
+    <PropertyColumn Property="cuentaporcobrar => cuentaporcobrar.Vencimiento" />
+    <PropertyColumn Property="cuentaporcobrar => cuentaporcobrar.ValorDebe" />
+    <PropertyColumn Property="cuentaporcobrar => cuentaporcobrar.ValorPagado" />
+    <PropertyColumn Property="cuentaporcobrar => cuentaporcobrar.CuotasTotales" />
+    <PropertyColumn Property="cuentaporcobrar => cuentaporcobrar.CuotasPagadas" />
+
+    <TemplateColumn Context="cuentaporcobrar">
+        <a href="@($"cuentaporcobrars/edit?idcuentaxc={cuentaporcobrar.IdcuentaxC}")">Edit</a> |
+        <a href="@($"cuentaporcobrars/details?idcuentaxc={cuentaporcobrar.IdcuentaxC}")">Details</a> |
+        <a href="@($"cuentaporcobrars/delete?idcuentaxc={cuentaporcobrar.IdcuentaxC}")">Delete</a>
+    </TemplateColumn>
+</QuickGrid>
+<Paginator State="@pagination" />
+
+@code {
+    private AcueductoContext context = default!;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+    PaginationState pagination = new PaginationState { ItemsPerPage = 10 };
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}

@@ -1,0 +1,10 @@
+/* Estilos aislados para la vista de detalles */
+.section-title { font-size: 1rem; font-weight: 700; color: #334155; margin: .5rem 0; }
+.kv { display:grid; grid-template-columns: 160px 1fr; gap:.5rem; padding:.25rem 0; border-bottom: 1px dashed #e5e7eb; }
+.kv .k { color:#6b7280; }
+.kv .v { color:#111827; }
+.desc-box { border:1px solid #e5e7eb; border-radius:.5rem; padding:.75rem; background:#fafafa; }
+.actions-bar { display:flex; gap:.5rem; justify-content:flex-end; }
+.chip { border: none; background: #e0f2fe; color: #075985; border-radius: 999px; padding: 2px 8px; font-size: 12px; display:inline-block; margin-right:6px; }
+.chip-outline { background: transparent; border: 1px solid #93c5fd; color: #1d4ed8; }
+@media (max-width: 576px){ .kv{ grid-template-columns: 120px 1fr; } }

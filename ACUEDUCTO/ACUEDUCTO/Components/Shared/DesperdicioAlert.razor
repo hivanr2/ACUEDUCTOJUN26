@@ -1,0 +1,49 @@
+@page "/desperdicio"
+@using ACUEDUCTO.Models
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<AcueductoContext> DbFactory
+@rendermode InteractiveServer
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h6 class="card-title">Alertas de desperdicio por predio</h6>
+        <p class="small text-muted">Lista los bimestres cuyo consumo supera el promedio histórico del predio.</p>
+
+        <div class="mb-2">
+            <span class="badge bg-danger">@((predioAlerts?.Count) ?? 0)</span>
+            <small class="text-muted ms-2">de @totalPrediosCount predios</small>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">cargando...</span></div>
+        }
+        else if (predioAlerts == null || !predioAlerts.Any())
+        {
+            <div class="text-muted">No se detectaron bimestres por encima del promedio.</div>
+        }
+        else
+        {
+            <div class="list-group">
+                @foreach (var p in predioAlerts)
+                {
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="fw-semibold">@p.PredioNombre <a class="ms-2 small" href="/predios/details?Idpredio=@p.PredioId" target="_blank" rel="noopener noreferrer">Ver detalle</a></div>
+                                <div class="small text-muted">Consumo promedio: @p.Promedio.ToString("0.##") m³</div>
+                            </div>
+                            <div class="small text-end">
+                                <div class="text-danger fw-semibold">@p.AboveCount @(" bimestre(s) arriba")</div>
+                            </div>
+                        </div>
+
+                        <div class="mt-2">
+                            <PredioAboveBimestres Items="p.AboveBimestres" />
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>

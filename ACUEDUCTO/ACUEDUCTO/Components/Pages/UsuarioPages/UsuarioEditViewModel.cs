@@ -1,0 +1,9 @@
+public class UsuarioEditViewModel
+{
+    public string Identificacion { get; set; }
+    public string? ApellidosNombres { get; set; }
+    public string? Celular { get; set; }
+    public string? CorreoElectronico { get; set; }
+    public string? NivelEducativo { get; set; }
+    public string? Observaciones { get; set; }
+}

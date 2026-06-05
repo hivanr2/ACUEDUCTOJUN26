@@ -1,0 +1,49 @@
+﻿@page "/periodos/details"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Detailles</PageTitle>
+
+<h1>Detailles</h1>
+
+<div>
+    <h2>Periodo</h2>
+    <hr />
+    @if (periodo is null)
+    {
+        <p><em>Llamando...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">DescripcionCorta</dt>
+            <dd class="col-sm-10">@periodo.DescripcionCorta</dd>
+            <dt class="col-sm-2">DescripcionLarga</dt>
+            <dd class="col-sm-10">@periodo.DescripcionLarga</dd>
+        </dl>
+        <div>
+            <a href="@($"/periodos/edit?idperiodo={periodo.Idperiodo}")">Edit</a> |
+            <a class="btn btn-outline-secondary btn-sm" href="" onclick="return cerrarVentana('');">Cerrar</a>
+        </div>
+    }
+</div>
+
+@code {
+    private Periodo? periodo;
+
+    [SupplyParameterFromQuery]
+    private int Idperiodo { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        periodo = await context.Periodos.FirstOrDefaultAsync(m => m.Idperiodo == Idperiodo);
+
+        if (periodo is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+}

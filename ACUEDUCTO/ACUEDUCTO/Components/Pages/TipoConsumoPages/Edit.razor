@@ -1,0 +1,100 @@
+﻿@page "/tipoconsumos/edit"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit</PageTitle>
+
+<h1>Edit</h1>
+
+<h2>TipoConsumo</h2>
+<hr />
+@if (TipoConsumo is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-4">
+            <EditForm method="post" Model="TipoConsumo" OnValidSubmit="UpdateTipoConsumo" FormName="edit" Enhance>
+                <DataAnnotationsValidator />
+                <ValidationSummary role="alert"/>
+                <input type="hidden" name="TipoConsumo.Id" value="@TipoConsumo.Id" />
+                <div class="mb-3">
+                    <label for="categoria" class="form-label">Categoria:</label>
+                    <InputText id="categoria" @bind-Value="TipoConsumo.Categoria" class="form-control" />
+                    <ValidationMessage For="() => TipoConsumo.Categoria" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="rango" class="form-label">Rango:</label>
+                    <InputText id="rango" @bind-Value="TipoConsumo.Rango" class="form-control" />
+                    <ValidationMessage For="() => TipoConsumo.Rango" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="observaciones" class="form-label">Observaciones:</label>
+                    <InputText id="observaciones" @bind-Value="TipoConsumo.Observaciones" class="form-control" />
+                    <ValidationMessage For="() => TipoConsumo.Observaciones" class="text-danger" />
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<div>
+    <a class="btn btn-outline-secondary btn-sm" href="" onclick="return cerrarVentana('');">Cerrar</a>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private int Id { get; set; }
+
+    [SupplyParameterFromForm]
+    private TipoConsumo? TipoConsumo { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        TipoConsumo ??= await context.TipoConsumos.FirstOrDefaultAsync(m => m.Id == Id);
+
+        if (TipoConsumo is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    // To protect from overposting attacks, enable the specific properties you want to bind to.
+    // For more information, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task UpdateTipoConsumo()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Attach(TipoConsumo!).State = EntityState.Modified;
+
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (!TipoConsumoExists(TipoConsumo!.Id))
+            {
+                NavigationManager.NavigateTo("notfound");
+            }
+            else
+            {
+                throw;
+            }
+        }
+
+        NavigationManager.NavigateTo("/tipoconsumos");
+    }
+
+    private bool TipoConsumoExists(int id)
+    {
+        using var context = DbFactory.CreateDbContext();
+        return context.TipoConsumos.Any(e => e.Id == id);
+    }
+}

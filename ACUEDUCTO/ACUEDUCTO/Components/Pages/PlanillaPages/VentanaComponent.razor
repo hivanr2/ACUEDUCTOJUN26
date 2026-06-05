@@ -1,0 +1,228 @@
+﻿@page "/ventanaFacturacion"
+@inject JSRuntime JS
+<div>
+    <div class="modal-content text-center" id="printableArea">
+        <div class="modal-header text-center">
+            <h3 class="modal-title text-center">Factura: @selectedFactura.CodigoFactura</h3>
+        </div>
+        <img src="./fondologo-acueducto.jpg" class="text-center border-2 text-center" />
+        <h6 class="text-center"><b>JUNTA DE ACCIÓN COMUNAL TOBIA CHICA</b></h6>
+        <h6 class="text-center"><b>MUNICIPIO DE NOCAIMA - CUNDINAMARCA</b></h6>
+        <h6 class="text-center"><b>NIT: 832.003.939-2</b></h6>
+        <div class="modal-body">
+            <div class="print-container">
+                <h4>Bimestre: @selectedFactura.IdplanillaNavigation.IdperiodoNavigation.DescripcionLarga</h4>
+                <h6>Elabora: @selectedFactura.FechaHoraRegistro</h6>
+                <h5>Ultimo día Pago: </h5><h4><b>@selectedFactura.IdplanillaNavigation.FechaLimitePago</b></h4>
+                <h4>Fecha Suspención : </h4><h4><b>@selectedFactura.IdplanillaNavigation.FechaSuspension</b></h4>
+                <hr />
+                <table class="table table-bordered">
+                    <tbody>
+                        <tr>
+                            <td><strong>Predio:</strong></td>
+                            <td class="text-info">@selectedFactura.IdpredioNavigation.ApellidosNombresUsuario</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Código Usuario:</strong></td>
+                            <td class="text-info">@selectedFactura.CodigoUsuario</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Medición Anterior:</strong></td>
+                            <td class="text-info">@selectedFactura.MedicionAnterior</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Medición Actual:</strong></td>
+                            <td class="text-info">@selectedFactura.MedicionActual</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Consumo M3:</strong></td>
+                            <td class="text-info">@selectedFactura.ConsumoM3</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Valor Consumo:</strong></td>
+                            <td class="text-info">@FormatCurrency(selectedFactura.ValorConsumo)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Cargo Fijo:</strong></td>
+                            <td class="text-info">@FormatCurrency(selectedFactura.CargoFijo)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Porcentaje SobreTasa:</strong></td>
+                            <td class="text-info">@selectedFactura.PorcentajeSobreTasa</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Valor SobreTasa:</strong></td>
+                            <td class="text-info">@FormatCurrency(selectedFactura.ValorSobreTasa)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Porcentaje Mora:</strong></td>
+                            <td class="text-info">@selectedFactura.PorcentajeMora</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Valor Mora:</strong></td>
+                            <td class="text-info">@FormatCurrency(selectedFactura.ValorMora)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Porcentaje Subsidio:</strong></td>
+                            <td class="text-info">@selectedFactura.PorcentajeSubsidio</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Valor Subsidio:</strong></td>
+                            <td class="text-info">@FormatCurrency(selectedFactura.ValorSubsidio)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Otros Valores:</strong></td>
+                            <td class="text-info">@FormatCurrency(selectedFactura.OtrosValores)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Valor Periodo:</strong></td>
+                            <td class="text-info">@FormatCurrency(selectedFactura.ValorPeriodo)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Deuda Anterior:</strong></td>
+                            <td class="text-info">@FormatCurrency(selectedFactura.DeudaAnterior)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Recaudo Periodo Total:</strong></td>
+                            <td class="text-info">@FormatCurrency(selectedFactura.RecaudoPeriodoTotal)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Deuda Pasa:</strong></td>
+                            <td class="text-info">@FormatCurrency(selectedFactura.DeudaPasa)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Notas Factura:</strong></td>
+                            <td class="text-info">@selectedFactura.NotasFactura</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Notas Recaudo:</strong></td>
+                            <td class="text-info">@selectedFactura.NotasRecaudo</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <style>
+            .modal-content {
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            }
+
+            .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e5e5e5;
+            }
+
+            .modal-title {
+            margin: 0;
+            }
+
+            .close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            }
+
+            .modal-body {
+            margin-top: 20px;
+            }
+
+            .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            border-top: 1px solid #e5e5e5;
+            padding-top: 10px;
+            }
+
+            .text-info {
+            color: #0d6efd8;
+            }
+
+            .table {
+            width: 100%;
+            margin-bottom: 1rem;
+            color: #212529;
+            }
+
+            .table-bordered {
+            border: 1px solid #dee2e6;
+            }
+
+            .table-bordered td {
+            border: 1px solid #dee2e6;
+            padding: 0.75rem;
+            vertical-align: top;
+            }
+
+            .table-bordered td strong {
+            display: block;
+            text-align: center;
+            }
+
+            .table-bordered td.text-info {
+            text-align: center;
+            }
+
+            .print-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            }
+        </style>
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-primary" @onclick="EnviarFacturaWhatsApp">WhatsApp</button>
+        <button class="btn btn-primary" @onclick="EnviarFacturaEmail">Correo</button>
+        <button class="btn btn-primary" @onclick="ImprimirFactura">Imprimir Factura</button>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    Facturacion selectedFactura { get; set; }
+
+    private async Task EnviarFacturaWhatsApp()
+    {
+        // Lógica para enviar la factura al número de teléfono
+        var telefono = selectedFactura.IdpredioNavigation.IdentificacionFacturacionNavigation.Celular;
+        // Implementar la lógica para enviar la factura al número de teléfono
+        Console.WriteLine($"Enviando factura a {telefono}");
+    }
+
+
+    private async Task EnviarFacturaEmail()
+    {
+        // Lógica para enviar la factura al correo electronico registrado porel usuario responsable
+        var correo = selectedFactura.IdpredioNavigation.IdentificacionFacturacionNavigation.CorreoElectronico;
+        // Implementar la lógica para enviar la factura al número de teléfono
+        Console.WriteLine($"Enviando correo a {correo}");
+    }
+
+    private string FormatCurrency(double? value)
+    {
+        if (value.HasValue)
+        {
+            return $"${value.Value:N0}";
+        }
+        return "$0";
+    }
+
+    private async Task ImprimirFactura()
+    {
+        bool exists = await JS.InvokeAsync<bool>("checkOnFacturaPrintExists");
+        if (exists)
+        {
+            await JS.InvokeVoidAsync("printDivById", "printableArea");
+        }
+        else
+        {
+            Console.WriteLine("La función OnFacturaPrint no existe en el DOM.");
+        }
+    }
+
+}

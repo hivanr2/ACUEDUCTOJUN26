@@ -1,0 +1,365 @@
+﻿@page "/facturacion/edit"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Edita Factura</PageTitle>
+
+@if (FacturacionVM is null)
+{
+    <p><em>Llamando...</em></p>
+}
+else
+{
+    <div class="container-fluid">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h1 class="card-title">Editar Facturación</h1>
+            </div>
+            <div class="card-body">
+                <EditForm Model="FacturacionVM" OnValidSubmit="UpdateFacturacion" FormName="edit-facturacion">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary role="alert" />
+
+                    <!-- Información Básica -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h5>Información Básica</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Planilla:</label>
+                                    <p class="form-control-plaintext">@FacturacionEntity?.IdplanillaNavigation?.Descripcion</p>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Predio:</label>
+                                    <p class="form-control-plaintext">@FacturacionEntity?.IdpredioNavigation?.ApellidosNombresUsuario
+                                    </p>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Periodo:</label>
+                                    <p class="form-control-plaintext">@FacturacionEntity?.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionLarga
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="codigofactura" class="form-label">CodigoFactura:</label>
+                                    <InputText id="codigofactura" @bind-Value="FacturacionVM.CodigoFactura" class="form-control" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="codigousuario" class="form-label">CodigoUsuario:</label>
+                                    <InputText id="codigousuario" @bind-Value="FacturacionVM.CodigoUsuario" class="form-control" />
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="fechahoraregistro" class="form-label">FechaHoraRegistro:</label>
+                                    <InputDate id="fechahoraregistro" @bind-Value="FacturacionVM.FechaHoraRegistro" class="form-control" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mediciones -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h5>Mediciones</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="medicionanterior" class="form-label">MedicionAnterior:</label>
+                                    <InputNumber id="medicionanterior" @bind-Value="FacturacionVM.MedicionAnterior" class="form-control" />
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="medicionactual" class="form-label">MedicionActual:</label>
+                                    <InputNumber id="medicionactual" @bind-Value="FacturacionVM.MedicionActual" class="form-control" />
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="consumom3" class="form-label">ConsumoM3:</label>
+                                    <InputNumber id="consumom3" @bind-Value="FacturacionVM.ConsumoM3" class="form-control" readonly />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cargos y Tasas -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h5>Cargos y Tasas</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="cargofijo" class="form-label">CargoFijo:</label>
+                                    <InputNumber id="cargofijo" @bind-Value="FacturacionVM.CargoFijo" class="form-control" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="valorconsumo" class="form-label">ValorConsumo:</label>
+                                    <InputNumber id="valorconsumo" @bind-Value="FacturacionVM.ValorConsumo" class="form-control" />
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="porcentajesobretasa" class="form-label">PorcentajeSobreTasa:</label>
+                                    <InputNumber id="porcentajesobretasa" @bind-Value="FacturacionVM.PorcentajeSobreTasa" class="form-control" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="valorsobretasa" class="form-label">ValorSobreTasa:</label>
+                                    <InputNumber id="valorsobretasa" @bind-Value="FacturacionVM.ValorSobreTasa" class="form-control" />
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="porcentajemora" class="form-label">PorcentajeMora:</label>
+                                    <InputNumber id="porcentajemora" @bind-Value="FacturacionVM.PorcentajeMora" class="form-control" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="valormora" class="form-label">ValorMora:</label>
+                                    <InputNumber id="valormora" @bind-Value="FacturacionVM.ValorMora" class="form-control" />
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="porcentajesubsidio" class="form-label">PorcentajeSubsidio:</label>
+                                    <InputNumber id="porcentajesubsidio" @bind-Value="FacturacionVM.PorcentajeSubsidio" class="form-control" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="valorsubsidio" class="form-label">ValorSubsidio:</label>
+                                    <InputNumber id="valorsubsidio" @bind-Value="FacturacionVM.ValorSubsidio" class="form-control" />
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="otrosvalores" class="form-label">OtrosValores:</label>
+                                <InputNumber id="otrosvalores" @bind-Value="FacturacionVM.OtrosValores" class="form-control" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Totales -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h5>Totales</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="valorperiodo" class="form-label">ValorPeriodo:</label>
+                                    <InputNumber id="valorperiodo" @bind-Value="FacturacionVM.ValorPeriodo" class="form-control" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="deudaanterior" class="form-label">DeudaAnterior:</label>
+                                    <InputNumber id="deudaanterior" @bind-Value="FacturacionVM.DeudaAnterior" class="form-control" />
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="recaudoperiodototal" class="form-label">RecaudoPeriodoTotal:</label>
+                                    <InputNumber id="recaudoperiodototal" @bind-Value="FacturacionVM.RecaudoPeriodoTotal" class="form-control" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="deudapasa" class="form-label">DeudaPasa:</label>
+                                    <InputNumber id="deudapasa" @bind-Value="FacturacionVM.DeudaPasa" class="form-control" readonly />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notas -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h5>Notas</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="notasfactura" class="form-label">NotasFactura:</label>
+                                <InputTextArea id="notasfactura" @bind-Value="FacturacionVM.NotasFactura" class="form-control" rows="3" />
+                            </div>
+                            <div class="mb-3">
+                                <label for="notasrecaudo" class="form-label">NotasRecaudo:</label>
+                                <InputTextArea id="notasrecaudo" @bind-Value="FacturacionVM.NotasRecaudo" class="form-control" rows="3" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+<div>
+    <a href="/facturacion">Volve a la Lista</a>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string Id { get; set; }
+
+    private FacturacionEditViewModelAutoCalc? FacturacionVM { get; set; }
+    private Facturacion? FacturacionEntity { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        FacturacionEntity = await context.Facturacions
+            .Include(f => f.IdplanillaNavigation)
+                .ThenInclude(p => p.IdperiodoNavigation)
+            .Include(f => f.IdpredioNavigation)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.Idfactura == Id);
+
+        if (FacturacionEntity is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+            return;
+        }
+
+        FacturacionVM = new FacturacionEditViewModelAutoCalc
+        {
+            Idfactura = FacturacionEntity.Idfactura,
+            Idplanilla = FacturacionEntity.Idplanilla,
+            Idpredio = FacturacionEntity.Idpredio,
+            CodigoFactura = FacturacionEntity.CodigoFactura,
+            CodigoUsuario = FacturacionEntity.CodigoUsuario,
+            FechaHoraRegistro = FacturacionEntity.FechaHoraRegistro,
+            MedicionAnterior = FacturacionEntity.MedicionAnterior,
+            MedicionActual = FacturacionEntity.MedicionActual,
+            ConsumoM3 = FacturacionEntity.ConsumoM3,
+            CargoFijo = FacturacionEntity.CargoFijo,
+            ValorConsumo = FacturacionEntity.ValorConsumo,
+            PorcentajeSobreTasa = FacturacionEntity.PorcentajeSobreTasa,
+            ValorSobreTasa = FacturacionEntity.ValorSobreTasa,
+            PorcentajeMora = FacturacionEntity.PorcentajeMora,
+            ValorMora = FacturacionEntity.ValorMora,
+            PorcentajeSubsidio = FacturacionEntity.PorcentajeSubsidio,
+            ValorSubsidio = FacturacionEntity.ValorSubsidio,
+            OtrosValores = FacturacionEntity.OtrosValores,
+            ValorPeriodo = FacturacionEntity.ValorPeriodo,
+            DeudaAnterior = FacturacionEntity.DeudaAnterior,
+            RecaudoPeriodoTotal = FacturacionEntity.RecaudoPeriodoTotal,
+            DeudaPasa = FacturacionEntity.DeudaPasa,
+            NotasFactura = FacturacionEntity.NotasFactura,
+            NotasRecaudo = FacturacionEntity.NotasRecaudo
+        };
+    }
+
+    private sealed class FacturacionEditViewModelAutoCalc : FacturacionEditViewModel
+    {
+        private double? _medicionAnterior;
+        private double? _medicionActual;
+        private double? _valorPeriodo;
+        private double? _deudaAnterior;
+        private double? _recaudoPeriodoTotal;
+
+        public new double? MedicionAnterior
+        {
+            get => _medicionAnterior;
+            set
+            {
+                _medicionAnterior = value;
+                RecalculateConsumo();
+            }
+        }
+
+        public new double? MedicionActual
+        {
+            get => _medicionActual;
+            set
+            {
+                _medicionActual = value;
+                RecalculateConsumo();
+            }
+        }
+
+        public new double? ValorPeriodo
+        {
+            get => _valorPeriodo;
+            set
+            {
+                _valorPeriodo = value;
+                RecalculateDeudaPasa();
+            }
+        }
+
+        public new double? DeudaAnterior
+        {
+            get => _deudaAnterior;
+            set
+            {
+                _deudaAnterior = value;
+                RecalculateDeudaPasa();
+            }
+        }
+
+        public new double? RecaudoPeriodoTotal
+        {
+            get => _recaudoPeriodoTotal;
+            set
+            {
+                _recaudoPeriodoTotal = value;
+                RecalculateDeudaPasa();
+            }
+        }
+
+        private void RecalculateConsumo()
+        {
+            var anterior = MedicionAnterior ?? 0d;
+            var actual = MedicionActual ?? 0d;
+            ConsumoM3 = actual - anterior;
+        }
+
+        private void RecalculateDeudaPasa()
+        {
+            var valorPeriodo = ValorPeriodo ?? 0d;
+            var deudaAnterior = DeudaAnterior ?? 0d;
+            var recaudo = RecaudoPeriodoTotal ?? 0d;
+            DeudaPasa = (valorPeriodo + deudaAnterior) - recaudo;
+        }
+    }
+
+    private async Task UpdateFacturacion()
+    {
+        using var context = DbFactory.CreateDbContext();
+        var facturacion = await context.Facturacions.FirstOrDefaultAsync(f => f.Idfactura == FacturacionVM.Idfactura);
+        if (facturacion is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+            return;
+        }
+
+        // facturacion.Idplanilla = FacturacionVM.Idplanilla; // No modificar
+        // facturacion.Idpredio = FacturacionVM.Idpredio; // No modificar
+        facturacion.CodigoFactura = FacturacionVM.CodigoFactura;
+        facturacion.CodigoUsuario = FacturacionVM.CodigoUsuario;
+        facturacion.FechaHoraRegistro = FacturacionVM.FechaHoraRegistro;
+        facturacion.MedicionAnterior = FacturacionVM.MedicionAnterior;
+        facturacion.MedicionActual = FacturacionVM.MedicionActual;
+        facturacion.ConsumoM3 = FacturacionVM.ConsumoM3;
+        facturacion.CargoFijo = FacturacionVM.CargoFijo;
+        facturacion.ValorConsumo = FacturacionVM.ValorConsumo;
+        facturacion.PorcentajeSobreTasa = FacturacionVM.PorcentajeSobreTasa;
+        facturacion.ValorSobreTasa = FacturacionVM.ValorSobreTasa;
+        facturacion.PorcentajeMora = FacturacionVM.PorcentajeMora;
+        facturacion.ValorMora = FacturacionVM.ValorMora;
+        facturacion.PorcentajeSubsidio = FacturacionVM.PorcentajeSubsidio;
+        facturacion.ValorSubsidio = FacturacionVM.ValorSubsidio;
+        facturacion.OtrosValores = FacturacionVM.OtrosValores;
+        facturacion.ValorPeriodo = FacturacionVM.ValorPeriodo;
+        facturacion.DeudaAnterior = FacturacionVM.DeudaAnterior;
+        facturacion.RecaudoPeriodoTotal = FacturacionVM.RecaudoPeriodoTotal;
+        facturacion.DeudaPasa = FacturacionVM.DeudaPasa;
+        facturacion.NotasFactura = FacturacionVM.NotasFactura;
+        facturacion.NotasRecaudo = FacturacionVM.NotasRecaudo;
+
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/facturacion");
+    }
+}

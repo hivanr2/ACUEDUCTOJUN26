@@ -1,0 +1,220 @@
+﻿@page "/Account/ExternalLogin"
+
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using System.Text
+@using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using ACUEDUCTO2.Data
+@using Microsoft.EntityFrameworkCore
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject IUserStore<ApplicationUser> UserStore
+@inject IEmailSender<ApplicationUser> EmailSender
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<ExternalLogin> Logger
+
+<PageTitle>Registro externo</PageTitle>
+
+<StatusMessage Message="@message" />
+<h1>Registro externo</h1>
+<h2>Asociar su cuenta de @ProviderDisplayName.</h2>
+<hr />
+
+<div class="alert alert-info">
+    Se ha autenticado correctamente con <strong>@ProviderDisplayName</strong>.
+    Por favor complete sus datos para crear su cuenta.
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <EditForm Model="Input" OnValidSubmit="OnValidSubmitAsync" FormName="confirmation" method="post">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert" />
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="email" placeholder="correo@ejemplo.com" />
+                <label for="Input.Email" class="form-label">Correo electrónico</label>
+                <ValidationMessage For="() => Input.Email" />
+            </div>
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.ApellidosNombres" id="Input.ApellidosNombres" class="form-control" autocomplete="name" placeholder="Apellidos y nombres" />
+                <label for="Input.ApellidosNombres" class="form-label">Apellidos y Nombres</label>
+                <ValidationMessage For="() => Input.ApellidosNombres" />
+            </div>
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.Identificacion" id="Input.Identificacion" class="form-control" autocomplete="off" aria-required="true" placeholder="Identificación" />
+                <label for="Input.Identificacion" class="form-label">Identificación</label>
+                <ValidationMessage For="() => Input.Identificacion" />
+            </div>
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.Telefono" id="Input.Telefono" class="form-control" autocomplete="tel" aria-required="true" placeholder="Teléfono" />
+                <label for="Input.Telefono" class="form-label">Teléfono</label>
+                <ValidationMessage For="() => Input.Telefono" />
+            </div>
+            <button type="submit" class="w-100 btn btn-lg btn-primary">Crear Cuenta</button>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    public const string LoginCallbackAction = "LoginCallback";
+
+    private string? message;
+    private ExternalLoginInfo? externalLoginInfo;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? RemoteError { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? Action { get; set; }
+
+    private string? ProviderDisplayName => externalLoginInfo?.ProviderDisplayName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (RemoteError is not null)
+        {
+            RedirectManager.RedirectToWithStatus("Account/Login", $"Error from external provider: {RemoteError}", HttpContext);
+        }
+
+        var info = await SignInManager.GetExternalLoginInfoAsync();
+        if (info is null)
+        {
+            RedirectManager.RedirectToWithStatus("Account/Login", "Error loading external login information.", HttpContext);
+        }
+
+        externalLoginInfo = info;
+
+        if (HttpMethods.IsGet(HttpContext.Request.Method))
+        {
+            if (Action == LoginCallbackAction)
+            {
+                await OnLoginCallbackAsync();
+                return;
+            }
+
+            // We should only reach this page via the login callback, so redirect back to
+            // the login page if we get here some other way.
+            RedirectManager.RedirectTo("Account/Login");
+        }
+    }
+
+    private async Task OnLoginCallbackAsync()
+    {
+        if (externalLoginInfo is null)
+        {
+            RedirectManager.RedirectToWithStatus("Account/Login", "Error loading external login information.", HttpContext);
+        }
+
+        // Sign in the user with this external login provider if the user already has a login.
+        var result = await SignInManager.ExternalLoginSignInAsync(
+            externalLoginInfo.LoginProvider,
+            externalLoginInfo.ProviderKey,
+            isPersistent: false,
+            bypassTwoFactor: true);
+
+        if (result.Succeeded)
+        {
+            Logger.LogInformation(
+                "{Name} logged in with {LoginProvider} provider.",
+                externalLoginInfo.Principal.Identity?.Name,
+                externalLoginInfo.LoginProvider);
+            RedirectManager.RedirectTo(ReturnUrl);
+        }
+        else if (result.IsLockedOut)
+        {
+            RedirectManager.RedirectTo("Account/Lockout");
+        }
+
+        // If the user does not have an account, then ask the user to create an account.
+        if (externalLoginInfo.Principal.HasClaim(c => c.Type == ClaimTypes.Email))
+        {
+            Input.Email = externalLoginInfo.Principal.FindFirstValue(ClaimTypes.Email) ?? "";
+        }
+    }
+
+    private async Task OnValidSubmitAsync()
+    {
+        if (externalLoginInfo is null)
+        {
+            RedirectManager.RedirectToWithStatus("Account/Login", "Error loading external login information during confirmation.", HttpContext);
+        }
+
+        // Verificar si el correo ya existe
+        var existingUser = await UserManager.FindByEmailAsync(Input.Email);
+        if (existingUser is not null)
+        {
+            message = "Ya existe una cuenta con este correo electrónico. Use Iniciar Sesión para acceder.";
+            return;
+        }
+
+        // Crear usuario nuevo
+        var user = new ApplicationUser
+        {
+            UserName = Input.Email,
+            Email = Input.Email,
+            ApellidosNombres = Input.ApellidosNombres,
+            Identificacion = Input.Identificacion,
+            PhoneNumber = Input.Telefono,
+            EmailConfirmed = true
+        };
+
+        var result = await UserManager.CreateAsync(user);
+        if (!result.Succeeded)
+        {
+            message = $"Error: {string.Join(", ", result.Errors.Select(e => e.Description))}";
+            return;
+        }
+
+        // Vincular login externo
+        result = await UserManager.AddLoginAsync(user, externalLoginInfo);
+        if (!result.Succeeded)
+        {
+            message = $"Error al vincular proveedor externo: {string.Join(", ", result.Errors.Select(e => e.Description))}";
+            return;
+        }
+
+        Logger.LogInformation("User {Email} created account via {Provider}.", Input.Email, externalLoginInfo.LoginProvider);
+
+        await SignInManager.SignInAsync(user, isPersistent: false, externalLoginInfo.LoginProvider);
+        RedirectManager.RedirectTo(ReturnUrl);
+    }
+
+    private IUserEmailStore<ApplicationUser> GetEmailStore()
+    {
+        if (!UserManager.SupportsUserEmail)
+        {
+            throw new NotSupportedException("The default UI requires a user store with email support.");
+        }
+        return (IUserEmailStore<ApplicationUser>)UserStore;
+    }
+
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "El correo electrónico es obligatorio.")]
+        [EmailAddress(ErrorMessage = "Ingrese un correo electrónico válido.")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Los apellidos y nombres son obligatorios.")]
+        public string ApellidosNombres { get; set; } = "";
+
+        [Required(ErrorMessage = "La identificación es obligatoria.")]
+        public string Identificacion { get; set; } = "";
+
+        [Required(ErrorMessage = "El teléfono es obligatorio.")]
+        [Phone(ErrorMessage = "Ingrese un número de teléfono válido.")]
+        public string Telefono { get; set; } = "";
+    }
+}

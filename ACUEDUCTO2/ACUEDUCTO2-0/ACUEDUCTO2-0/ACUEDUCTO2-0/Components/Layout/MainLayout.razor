@@ -1,0 +1,25 @@
+﻿@inherits LayoutComponentBase
+
+<header class="top-row col-12">
+    <div class="header-inner px-3">
+        <NavMenu @rendermode="InteractiveServer" />
+    </div>
+</header>
+<div class="page">
+    <main>
+        <div class="content px-4">
+            <article class="col-12">
+                @Body
+            </article>
+        </div>
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+<!-- Fix for browser autofill: dispatch input/change events so Blazor sees prefilled values -->
+<script src="/js/autofill-fix.js"></script>

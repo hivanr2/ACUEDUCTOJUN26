@@ -1,0 +1,597 @@
+﻿@page "/predios/edit"
+@page "/proceso/Actualizacion Datos Predio"
+@* layout removed for compatibility during migration *@
+@using ACUEDUCTO2.Share.Models
+@using ACUEDUCTO2.Services.PredioServices
+@using System.Linq
+@using System.IO
+@using System.Text.Json
+@inject ACUEDUCTO2.Services.PredioServices.PredioService PredioService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@inject IWebHostEnvironment WebHostEnvironment
+
+@rendermode InteractiveServer
+
+<PageTitle>Editar Predio</PageTitle>
+
+@if (Predio is null)
+{
+    <div class="container py-5 text-center text-muted">Cargando...</div>
+}
+else
+{
+    <div class="container-fluid py-2 py-md-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div>
+                <h1 class="h5 mb-0">Editar Predio</h1>
+                <small class="text-muted">@Predio.ApellidosNombresUsuario</small>
+            </div>
+            <div class="d-flex gap-2">
+                <a class="btn btn-outline-secondary btn-sm" href="/predios" onclick="return cerrarVentana('/predios');">Cerrar</a>
+                <button type="button" class="btn btn-secondary btn-sm" @onclick="AbrirGaleriaNuevaVentana">Imágenes/Videos (@totalArchivos)</button>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <EditForm method="post" Model="Predio" OnValidSubmit="UpdatePredio" FormName="edit" Enhance>
+                    <DataAnnotationsValidator />
+                    <ValidationSummary role="alert" />
+                    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+                    {
+                        <div class="alert alert-warning" role="status">@ErrorMessage</div>
+                    }
+                    <input type="hidden" name="Predio.IdPredio" value="@Predio.IdPredio" />
+
+                    <!-- Identificación y ubicación -->
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label for="apellidosnombresusuario" class="form-label">Apellidos y Nombres</label>
+                            <InputText id="apellidosnombresusuario" @bind-Value="Predio.ApellidosNombresUsuario" class="form-control" />
+                            <ValidationMessage For="() => Predio.ApellidosNombresUsuario" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <label for="codigousuario" class="form-label">Código Usuario</label>
+                            <InputText id="codigousuario" @bind-Value="Predio.CodigoUsuario" class="form-control" />
+                            <ValidationMessage For="() => Predio.CodigoUsuario" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <label for="identificacionfacturacion" class="form-label">Identificación Facturación</label>
+                            <InputSelect id="identificacionfacturacion" class="form-select" @bind-Value="Predio.IdentificacionFacturacion">
+                                <option value="">Seleccione...</option>
+                                @foreach (var usuario in UsuariosFacturacion)
+                                {
+                                    <option value="@usuario.Identificacion">@usuario.Identificacion - @usuario.Nombre</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => Predio.IdentificacionFacturacion" class="text-danger" />
+                            @{
+                                var usuarioSeleccionado = UsuariosFacturacion.FirstOrDefault(u => u.Identificacion == Predio.IdentificacionFacturacion)?.Nombre;
+                            }
+                            @if (!string.IsNullOrWhiteSpace(usuarioSeleccionado))
+                            {
+                                <small class="text-muted d-block">@usuarioSeleccionado</small>
+                            }
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="estrato" class="form-label">Estrato</label>
+                            <InputNumber id="estrato" @bind-Value="Predio.Estrato" class="form-control" />
+                            <ValidationMessage For="() => Predio.Estrato" class="text-danger" />
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="ruta" class="form-label">Ruta</label>
+                            <InputNumber id="ruta" @bind-Value="Predio.Ruta" class="form-control" />
+                            <ValidationMessage For="() => Predio.Ruta" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label for="direccion" class="form-label">Dirección</label>
+                            <InputText id="direccion" @bind-Value="Predio.Direccion" class="form-control" />
+                            <ValidationMessage For="() => Predio.Direccion" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label for="numerocatastral" class="form-label">Número Catastral</label>
+                            <InputText id="numerocatastral" @bind-Value="Predio.NumeroCatastral" class="form-control" />
+                            <ValidationMessage For="() => Predio.NumeroCatastral" class="text-danger" />
+                        </div>
+                        <div class="col-12">
+                            <label for="informacioncatastral" class="form-label">Información Catastral</label>
+                            <InputTextArea id="informacioncatastral" @bind-Value="Predio.InformacionCatastral" class="form-control" />
+                            <ValidationMessage For="() => Predio.InformacionCatastral" class="text-danger" />
+                        </div>
+                    </div>
+
+                    <hr />
+
+                    <!-- Medidas y consumo -->
+                    <div class="row g-3">
+                        <div class="col-6 col-md-3">
+                            <label for="extensionm2" class="form-label">Extensión (m²)</label>
+                            <InputNumber id="extensionm2" @bind-Value="Predio.ExtensionM2" class="form-control" />
+                            <ValidationMessage For="() => Predio.ExtensionM2" class="text-danger" />
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="m2construidos" class="form-label">Construidos (m²)</label>
+                            <InputNumber id="m2construidos" @bind-Value="Predio.M2construidos" class="form-control" />
+                            <ValidationMessage For="() => Predio.M2construidos" class="text-danger" />
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="puntosfuturos" class="form-label">Puntos Futuros</label>
+                            <InputNumber id="puntosfuturos" @bind-Value="Predio.PuntosFuturos" class="form-control" />
+                            <ValidationMessage For="() => Predio.PuntosFuturos" class="text-danger" />
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="fechahoraregistro" class="form-label">Fecha Registro</label>
+                            <InputDate id="fechahoraregistro" @bind-Value="Predio.FechaHoraRegistro" class="form-control" />
+                            <ValidationMessage For="() => Predio.FechaHoraRegistro" class="text-danger" />
+                        </div>
+                    </div>
+
+                    <hr />
+
+                    <!-- Medidor -->
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <label for="numeromedidor" class="form-label">Número Medidor</label>
+                            <InputText id="numeromedidor" @bind-Value="Predio.NumeroMedidor" class="form-control" />
+                            <ValidationMessage For="() => Predio.NumeroMedidor" class="text-danger" />
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <label for="marcamedidor" class="form-label">Marca</label>
+                            <InputText id="marcamedidor" @bind-Value="Predio.MarcaMedidor" class="form-control" />
+                            <ValidationMessage For="() => Predio.MarcaMedidor" class="text-danger" />
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <label for="estadomedidor" class="form-label">Estado</label>
+                            <InputText id="estadomedidor" @bind-Value="Predio.EstadoMedidor" class="form-control" />
+                            <ValidationMessage For="() => Predio.EstadoMedidor" class="text-danger" />
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="ultimamedicion" class="form-label">Última Medición</label>
+                            <InputNumber id="ultimamedicion" @bind-Value="Predio.UltimaMedicion" class="form-control" />
+                            <ValidationMessage For="() => Predio.UltimaMedicion" class="text-danger" />
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="consumom3promedio" class="form-label">Consumo Prom. (m³)</label>
+                            <InputNumber id="consumom3promedio" @bind-Value="Predio.ConsumoM3promedio" class="form-control" />
+                            <ValidationMessage For="() => Predio.ConsumoM3promedio" class="text-danger" />
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="ultimoconsumom3" class="form-label">Último Consumo (m³)</label>
+                            <InputNumber id="ultimoconsumom3" @bind-Value="Predio.UltimoConsumoM3" class="form-control" />
+                            <ValidationMessage For="() => Predio.UltimoConsumoM3" class="text-danger" />
+                        </div>
+                    </div>
+
+                    <hr />
+
+                    <!-- Coordenadas, switches y geolocalización -->
+                    <div class="row g-3">
+                        <div class="col-6 col-md-3">
+                            <label for="latitud" class="form-label">Latitud</label>
+                            <InputNumber id="latitud" @bind-Value="Predio.Latitud" class="form-control" step="0.0000000001" />
+                            <ValidationMessage For="() => Predio.Latitud" class="text-danger" />
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="longitud" class="form-label">Longitud</label>
+                            <InputNumber id="longitud" @bind-Value="Predio.Longitud" class="form-control" step="0.0000000001" />
+                            <ValidationMessage For="() => Predio.Longitud" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-6 d-flex align-items-center flex-wrap gap-4">
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="GetLocation" @onclick:preventDefault="true">Geolocalizar</button>
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="activo" @bind-Value="@this.Activo" class="form-check-input" />
+                                <label class="form-check-label" for="activo">Activo</label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="contadorenseguimiento" @bind-Value="ContadorEnSeguimiento" class="form-check-input" />
+                                <label class="form-check-label" for="contadorenseguimiento">En seguimiento</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr />
+
+                    <!-- Preferencias -->
+                    <div class="row g-3">
+                        <div class="col-12 d-flex align-items-center flex-wrap gap-4">
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="tienesubsidio" @bind-Value="TieneSubsidio" class="form-check-input" />
+                                <label class="form-check-label" for="tienesubsidio">Tiene Subsidio</label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="imprimefactura" @bind-Value="ImprimeFactura" class="form-check-input" />
+                                <label class="form-check-label" for="imprimefactura">Imprime Factura</label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="enviawhatsapp" @bind-Value="EnviaWhatsapp" class="form-check-input" />
+                                <label class="form-check-label" for="enviawhatsapp">Envia WhatsApp</label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="enviacorreo" @bind-Value="EnviaCorreo" class="form-check-input" />
+                                <label class="form-check-label" for="enviacorreo">Envia Correo</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr />
+
+                    <!-- Requisitos PUEAA - Ahorro de Agua -->
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <h2 class="h6 mb-0">Requisitos PUEAA - Ahorro de Agua</h2>
+                        </div>
+                        <div class="col-12 d-flex align-items-center flex-wrap gap-4">
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="pueaa_tanquereservaacueducto" @bind-Value="PueaaTanqueReservaAcueducto" class="form-check-input" />
+                                <label class="form-check-label" for="pueaa_tanquereservaacueducto">Tanque de reserva de acueducto</label>
+                            </div>
+                            @if (PueaaTanqueReservaAcueducto)
+                            {
+                                <div class="col-12">
+                                    <label for="pueaa_tanquereservaacueducto_obs" class="form-label">Observaciones - Tanque de reserva acueducto</label>
+                                    <InputTextArea id="pueaa_tanquereservaacueducto_obs" @bind-Value="Predio.PUEAA_TanqueReservaAcueductoObservaciones" class="form-control" />
+                                </div>
+                            }
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="pueaa_tanquereservalluvia" @bind-Value="PueaaTanqueReservaLluvia" class="form-check-input" />
+                                <label class="form-check-label" for="pueaa_tanquereservalluvia">Tanque de reserva de lluvia</label>
+                            </div>
+                            @if (PueaaTanqueReservaLluvia)
+                            {
+                                <div class="col-12">
+                                    <label for="pueaa_tanquereservalluvia_obs" class="form-label">Observaciones - Tanque de reserva lluvia</label>
+                                    <InputTextArea id="pueaa_tanquereservalluvia_obs" @bind-Value="Predio.PUEAA_TanqueReservaLluviaObservaciones" class="form-control" />
+                                </div>
+                            }
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="pueaa_reciclajeaguas" @bind-Value="PueaaReciclajeAguas" class="form-check-input" />
+                                <label class="form-check-label" for="pueaa_reciclajeaguas">Reciclaje de aguas</label>
+                            </div>
+                            @if (PueaaReciclajeAguas)
+                            {
+                                <div class="col-12">
+                                    <label for="pueaa_reciclajeaguas_obs" class="form-label">Observaciones - Reciclaje de aguas</label>
+                                    <InputTextArea id="pueaa_reciclajeaguas_obs" @bind-Value="Predio.PUEAA_ReciclajeAguasObservaciones" class="form-control" />
+                                </div>
+                            }
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="pueaa_recirculacionaguas" @bind-Value="PueaaRecirculacionAguas" class="form-check-input" />
+                                <label class="form-check-label" for="pueaa_recirculacionaguas">Recirculación de aguas</label>
+                            </div>
+                            @if (PueaaRecirculacionAguas)
+                            {
+                                <div class="col-12">
+                                    <label for="pueaa_recirculacionaguas_obs" class="form-label">Observaciones - Recirculación de aguas</label>
+                                    <InputTextArea id="pueaa_recirculacionaguas_obs" @bind-Value="Predio.PUEAA_RecirculacionAguasObservaciones" class="form-control" />
+                                </div>
+                            }
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="pueaa_controlperdidas" @bind-Value="PueaaControlPerdidas" class="form-check-input" />
+                                <label class="form-check-label" for="pueaa_controlperdidas">Control de pérdidas</label>
+                            </div>
+                            @if (PueaaControlPerdidas)
+                            {
+                                <div class="col-12">
+                                    <label for="pueaa_controlperdidas_obs" class="form-label">Observaciones - Control pérdidas</label>
+                                    <InputTextArea id="pueaa_controlperdidas_obs" @bind-Value="Predio.PUEAA_ControlPerdidasObservaciones" class="form-control" />
+                                </div>
+                            }
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="pueaa_mantenimientopiscina" @bind-Value="PueaaMantenimientoPiscina" class="form-check-input" />
+                                <label class="form-check-label" for="pueaa_mantenimientopiscina">Mantenimiento de piscina</label>
+                            </div>
+                            @if (PueaaMantenimientoPiscina)
+                            {
+                                <div class="col-12">
+                                    <label for="pueaa_mantenimientopiscina_obs" class="form-label">Observaciones - Mantenimiento piscina</label>
+                                    <InputTextArea id="pueaa_mantenimientopiscina_obs" @bind-Value="Predio.PUEAA_MantenimientoPiscinaObservaciones" class="form-control" />
+                                </div>
+                            }
+                            <div class="form-check form-switch">
+                                <InputCheckbox id="pueaa_otrosprocesos" @bind-Value="PueaaOtrosProcesos" class="form-check-input" />
+                                <label class="form-check-label" for="pueaa_otrosprocesos">Otros procesos</label>
+                            </div>
+                            @if (PueaaOtrosProcesos)
+                            {
+                                <div class="col-12">
+                                    <label for="pueaa_otrosprocesos_obs" class="form-label">Observaciones - Otros procesos PUEAA</label>
+                                    <InputTextArea id="pueaa_otrosprocesos_obs" @bind-Value="Predio.PUEAA_OtrosProcesosObservaciones" class="form-control" />
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <hr />
+
+                    <!-- Valores y tipo consumo -->
+                    <div class="row g-3">
+                        <div class="col-12 col-md-3">
+                            <label for="valortotalcobros" class="form-label">Total Cobros</label>
+                            <InputNumber id="valortotalcobros" @bind-Value="Predio.ValorTotalCobros" class="form-control" />
+                            <ValidationMessage For="() => Predio.ValorTotalCobros" class="text-danger" />
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="cantidadcoutascobros" class="form-label">Cuotas Cobros</label>
+                            <InputNumber id="cantidadcoutascobros" @bind-Value="Predio.CantidadCoutasCobros" class="form-control" />
+                            <ValidationMessage For="() => Predio.CantidadCoutasCobros" class="text-danger" />
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="cantidadcuotaspagadas" class="form-label">Cuotas Pagadas</label>
+                            <InputNumber id="cantidadcuotaspagadas" @bind-Value="Predio.CantidadCuotasPagadas" class="form-control" />
+                            <ValidationMessage For="() => Predio.CantidadCuotasPagadas" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <label for="valortotalpagos" class="form-label">Total Pagos</label>
+                            <InputNumber id="valortotalpagos" @bind-Value="Predio.ValorTotalPagos" class="form-control" />
+                            <ValidationMessage For="() => Predio.ValorTotalPagos" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <label for="valortotaldeuda" class="form-label">Total Deuda</label>
+                            <InputNumber id="valortotaldeuda" @bind-Value="Predio.ValorTotalDeuda" class="form-control" />
+                            <ValidationMessage For="() => Predio.ValorTotalDeuda" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label for="tipoconsumo" class="form-label">Tipo de Consumo</label>
+                            <InputSelect id="tipoconsumo" @bind-Value="SelectedTipoConsumoId" class="form-select">
+                                <option value="">Seleccione...</option>
+                                @foreach (var tipo in TiposConsumo)
+                                {
+                                    <option value="@tipo.Id">@tipo.Categoria - (@tipo.Rango)</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => SelectedTipoConsumoId" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label for="observaciones" class="form-label">Observaciones</label>
+                            <InputTextArea id="observaciones" @bind-Value="Predio.Observaciones" class="form-control" />
+                            <ValidationMessage For="() => Predio.Observaciones" class="text-danger" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <a class="btn btn-outline-secondary" href="/predios">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    private string Idpredio { get; set; }
+
+    [SupplyParameterFromForm]
+    private Predio? Predio { get; set; }
+
+    private string ErrorMessage { get; set; } = string.Empty;
+    private bool TieneSubsidio { get; set; } = false;
+    private bool ImprimeFactura { get; set; } = true;
+    private bool EnviaWhatsapp { get; set; } = false;
+    private bool EnviaCorreo { get; set; } = false;
+    private bool ContadorEnSeguimiento { get; set; } = false;
+    private bool Activo { get; set; } = false;
+    private List<TipoConsumo> TiposConsumo { get; set; } = new();
+    private List<UsuarioLookupItem> UsuariosFacturacion { get; set; } = new();
+    private int? selectedTipoConsumoId;
+    private int? SelectedTipoConsumoId
+    {
+        get => selectedTipoConsumoId;
+        set
+        {
+            selectedTipoConsumoId = value;
+            if (value.HasValue && !string.IsNullOrWhiteSpace(ErrorMessage))
+            {
+                ErrorMessage = string.Empty;
+            }
+        }
+    }
+    private Location location { get; set; }
+
+    // PUEAA fields (UI state)
+    private bool PueaaTanqueReservaAcueducto { get; set; } = false;
+    private bool PueaaTanqueReservaLluvia { get; set; } = false;
+    private bool PueaaReciclajeAguas { get; set; } = false;
+    private bool PueaaRecirculacionAguas { get; set; } = false;
+    private bool PueaaControlPerdidas { get; set; } = false;
+    private bool PueaaMantenimientoPiscina { get; set; } = false;
+    private bool PueaaOtrosProcesos { get; set; } = false;
+
+    // archivos
+    private int totalArchivos = 0;
+    private string? carpetaImagenesPredio;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Predio ??= await PredioService.GetByIdAsync(Idpredio, includeTipoConsumo: true, includeUsuarioFacturacion: true);
+        TiposConsumo = await PredioService.GetTipoConsumoAsync();
+        UsuariosFacturacion = await PredioService.GetUsuariosFacturacionAsync();
+
+        if (Predio is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+            return;
+        }
+        else
+        {
+            TieneSubsidio = Predio.TieneSubsidio ?? false;
+            ImprimeFactura = Predio.ImprimeFactura ?? true;
+            EnviaWhatsapp = Predio.EnviaWhatsapp ?? false;
+            EnviaCorreo = Predio.EnviaCorreo ?? false;
+            ContadorEnSeguimiento = Predio.ContadorEnSeguimiento ?? false;
+            this.Activo = Predio.Activo ?? false;
+            SelectedTipoConsumoId = Predio.IdTipoConsumo ?? null;
+
+            // init PUEAA UI fields
+            PueaaTanqueReservaAcueducto = Predio.PUEAA_TanqueReservaAcueducto ?? false;
+            PueaaTanqueReservaLluvia = Predio.PUEAA_TanqueReservaLluvia ?? false;
+            PueaaReciclajeAguas = Predio.PUEAA_ReciclajeAguas ?? false;
+            PueaaRecirculacionAguas = Predio.PUEAA_RecirculacionAguas ?? false;
+            PueaaControlPerdidas = Predio.PUEAA_ControlPerdidas ?? false;
+            PueaaMantenimientoPiscina = Predio.PUEAA_MantenimientoPiscina ?? false;
+            PueaaOtrosProcesos = Predio.PUEAA_OtrosProcesos ?? false;
+        }
+
+        // preparar carpeta y contar archivos
+        EnsureFolderAndCount();
+    }
+
+    private async Task AbrirGaleriaNuevaVentana()
+    {
+        EnsureFolderAndCount();
+        var codigo = Predio?.CodigoUsuario ?? string.Empty;
+        var url = NavigationManager.GetUriWithQueryParameters("/archivosgaleria", new Dictionary<string, object?>
+        {
+            ["CodigoUsuario"] = codigo
+        });
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+    }
+
+    private void EnsureFolderAndCount()
+    {
+        try
+        {
+            var basePath = Path.Combine(WebHostEnvironment.WebRootPath ?? string.Empty, "imagenes");
+            if (string.IsNullOrEmpty(basePath))
+            {
+                totalArchivos = 0;
+                return;
+            }
+            Directory.CreateDirectory(basePath);
+
+            var folderName = !string.IsNullOrWhiteSpace(Predio?.CodigoUsuario)
+                ? Predio!.CodigoUsuario!.Trim()
+                : (Predio?.IdPredio ?? "SinCodigo");
+
+            carpetaImagenesPredio = Path.Combine(basePath, folderName);
+            Directory.CreateDirectory(carpetaImagenesPredio);
+
+            totalArchivos = Directory.Exists(carpetaImagenesPredio)
+                ? Directory.GetFiles(carpetaImagenesPredio).Length
+                : 0;
+        }
+        catch
+        {
+            totalArchivos = 0;
+        }
+    }
+
+    private void RecontarArchivos()
+    {
+        EnsureFolderAndCount();
+        StateHasChanged();
+    }
+
+    private async Task UpdatePredio()
+    {
+        if (Predio is null)
+        {
+            ErrorMessage = "No se pudo cargar la información del predio.";
+            return;
+        }
+
+        if (SelectedTipoConsumoId == null)
+        {
+            ErrorMessage = "Debe seleccionar un TipoConsumo válido.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(Predio.IdentificacionFacturacion))
+        {
+            ErrorMessage = "Debe ingresar una identificación de facturación existente.";
+            return;
+        }
+
+        if (!await PredioService.UsuarioExistsAsync(Predio.IdentificacionFacturacion))
+        {
+            ErrorMessage = "La identificación de facturación no corresponde a un usuario registrado.";
+            return;
+        }
+
+        ErrorMessage = string.Empty;
+
+        // Asignar valores al objeto Predio
+        Predio.IdTipoConsumo = SelectedTipoConsumoId.Value;
+        Predio.TieneSubsidio = TieneSubsidio;
+        Predio.ImprimeFactura = ImprimeFactura;
+        Predio.EnviaWhatsapp = EnviaWhatsapp;
+        Predio.EnviaCorreo = EnviaCorreo;
+        Predio.ContadorEnSeguimiento = ContadorEnSeguimiento;
+        Predio.Activo = Activo;
+
+        // PUEAA assignments (bool switches)
+        Predio.PUEAA_TanqueReservaAcueducto = PueaaTanqueReservaAcueducto;
+        Predio.PUEAA_TanqueReservaLluvia = PueaaTanqueReservaLluvia;
+        Predio.PUEAA_ReciclajeAguas = PueaaReciclajeAguas;
+        Predio.PUEAA_RecirculacionAguas = PueaaRecirculacionAguas;
+        Predio.PUEAA_ControlPerdidas = PueaaControlPerdidas;
+        Predio.PUEAA_MantenimientoPiscina = PueaaMantenimientoPiscina;
+        Predio.PUEAA_OtrosProcesos = PueaaOtrosProcesos;
+
+        try
+        {
+            await PredioService.UpdateAsync(Predio);
+        }
+        catch (InvalidOperationException)
+        {
+            var exists = await PredioService.GetByIdAsync(Predio.IdPredio);
+            if (exists is null)
+            {
+                NavigationManager.NavigateTo("notfound");
+                return;
+            }
+
+            throw;
+        }
+
+        // Redirigir al listado de predios
+        await JSRuntime.InvokeVoidAsync("alert", "Predio guardado correctamente.");
+        NavigationManager.NavigateTo("/predios");
+    }
+
+    private async Task GetLocation()
+    {
+        try
+        {
+            // Call the JS helper which returns an object with Latitud/Longitud or latitud/longitud
+            var result = await JSRuntime.InvokeAsync<JsonElement>("getGeolocation");
+            if (result.ValueKind == JsonValueKind.Object && Predio is not null)
+            {
+                double? lat = null; double? lon = null;
+                if (result.TryGetProperty("Latitud", out var pLat) || result.TryGetProperty("latitud", out pLat))
+                {
+                    if (pLat.ValueKind == JsonValueKind.Number && pLat.TryGetDouble(out var dlat)) lat = dlat;
+                }
+                if (result.TryGetProperty("Longitud", out var pLon) || result.TryGetProperty("longitud", out pLon))
+                {
+                    if (pLon.ValueKind == JsonValueKind.Number && pLon.TryGetDouble(out var dlon)) lon = dlon;
+                }
+
+                if (lat.HasValue && lon.HasValue)
+                {
+                    // Store coordinates with the full precision provided by the browser
+                    Predio.Latitud = lat.Value;
+                    Predio.Longitud = lon.Value;
+                    StateHasChanged();
+                }
+            }
+        }
+        catch (JSException jsEx)
+        {
+            Console.WriteLine($"Geolocation JS error: {jsEx.Message}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error geolocalización: {ex.Message}");
+        }
+    }
+
+
+    private class Location
+    {
+        public double Latitud { get; set; }
+        public double Longitud { get; set; }
+    }
+}

@@ -1,0 +1,217 @@
+﻿@implements IDisposable
+
+@using System.Linq
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ACUEDUCTO2.Data.SeguridadService SeguridadService
+
+<nav class="acu-navbar">
+    <div class="acu-navbar-header">
+        <!-- Responsive: móvil/pequeña = ACUEDUCTO, media = ACUEDUCTO COMUNITARIO, grande = ACUEDUCTO COMUNITARIO TOBIA CHICA -->
+        <!-- Visible en xs y sm -->
+        <a class="acu-brand col-12 d-inline d-md-none" href="" @onclick:preventDefault="true" @onclick="ToggleMenu">ACUEDUCTO</a>
+        <!-- Visible solo en md -->
+        <a class="acu-brand col-12 d-none d-md-inline d-lg-none" href="" @onclick:preventDefault="true" @onclick="ToggleMenu">ACUEDUCTO COMUNITARIO</a>
+        <!-- Visible en lg y superiores -->
+        <a class="acu-brand col-12 d-none d-lg-inline" href="" @onclick:preventDefault="true" @onclick="ToggleMenu">ACUEDUCTO COMUNITARIO TOBIA CHICA</a>
+        <AuthorizeView>
+            <Authorized>
+                <div class="col-12 acu-user-name">@context.User.Identity?.Name</div>
+            </Authorized>
+        </AuthorizeView>
+        <button class="acu-toggler" @onclick="ToggleMenu" aria-label="Toggle navigation">☰</button>
+    </div>
+    <div class="acu-nav-body @(collapseNavMenu ? "acu-nav-closed" : "acu-nav-open")">
+        <a class="acu-nav-link @ActiveClass("")" href="">Inicio</a>
+
+        <AuthorizeView>
+            <Authorized>
+                @if (menuPorObjeto != null)
+                {
+                    @foreach (var obj in menuPorObjeto)
+                    {
+                        <div class="acu-nav-group">
+                            <button class="acu-nav-link acu-nav-group-header" @onclick="() => ToggleGroup(obj.Key)">
+                                @obj.Key
+                                <span class="acu-nav-arrow @(expandedGroups.Contains(obj.Key) ? "acu-nav-arrow-open" : "")">▾</span>
+                            </button>
+                            @if (expandedGroups.Contains(obj.Key))
+                            {
+                                <div class="acu-nav-group-items">
+                                    @foreach (var proceso in GetProcesosOrdenados(obj.Value))
+                                    {
+                                        <NavLink class="acu-nav-link acu-nav-sublink" href="@GetProcesoUrl(proceso, obj.Key)" Match="NavLinkMatch.Prefix">
+                                            <span class="acu-tipo-badge @GetBadgeClass(proceso)">
+                                                @GetIcon(proceso)
+                                            </span>
+                                            @proceso.Nombre
+                                        </NavLink>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+
+                <span class="acu-spacer"></span>
+                <a class="acu-nav-link" href="Account/Manage">@context.User.Identity?.Name</a>
+                <form action="Account/Logout" method="post">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                    <button type="submit" class="acu-nav-link">Cerrar Sesión</button>
+                </form>
+            </Authorized>
+            <NotAuthorized>
+                <span class="acu-spacer"></span>
+                <a class="acu-nav-link" href="Account/Register">Registrarse</a>
+                <a class="acu-nav-link" href="Account/Login">Iniciar Sesión</a>
+            </NotAuthorized>
+        </AuthorizeView>
+    </div>
+</nav>
+
+@code {
+    private bool collapseNavMenu = true;
+    private string? currentUrl;
+    private Dictionary<string, List<DefinicionProceso>>? menuPorObjeto;
+    private HashSet<string> expandedGroups = new();
+
+    private string ActiveClass(string href)
+    {
+        var rel = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).TrimStart('/');
+        return rel.Equals(href.TrimStart('/'), StringComparison.OrdinalIgnoreCase) ? "active" : "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        NavigationManager.LocationChanged += OnLocationChanged;
+        await CargarMenuAsync();
+    }
+
+    private async Task CargarMenuAsync()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    menuPorObjeto = await SeguridadService.ObtenerMenuPorObjetoAsync(userId);
+                }
+            }
+        }
+        catch
+        {
+            menuPorObjeto = null;
+        }
+    }
+
+    private void ToggleMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+
+    private void ToggleGroup(string groupName)
+    {
+        if (!expandedGroups.Remove(groupName))
+        {
+            expandedGroups.Add(groupName);
+        }
+    }
+
+    private string GetProcesoUrl(DefinicionProceso proceso, string? objeto)
+    {
+        // If the menu group is 'Solicitud' or 'Solicitudes', route to the Blazor components
+        // if (!string.IsNullOrWhiteSpace(objeto) &&
+        //     (objeto.Equals("Solicitud", StringComparison.OrdinalIgnoreCase) || objeto.Equals("Solicitudes", StringComparison.OrdinalIgnoreCase)))
+        // {
+        //     var name = (proceso.Nombre ?? string.Empty).ToLowerInvariant();
+
+        //     if (name.Contains("crear") || name.Contains("nuevo") || name.Contains("add") || name.Contains("agregar"))
+        //     {
+        //         // Route to the Crear component
+        //         return "/solicitud/crear";
+        //     }
+
+        //     if (name.Contains("editar") || name.Contains("edit") || name.Contains("modificar"))
+        //     {
+        //         // Route to the Editar list (component expects an id for editing individual items)
+        //         return "/solicitud/editar";
+        //     }
+
+        //     if (name.Contains("detalle") || name.Contains("ver") || name.Contains("details") || name.Contains("info"))
+        //     {
+        //         return "/solicitud/detalles";
+        //     }
+
+        //     // Default to the list page for solicitudes (singular route)
+        //     return "/solicitud";
+        // }
+
+        // If the object represents a document, link to the ArchivosDocumentos viewer/uploader
+        if (!string.IsNullOrWhiteSpace(objeto) && objeto.Equals("Documento", StringComparison.OrdinalIgnoreCase))
+        {
+            var name = proceso?.Nombre ?? string.Empty;
+            // Always include the document name in the link so it opens the gallery for that document
+            // If the process has no name, fallback to the documents gallery root
+            if (string.IsNullOrWhiteSpace(name))
+                return "/archivosdocumentos";
+
+            return $"/archivosdocumentos/{Uri.EscapeDataString(name)}";
+        }
+
+        return $"proceso/{Uri.EscapeDataString(proceso.Nombre ?? string.Empty)}";
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        collapseNavMenu = true;
+        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+
+    private IEnumerable<DefinicionProceso> GetProcesosOrdenados(List<DefinicionProceso> lista)
+    {
+        if (lista == null) return Enumerable.Empty<DefinicionProceso>();
+
+        // Primero los "listados" (1), ordenados por nombre,
+        // luego el resto de procesos también ordenados por nombre.
+        var listados = lista.Where(p => p.Tipo == 1).OrderBy(p => p.Nombre ?? string.Empty);
+        var otros = lista.Where(p => p.Tipo != 1).OrderBy(p => p.Nombre ?? string.Empty);
+        return listados.Concat(otros);
+    }
+
+    private bool IsAuditoria(DefinicionProceso? proceso)
+    {
+        if (proceso == null) return false;
+        var name = (proceso.Nombre ?? string.Empty).ToLowerInvariant();
+        return name.Contains("auditor") || name.Contains("auditoría") || name.Contains("auditoria") || name.Contains("auditar") || name.Contains("auditorias");
+    }
+
+    private string GetBadgeClass(DefinicionProceso proceso)
+    {
+        if (IsAuditoria(proceso)) return "acu-tipo-auditoria";
+        return proceso.Tipo == 1 ? "acu-tipo-info" : "acu-tipo-proceso";
+    }
+
+    private string GetIcon(DefinicionProceso proceso)
+    {
+        if (IsAuditoria(proceso))
+        {
+            // Icono más apropiado para auditoría
+            return "🔎";
+        }
+
+        return proceso.Tipo == 1 ? "ℹ" : "⚙";
+    }
+}
+

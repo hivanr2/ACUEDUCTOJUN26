@@ -1,0 +1,326 @@
+﻿@using ACUEDUCTO.Models
+@using Microsoft.AspNetCore.Components
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.JSInterop
+@inject IDbContextFactory<AcueductoContext> DbFactory
+@inject IJSRuntime JS
+@inject NavigationManager nav
+
+@rendermode InteractiveServer
+
+<div class="facturas-component">
+    <style>
+        /* Minimal, component-scoped styles only: keep table header sticky. Avoid inner scrolling to prevent double scrollbars */
+        .facturas-component .table-sticky-wrapper { max-height: none; overflow: visible; }
+        .facturas-component .table-sticky thead th { position: sticky; top: 0; z-index: 5; }
+        /* Ensure sticky headers keep background to match theme variables without forcing colors */
+        .facturas-component .table-sticky thead th { background-color: var(--bs-dark); color: var(--bs-white); }
+        /* Small spacing tweak so component looks consistent */
+        .facturas-component .card { margin-top: 1rem; }
+    </style>
+
+    <div class="w-100 mb-2 d-flex align-items-center">
+        <!-- left spacer to keep title centered -->
+        <div style="width:2.6rem"></div>
+        <div class="flex-grow-1 text-center">
+            <h2 class="h4 mb-0">@predio?.ApellidosNombresUsuario</h2>
+        </div>
+        <button type="button" class="btn btn-outline-secondary ms-2" @onclick="OnCloseClicked" title="Cerrar">
+            <i class="bi bi-x-lg fs-4" aria-hidden="true"></i>
+        </button>
+    </div>
+
+    <div class="card shadow-sm mt-3">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <strong>Facturas</strong>
+        <small class="text-muted">Histórico</small>
+        @if (!string.IsNullOrWhiteSpace(predio?.IdentificacionFacturacionNavigation?.CorreoElectronico))
+        {
+            <button class="btn btn-outline-primary btn-sm" @onclick="DisableButton" disabled="@(isSending || isProcessing)">Enviar Histórico</button>
+        }
+        else
+        {
+            <div class="alert alert-warning small ms-2">No se puede enviar reporte a correo electrónico, el Usuario no registra.</div>
+        }
+    </div>
+    <div class="card-body p-0">
+        @if (facturacion == null || !facturacion.Any())
+        {
+            <div class="p-3 text-muted">No tiene facturas</div>
+        }
+        else
+        {
+            <div class="table-responsive table-sticky-wrapper">
+                <table class="table table-hover table-sm align-middle mb-0 table-sticky">
+                    <thead>
+                        <tr>
+                            <th colspan="7" class="bg-dark text-white text-center" style="font-size:1.05rem;padding:0.6rem">FACTURAS BIMESTRALES</th>
+                            <th colspan="5" class="bg-secondary text-white text-center" style="font-size:1.05rem;padding:0.6rem">DEUDA Y RECAUDO</th>
+                        </tr>
+                        <tr>
+                            <th class="bg-dark text-white">Fecha</th>
+                            <th class="bg-dark text-white">Periodo</th>
+                            <th class="bg-dark text-white">Número</th>
+                            <th class="bg-dark text-white">Medición Ant.</th>
+                            <th class="bg-dark text-white">Medición Act.</th>
+                            <th class="bg-dark text-white">Consumo (m³)</th>
+                            <th class="bg-dark text-white">Valor factura</th>
+                            <th class="bg-secondary text-white">Deuda anterior</th>
+                            <th class="bg-secondary text-white">Recaudo</th>
+                            <th class="bg-secondary text-white">Deuda pasa</th>
+                            <th class="bg-secondary text-white">Nota factura</th>
+                            <th class="bg-secondary text-white">Nota recaudo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var factura in facturacion)
+                        {
+                            var colorFondo = factura.DeudaAnterior <= factura.RecaudoPeriodoTotal ? "bg-success text-white" : "bg-danger text-white";
+                            <tr>
+                                <td>@factura.FechaHoraRegistro - <a href="@($"/facturacion/edit?id={factura.Idfactura}")" target="_blank">Edita</a> - <a href="@($"/imagenes/{predio.CodigoUsuario}/{factura.CodigoFactura}.pdf")" target="_blank">F</a>@if (factura.RecaudoPeriodoTotal > 0 && _reciboNumeroPorFactura.TryGetValue(factura.Idfactura, out var nro) && nro > 0) {
+                                    <text> - <a href="@($"/imagenes/{predio.CodigoUsuario}/REC-{nro:0000}.pdf")" target="_blank">R</a></text>
+                                }
+                            </td>
+                            <td class="text-xl-center"><b>@factura.IdplanillaNavigation.IdperiodoNavigation.DescripcionCorta</b></td>
+                            <td>@factura.CodigoFactura</td>
+                            <td><b>@factura.MedicionAnterior</b></td>
+                            <td><b>@factura.MedicionActual</b></td>
+                            <td>@factura.ConsumoM3</td>
+                            <td class="bg-dark text-white"><strong>@FormatCurrency(factura.ValorPeriodo)</strong></td>
+                            <td>@FormatCurrency(factura.DeudaAnterior)</td>
+                            <td>@FormatCurrency(factura.RecaudoPeriodoTotal)</td>
+                            <td class="@colorFondo">@FormatCurrency(factura.DeudaPasa)</td>
+                            <td>@factura.NotasFactura</td>
+                            <td>@factura.NotasRecaudo</td>
+                        </tr>
+                    }
+                </tbody>
+                @if (facturacion is not null && facturacion.Any())
+                {
+                    <tfoot>
+                        <tr>
+                            <td class="text-end" colspan="5"><strong>Promedio bimestre (m³)</strong></td>
+                            @if (facturacion.Any(c => c.ConsumoM3 != null))
+                            {
+                                <td class="bg-dark text-white">
+                                    <strong>
+                                        @{
+                                            var total = facturacion.Sum(c => c.ConsumoM3 ?? 0);
+                                            var count = facturacion.Count;
+                                            @(count > 0 ? Convert.ToInt64(total / count) : 0)
+                                            ;
+                                        }
+                                    </strong>
+                                </td>
+                            }
+                            else
+                            {
+                                <td class="bg-dark text-white"><strong>N.A.</strong></td>
+                            }
+                            <td class="bg-dark text-white"><strong>@FormatCurrency(facturacion.Sum(c => c.ValorPeriodo))</strong></td>
+                            <td class="bg-dark text-white"><strong>@FormatCurrency(facturacion.Sum(c => c.DeudaAnterior))</strong></td>
+                            <td class="bg-dark text-white"><strong>@FormatCurrency(facturacion.Sum(c => c.RecaudoPeriodoTotal))</strong></td>
+                            <td class="bg-dark text-white"><strong>@FormatCurrency(facturacion.Sum(c => c.DeudaPasa))</strong></td>
+                            <td colspan="2">-</td>
+                        </tr>
+                    </tfoot>
+                }
+            </table>
+        </div>
+    }
+</div>
+</div>
+</div>
+@code {
+    [Parameter]
+    public string? Idpredio { get; set; }
+
+    private Predio? predio;
+    private IList<Facturacion> facturacion = new List<Facturacion>();
+    private Dictionary<string, int> _reciboNumeroPorFactura = new();
+    private bool isSending = false;
+    private bool isProcessing = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Idpredio)) return;
+
+        using var context = DbFactory.CreateDbContext();
+        predio = await context.Predios
+            .Include(c => c.IdentificacionFacturacionNavigation)
+            .FirstOrDefaultAsync(m => m.Idpredio == Idpredio);
+
+        facturacion = await context.Facturacions
+            .Where(c => c.Idpredio == Idpredio)
+            .Include(f => f.IdplanillaNavigation)
+            .ThenInclude(p => p.IdperiodoNavigation)
+            .OrderBy(c => c.FechaHoraRegistro)
+            .ToListAsync();
+
+        // Cargar números de recibo existentes por factura
+        _reciboNumeroPorFactura.Clear();
+        var facturaIds = facturacion.Select(f => f.Idfactura).ToList();
+        var ingresos = await context.Ingresos.Where(i => facturaIds.Contains(i.Idfactura)).Select(i => new { i.Idfactura, i.Numero }).AsNoTracking().ToListAsync();
+        foreach (var ing in ingresos)
+        {
+            if (ing.Numero > 0 && !_reciboNumeroPorFactura.ContainsKey(ing.Idfactura))
+                _reciboNumeroPorFactura[ing.Idfactura] = ing.Numero;
+        }
+
+        // Set page title dynamically to include predio name and HISTORICO CONSUMOS
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(predio?.ApellidosNombresUsuario))
+            {
+                await JS.InvokeVoidAsync("setPageTitle", $"{predio.ApellidosNombresUsuario} - HISTORICO CONSUMOS");
+            }
+        }
+        catch { }
+    }
+
+    private async Task OnCloseClicked()
+    {
+        try
+        {
+            // Try to close the window/tab (works when opened via script)
+            await JS.InvokeVoidAsync("window.close");
+            // Small delay to allow close to take effect in some browsers
+            await Task.Delay(100);
+        }
+        catch { }
+
+        // Fallback: navigate back to the predios list
+        nav.NavigateTo("/predios");
+    }
+
+    private string FormatCurrency(double? value)
+    {
+        if (value.HasValue) return $"${value.Value:N0}";
+        return "$0";
+    }
+
+    private void DisableButton()
+    {
+        if (isProcessing) return;
+        isProcessing = true;
+        isSending = true;
+        StateHasChanged();
+        _ = EnviarHistorico();
+    }
+
+    private async Task EnviarHistorico()
+    {
+        try
+        {
+            var email = predio?.IdentificacionFacturacionNavigation?.CorreoElectronico;
+            if (string.IsNullOrWhiteSpace(email)) return;
+
+            var subject = $"{predio?.ApellidosNombresUsuario} - HISTORICO CONSUMOS";
+            var body = GenerateHistoricoBody();
+
+            await SendEmailAsync(email, subject, body);
+            await JS.InvokeVoidAsync("alert", "Histórico enviado por correo electrónico.");
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error enviando correo: {ex.Message}");
+            isSending = false;
+            StateHasChanged();
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private string GenerateHistoricoBody()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("<html><head><style>");
+        sb.AppendLine("table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; } ");
+        sb.AppendLine("th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } ");
+        sb.AppendLine("th { background-color: #f2f2f2; } ");
+        sb.AppendLine("tr:nth-child(even) { background-color: #f9f9f9; } ");
+        sb.AppendLine(".bg-dark { background-color: #212529 !important; color: white !important; } ");
+        sb.AppendLine(".bg-secondary { background-color: #6c757d !important; color: white !important; } ");
+        sb.AppendLine(".bg-success { background-color: #28a745 !important; color: white !important; } ");
+        sb.AppendLine(".bg-danger { background-color: #dc3545 !important; color: white !important; } ");
+        sb.AppendLine("</style></head><body>");
+        sb.AppendLine($"<h2>Histórico de Facturas para {predio?.ApellidosNombresUsuario}</h2>");
+        sb.AppendLine($"<div><strong>Código usuario:</strong> {predio?.CodigoUsuario ?? "N/A"} - <strong>Dirección:</strong> {predio?.Direccion ?? "N/A"}</div>");
+        sb.AppendLine("<table>");
+        sb.AppendLine("<thead>");
+        // Header row grouping: FACTURAS BIMESTRALES and PAGOS DE CUENTA
+        sb.AppendLine("<tr>");
+        sb.AppendLine("<th colspan='7' style='background:#212529;color:#fff;text-align:center;font-size:1.05rem;padding:0.6rem'>FACTURAS BIMESTRALES</th>");
+        sb.AppendLine("<th colspan='5' style='background:#6c757d;color:#fff;text-align:center;font-size:1.05rem;padding:0.6rem'>PAGOS DE CUENTA</th>");
+        sb.AppendLine("</tr>");
+        sb.AppendLine("<tr>");
+        sb.AppendLine("<th style='background:#212529;color:#fff'>Fecha</th>");
+        sb.AppendLine("<th style='background:#212529;color:#fff'>Periodo</th>");
+        sb.AppendLine("<th style='background:#212529;color:#fff'>Número</th>");
+        sb.AppendLine("<th style='background:#212529;color:#fff'>Medición Ant.</th>");
+        sb.AppendLine("<th style='background:#212529;color:#fff'>Medición Act.</th>");
+        sb.AppendLine("<th style='background:#212529;color:#fff'>Consumo (m³)</th>");
+        sb.AppendLine("<th style='background:#212529;color:#fff'>Valor factura</th>");
+        sb.AppendLine("<th style='background:#6c757d;color:#fff'>Deuda anterior</th>");
+        sb.AppendLine("<th style='background:#6c757d;color:#fff'>Recaudo</th>");
+        sb.AppendLine("<th style='background:#6c757d;color:#fff'>Deuda pasa</th>");
+        sb.AppendLine("<th style='background:#6c757d;color:#fff'>Nota factura</th>");
+        sb.AppendLine("<th style='background:#6c757d;color:#fff'>Nota recaudo</th>");
+        sb.AppendLine("</tr>");
+        sb.AppendLine("</thead><tbody>");
+
+        foreach (var f in facturacion)
+        {
+            var colorFondo = f.DeudaAnterior <= f.RecaudoPeriodoTotal ? "bg-success" : "bg-danger";
+            sb.AppendLine("<tr>");
+            sb.AppendLine($"<td>{f.FechaHoraRegistro}</td>");
+            sb.AppendLine($"<td><b>{f.IdplanillaNavigation.IdperiodoNavigation.DescripcionCorta}</b></td>");
+            sb.AppendLine($"<td>{f.CodigoFactura}</td>");
+            sb.AppendLine($"<td><b>{f.MedicionAnterior}</b></td>");
+            sb.AppendLine($"<td><b>{f.MedicionActual}</b></td>");
+            sb.AppendLine($"<td>{f.ConsumoM3}</td>");
+            sb.AppendLine($"<td class='bg-dark'><strong>{FormatCurrency(f.ValorPeriodo)}</strong></td>");
+            sb.AppendLine($"<td>{FormatCurrency(f.DeudaAnterior)}</td>");
+            sb.AppendLine($"<td>{FormatCurrency(f.RecaudoPeriodoTotal)}</td>");
+            sb.AppendLine($"<td class='{colorFondo}'>{FormatCurrency(f.DeudaPasa)}</td>");
+            sb.AppendLine($"<td>{f.NotasFactura}</td>");
+            sb.AppendLine($"<td>{f.NotasRecaudo}</td>");
+            sb.AppendLine("</tr>");
+        }
+
+        sb.AppendLine("</tbody>");
+        if (facturacion.Any())
+        {
+            sb.AppendLine("<tfoot><tr>");
+            sb.AppendLine("<td colspan='5' style='text-align: right;'><strong>Promedio bimestre (m³)</strong></td>");
+            if (facturacion.Any(c => c.ConsumoM3 != null))
+            {
+                var total = facturacion.Sum(c => c.ConsumoM3 ?? 0);
+                var count = facturacion.Count;
+                var promedio = count > 0 ? Convert.ToInt64(total / count) : 0;
+                sb.AppendLine($"<td class='bg-dark'><strong>{promedio}</strong></td>");
+            }
+            else
+            {
+                sb.AppendLine("<td class='bg-dark'><strong>N.A.</strong></td>");
+            }
+            sb.AppendLine($"<td class='bg-dark'><strong>{FormatCurrency(facturacion.Sum(c => c.ValorPeriodo))}</strong></td>");
+            sb.AppendLine($"<td class='bg-dark'><strong>{FormatCurrency(facturacion.Sum(c => c.DeudaAnterior))}</strong></td>");
+            sb.AppendLine($"<td class='bg-dark'><strong>{FormatCurrency(facturacion.Sum(c => c.RecaudoPeriodoTotal))}</strong></td>");
+            sb.AppendLine($"<td class='bg-dark'><strong>{FormatCurrency(facturacion.Sum(c => c.DeudaPasa))}</strong></td>");
+            sb.AppendLine("<td colspan='2'>-</td>");
+            sb.AppendLine("</tr></tfoot>");
+        }
+        sb.AppendLine("</table>");
+        sb.AppendLine("</body></html>");
+        return sb.ToString();
+    }
+
+    private async Task SendEmailAsync(string to, string subject, string body)
+    {
+        var emailService = new EmailService("smtp.xcursor.org", 22, "acueductotobiachica@xcursor.org", "");
+        await emailService.SendEmailAsync(to, subject, body);
+    }
+}

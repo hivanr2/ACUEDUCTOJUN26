@@ -1,0 +1,81 @@
+﻿@page "/inventarios"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Models
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+@rendermode InteractiveServer
+
+<PageTitle>Inventarios</PageTitle>
+
+<div class="container-fluid py-2 py-md-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Inventarios</h1>
+            <small class="text-muted">Gestión de productos en inventario</small>
+        </div>
+        <!-- Acciones superiores reemplazadas por FAB -->
+    </div>
+
+    <div class="row g-2 align-items-center mb-2">
+        <div class="col-12 col-md-6">
+            <input type="search" class="form-control" @bind=filterText @bind:event="oninput" placeholder="Buscar por código o descripción..." />
+        </div>
+        <div class="col-12 col-md-6 text-md-end text-muted">
+            <span>Items: <span class="badge bg-secondary">@InventariosFiltered.Count()</span></span>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <QuickGrid Class="table table-hover table-sm align-middle mb-0" Items="InventariosFiltered">
+                <PropertyColumn Property="inventario => inventario.Codigo" Title="Código" />
+                <PropertyColumn Property="inventario => inventario.DescripcionCorta" Title="Descripción corta" />
+                <PropertyColumn Property="inventario => inventario.DescripcionLarga" Title="Descripción larga" />
+                <PropertyColumn Property="inventario => inventario.Unidad" />
+                <PropertyColumn Property="inventario => inventario.Medida" />
+                <PropertyColumn Property="inventario => inventario.Cantidad" Title="Cant." />
+                <PropertyColumn Property="inventario => inventario.ValorUnitario" Title="Vlr. Unit." />
+                <PropertyColumn Property="inventario => inventario.ValorTotal" Title="Vlr. Total" />
+                <PropertyColumn Property="inventario => inventario.FechaHoraRegistro" Title="Registro" />
+
+                <TemplateColumn Context="inventario" Title="Acciones">
+                    <div class="text-end">
+                        <a class="btn btn-link btn-sm" href="@($"inventarios/edit?idinventario={inventario.Idinventario}")" target="_blank">Editar</a>
+                        <span class="text-muted">|</span>
+                        <a class="btn btn-link btn-sm" href="@($"inventarios/details?idinventario={inventario.Idinventario}")" target="_blank">Detalles</a>
+                        <span class="text-muted">|</span>
+                        <a class="btn btn-link btn-sm text-danger" href="@($"inventarios/delete?idinventario={inventario.Idinventario}")" target="_blank">Borrar</a>
+                    </div>
+                </TemplateColumn>
+            </QuickGrid>
+        </div>
+    </div>
+</div>
+
+<!-- Botón flotante Crear -->
+<a href="/inventarios/create" class="fab-create" title="Crear inventario" aria-label="Crear inventario" target="_blank">
+    <img src="/img/plus.svg" alt="Crear" onerror="this.onerror=null;this.outerHTML='+';" />
+</a>
+
+@code {
+    private AcueductoContext context = default!;
+    private string? filterText = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+
+    IQueryable<Inventario> InventariosFiltered => string.IsNullOrWhiteSpace(filterText)
+        ? context.Inventarios.OrderBy(c => c.Codigo)
+        : context.Inventarios
+            .Where(i => ((i.Codigo ?? string.Empty).Contains(filterText!)
+                      || (i.DescripcionCorta ?? string.Empty).Contains(filterText!)
+                      || (i.DescripcionLarga ?? string.Empty).Contains(filterText!)))
+            .OrderBy(i => i.Codigo);
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}

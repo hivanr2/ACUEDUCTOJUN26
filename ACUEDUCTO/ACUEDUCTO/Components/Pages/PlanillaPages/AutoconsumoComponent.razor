@@ -1,0 +1,442 @@
+@page "/autoconsumocomponent"
+@page "/planillas/autoconsumocomponent"
+@layout MainLayout
+@using ACUEDUCTO.Components.Layout
+@using ACUEDUCTO.Models
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@inject IDbContextFactory<AcueductoContext> DbFactory
+@inject IJSRuntime JSRuntime
+
+@rendermode InteractiveServer
+
+<PageTitle>Autoconsumo</PageTitle>
+
+<div class="container py-4">
+    <h3 class="text-center">AUTOCONSUMO</h3>
+
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+            <div class="border rounded p-3 mb-3">
+                <label for="codigoCliente" class="form-label">Número del cliente</label>
+                <div class="input-group">
+                    <InputText id="codigoCliente" class="form-control" @bind-Value="codigoCliente" />
+                    <button class="btn btn-primary" @onclick="BuscarFactura" disabled="@buscando">Buscar</button>
+                </div>
+                @if (planillaActual != null)
+                {
+                    <div class="form-text">
+                        Bimestre actual: @planillaActual.IdperiodoNavigation?.DescripcionLarga
+                    </div>
+                }
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(mensaje))
+            {
+                <div class="alert alert-warning">@mensaje</div>
+            }
+
+            @if (factura != null)
+            {
+                <div class="border rounded p-3 mb-3">
+                    <h4>@factura.IdpredioNavigation.ApellidosNombresUsuario</h4>
+                    <div class="row g-2">
+                        <div class="col-12 col-md-6">
+                            <strong>Código usuario:</strong> @factura.CodigoUsuario
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <strong>Factura:</strong> @factura.CodigoFactura
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <strong>Medición anterior:</strong> @factura.MedicionAnterior
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <strong>Consumo registrado:</strong> @factura.ConsumoM3
+                        </div>
+                        <div class="col-12">
+                            <strong>Notas factura:</strong>
+                            <div class="small text-muted">@(!string.IsNullOrWhiteSpace(factura.NotasFactura) ? factura.NotasFactura : "N/A")</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <label for="autoconsumo" class="form-label">Medición actual</label>
+                        <InputNumber id="autoconsumo" class="form-control" @bind-Value="autoconsumo" />
+                        <div class="form-text">
+                            El consumo M3 se calcula como: Medición actual - Medición anterior.
+                        </div>
+                    </div>
+
+                    <div class="mt-3 d-flex gap-2">
+                        <button class="btn btn-success" @onclick="GuardarAutoconsumo" disabled="@guardando">Guardar autoconsumo</button>
+                        @if (facturaGuardada != null)
+                        {
+                            <button class="btn btn-primary" @onclick="ImprimirFactura">Imprimir factura</button>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (facturaGuardada != null)
+            {
+                <div class="border rounded p-3" id="facturaResultado">
+                    <h4 class="text-center">Factura realizada</h4>
+                    <table class="table table-bordered">
+                        <tbody>
+                            <tr>
+                                <td><strong>Bimestre:</strong></td>
+                                <td>@facturaGuardada.IdplanillaNavigation.IdperiodoNavigation?.DescripcionLarga</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Fecha registro:</strong></td>
+                                <td>@facturaGuardada.FechaHoraRegistro</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Predio:</strong></td>
+                                <td>@facturaGuardada.IdpredioNavigation.ApellidosNombresUsuario</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Dirección:</strong></td>
+                                <td>@facturaGuardada.IdpredioNavigation.Direccion</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Medición anterior:</strong></td>
+                                <td>@facturaGuardada.MedicionAnterior</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Medición actual:</strong></td>
+                                <td>@facturaGuardada.MedicionActual</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Consumo M3:</strong></td>
+                                <td>@facturaGuardada.ConsumoM3</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Valor consumo:</strong></td>
+                                <td>@FormatCurrency(facturaGuardada.ValorConsumo)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Cargo fijo:</strong></td>
+                                <td>@FormatCurrency(facturaGuardada.CargoFijo)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Valor sobretasa:</strong></td>
+                                <td>@FormatCurrency(facturaGuardada.ValorSobreTasa)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Valor subsidio:</strong></td>
+                                <td>@FormatCurrency(facturaGuardada.ValorSubsidio)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Otros valores:</strong></td>
+                                <td>@FormatCurrency(facturaGuardada.OtrosValores)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Valor bimestre a pagar:</strong></td>
+                                <td class="h4">@FormatCurrency(facturaGuardada.ValorPeriodo)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Deuda anterior:</strong></td>
+                                <td>@FormatCurrency(facturaGuardada.DeudaAnterior)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Pago realizado bimestre:</strong></td>
+                                <td>@FormatCurrency(facturaGuardada.RecaudoPeriodoTotal)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Deuda total:</strong></td>
+                                <td class="h4">@FormatCurrency(facturaGuardada.DeudaPasa)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Notas factura:</strong></td>
+                                <td>@(!string.IsNullOrWhiteSpace(facturaGuardada.NotasFactura) ? facturaGuardada.NotasFactura : "N/A")</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string? codigoCliente;
+    private double? autoconsumo;
+    private string? mensaje;
+    private bool buscando;
+    private bool guardando;
+    private Planilla? planillaActual;
+    private Facturacion? factura;
+    private Facturacion? facturaGuardada;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarPlanillaActual();
+    }
+
+    private async Task CargarPlanillaActual()
+    {
+        using var context = DbFactory.CreateDbContext();
+        var fechaActual = DateTime.Now;
+
+        planillaActual = await context.Planillas
+            .Include(p => p.IdperiodoNavigation)
+            .Where(p => p.FechaHoraRegistroConsumo.HasValue && p.FechaHoraRegistroConsumo <= fechaActual)
+            .OrderByDescending(p => p.FechaHoraRegistroConsumo)
+            .FirstOrDefaultAsync();
+    }
+
+    private async Task BuscarFactura()
+    {
+        mensaje = null;
+        factura = null;
+        facturaGuardada = null;
+        autoconsumo = null;
+        buscando = true;
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(codigoCliente))
+            {
+                mensaje = "Digite el número del cliente.";
+                return;
+            }
+
+            if (planillaActual == null)
+            {
+                await CargarPlanillaActual();
+            }
+
+            if (planillaActual == null)
+            {
+                mensaje = "No se encontró una planilla para el bimestre actual.";
+                return;
+            }
+
+            var codigo = codigoCliente.Trim();
+
+            using var context = DbFactory.CreateDbContext();
+            factura = await context.Facturacions
+                .Include(f => f.IdplanillaNavigation)
+                .ThenInclude(p => p.IdperiodoNavigation)
+                .Include(f => f.IdpredioNavigation)
+                .FirstOrDefaultAsync(f =>
+                    f.Idplanilla == planillaActual.Idplanilla &&
+                    f.IdpredioNavigation.CodigoUsuario == codigo);
+
+            if (factura == null)
+            {
+                mensaje = "No se encontró factura para ese cliente en el bimestre actual.";
+                return;
+            }
+
+            // Input is Medición actual
+            autoconsumo = factura.MedicionActual ?? ((factura.MedicionAnterior ?? 0) + (factura.ConsumoM3 ?? 0));
+        }
+        finally
+        {
+            buscando = false;
+        }
+    }
+
+    private async Task GuardarAutoconsumo()
+    {
+        mensaje = null;
+        facturaGuardada = null;
+        guardando = true;
+
+        try
+        {
+            if (factura == null)
+            {
+                mensaje = "Primero busque la factura del cliente.";
+                return;
+            }
+
+            if (!autoconsumo.HasValue || autoconsumo < 0)
+            {
+                mensaje = "Digite una medición actual válida.";
+                return;
+            }
+
+            var medicionActualIngresada = autoconsumo.Value;
+
+            using var context = DbFactory.CreateDbContext();
+            var facturaDb = await context.Facturacions
+                .Include(f => f.IdplanillaNavigation)
+                .ThenInclude(p => p.IdperiodoNavigation)
+                .Include(f => f.IdpredioNavigation)
+                .FirstOrDefaultAsync(f => f.Idfactura == factura.Idfactura);
+
+            if (facturaDb == null)
+            {
+                mensaje = "No se pudo encontrar la factura para guardar.";
+                return;
+            }
+
+            facturaDb.MedicionActual = medicionActualIngresada;
+            var medAnterior = facturaDb.MedicionAnterior ?? 0;
+            facturaDb.ConsumoM3 = medicionActualIngresada >= medAnterior ? medicionActualIngresada - medAnterior : 0;
+            facturaDb.FechaHoraRegistro = DateTime.Now;
+
+            await CalcularValorConsumo(context, facturaDb);
+            CalcularValorSobreTasa(facturaDb);
+            CalcularValorPeriodo(facturaDb);
+            RecalcularDeuda(facturaDb);
+
+            context.Facturacions.Update(facturaDb);
+            await context.SaveChangesAsync();
+
+            await ActualizarPlanilla(context, facturaDb.Idplanilla);
+            await ActualizarMedicionAnteriorEnSiguienteFactura(facturaDb);
+
+            factura = facturaDb;
+            facturaGuardada = facturaDb;
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private static async Task CalcularValorConsumo(AcueductoContext context, Facturacion factura)
+    {
+        var tarifas = await context.Tarifas.OrderBy(t => t.Desde).ToListAsync();
+
+        double valorConsumo = 0;
+        double consumoRestante = factura.ConsumoM3 ?? 0;
+
+        foreach (var tarifa in tarifas)
+        {
+            if (tarifa.Desde.HasValue && tarifa.Hasta.HasValue && tarifa.ValorUnidad.HasValue)
+            {
+                double rangoConsumo = Math.Min(consumoRestante, tarifa.Hasta.Value - tarifa.Desde.Value + 1);
+                valorConsumo += rangoConsumo * tarifa.ValorUnidad.Value;
+                consumoRestante -= rangoConsumo;
+
+                if (consumoRestante <= 0)
+                {
+                    break;
+                }
+            }
+        }
+
+        factura.ValorConsumo = valorConsumo;
+    }
+
+    private void CalcularValorSobreTasa(Facturacion factura)
+    {
+        if (factura.CargoFijo.HasValue && factura.PorcentajeSobreTasa.HasValue)
+        {
+            var valorSobreTasa = (factura.CargoFijo.Value + (factura.ValorConsumo ?? 0)) * (factura.PorcentajeSobreTasa.Value / 100);
+            factura.ValorSobreTasa = RedondearValor(valorSobreTasa);
+        }
+    }
+
+    private void CalcularValorPeriodo(Facturacion factura)
+    {
+        if (factura.PorcentajeSubsidio != null && factura.PorcentajeSubsidio > 0)
+        {
+            factura.ValorSubsidio = -(((factura.CargoFijo ?? 0) + (factura.ValorConsumo ?? 0)) * factura.PorcentajeSubsidio.Value / 100);
+        }
+        else
+        {
+            factura.PorcentajeSubsidio = 0;
+            factura.ValorSubsidio = 0;
+        }
+
+        double valorPeriodo = (factura.CargoFijo ?? 0)
+            + (factura.ValorConsumo ?? 0)
+            + (factura.ValorSobreTasa ?? 0)
+            + (factura.ValorMora ?? 0)
+            + (factura.ValorSubsidio ?? 0)
+            + (factura.OtrosValores ?? 0);
+
+        factura.ValorPeriodo = RedondearValor(valorPeriodo);
+    }
+
+    private static void RecalcularDeuda(Facturacion factura)
+    {
+        factura.DeudaPasa = (factura.ValorPeriodo ?? 0)
+            + (factura.DeudaAnterior ?? 0)
+            - (factura.RecaudoPeriodoTotal ?? 0);
+    }
+
+    private async Task ActualizarPlanilla(AcueductoContext context, string idPlanilla)
+    {
+        var planilla = await context.Planillas.FirstOrDefaultAsync(p => p.Idplanilla == idPlanilla);
+        if (planilla == null)
+        {
+            return;
+        }
+
+        var facturas = await context.Facturacions
+            .Where(f => f.Idplanilla == idPlanilla)
+            .ToListAsync();
+
+        planilla.CantidadConsumoM3total = facturas.Sum(f => f.ConsumoM3 ?? 0);
+        planilla.ValorTotalConsumoM3 = facturas.Sum(f => f.ValorConsumo ?? 0);
+        planilla.ValorTotalPlanilla = facturas.Sum(f => f.ValorPeriodo ?? 0);
+        planilla.ValorTotalRecaudo = facturas.Sum(f => f.RecaudoPeriodoTotal ?? 0);
+
+        context.Planillas.Update(planilla);
+        await context.SaveChangesAsync();
+    }
+
+    private async Task ActualizarMedicionAnteriorEnSiguienteFactura(Facturacion facturaActual)
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        var planilla = await context.Planillas.FirstOrDefaultAsync(p => p.Idplanilla == facturaActual.Idplanilla);
+        if (planilla == null)
+        {
+            return;
+        }
+
+        var planillaSiguiente = await context.Planillas
+            .Where(p => p.FechaHoraRegistroConsumo > planilla.FechaHoraRegistroConsumo)
+            .OrderBy(p => p.FechaHoraRegistroConsumo)
+            .FirstOrDefaultAsync();
+
+        if (planillaSiguiente == null)
+        {
+            return;
+        }
+
+        var facturaSiguiente = await context.Facturacions
+            .FirstOrDefaultAsync(f => f.Idplanilla == planillaSiguiente.Idplanilla && f.Idpredio == facturaActual.Idpredio);
+
+        if (facturaSiguiente == null)
+        {
+            return;
+        }
+
+        facturaSiguiente.MedicionAnterior = facturaActual.MedicionActual;
+        context.Facturacions.Update(facturaSiguiente);
+        await context.SaveChangesAsync();
+    }
+
+    private async Task ImprimirFactura()
+    {
+        if (facturaGuardada == null)
+        {
+            return;
+        }
+
+        var url = $"/factura/imprimir?idFactura={facturaGuardada.Idfactura}";
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+    }
+
+    private double RedondearValor(double valor)
+    {
+        int centenas = (int)(valor / 100);
+        int decenas = (int)((valor % 100) / 10);
+
+        return decenas <= 5 ? centenas * 100 : (centenas + 1) * 100;
+    }
+
+    private string FormatCurrency(double? value)
+    {
+        return value.HasValue ? value.Value.ToString("C0", new CultureInfo("es-CO")) : "$0";
+    }
+}

@@ -1,0 +1,62 @@
+﻿@page "/cuentaporcobrars/details"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Details</PageTitle>
+
+<h1>Details</h1>
+
+<div>
+    <h2>CuentaPorCobrar</h2>
+    <hr />
+    @if (cuentaporcobrar is null)
+    {
+        <p><em>Llamando...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Numero</dt>
+            <dd class="col-sm-10">@cuentaporcobrar.Numero</dd>
+            <dt class="col-sm-2">Identificacion</dt>
+            <dd class="col-sm-10">@cuentaporcobrar.Identificacion</dd>
+            <dt class="col-sm-2">Descripcion</dt>
+            <dd class="col-sm-10">@cuentaporcobrar.Descripcion</dd>
+            <dt class="col-sm-2">FechaHora</dt>
+            <dd class="col-sm-10">@cuentaporcobrar.FechaHora</dd>
+            <dt class="col-sm-2">Vencimiento</dt>
+            <dd class="col-sm-10">@cuentaporcobrar.Vencimiento</dd>
+            <dt class="col-sm-2">ValorDebe</dt>
+            <dd class="col-sm-10">@cuentaporcobrar.ValorDebe</dd>
+            <dt class="col-sm-2">ValorPagado</dt>
+            <dd class="col-sm-10">@cuentaporcobrar.ValorPagado</dd>
+            <dt class="col-sm-2">CuotasTotales</dt>
+            <dd class="col-sm-10">@cuentaporcobrar.CuotasTotales</dd>
+            <dt class="col-sm-2">CuotasPagadas</dt>
+            <dd class="col-sm-10">@cuentaporcobrar.CuotasPagadas</dd>
+        </dl>
+        <div>
+            <a href="@($"/cuentaporcobrars/edit?idcuentaxc={cuentaporcobrar.IdcuentaxC}")">Edit</a> |
+            <a href="@($"/cuentaporcobrars")">Back to List</a>
+        </div>
+    }
+</div>
+
+@code {
+    private CuentaPorCobrar? cuentaporcobrar;
+
+    [SupplyParameterFromQuery]
+    private string IdcuentaxC { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        cuentaporcobrar = await context.CuentaPorCobrars.FirstOrDefaultAsync(m => m.IdcuentaxC == IdcuentaxC);
+
+        if (cuentaporcobrar is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+}

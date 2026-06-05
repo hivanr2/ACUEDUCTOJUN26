@@ -1,0 +1,111 @@
+@page "/admin/permisos-menu"
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Services
+@inject IMenuPermissionService Service
+@inject AuthenticationStateProvider Auth
+
+<h3>Permisos de Menú</h3>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <EditForm Model="editing" OnValidSubmit="SaveAsync">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-3">
+                    <label class="form-label">Usuario (opcional)</label>
+                    <InputText class="form-control" @bind-Value="editing.UserName" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label">Rol (opcional)</label>
+                    <InputText class="form-control" @bind-Value="editing.Role" placeholder="Admin,Operator,Public" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label">Menú</label>
+                    <InputText class="form-control" @bind-Value="editing.MenuKey" placeholder="Usuarios, Predios, Planillas, ..." />
+                </div>
+                <div class="col-12 col-md-3">
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="editing.CanView" />
+                        <label class="form-check-label">Ver</label>
+                    </div>
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="editing.CanCreate" />
+                        <label class="form-check-label">Crear</label>
+                    </div>
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="editing.CanEdit" />
+                        <label class="form-check-label">Editar</label>
+                    </div>
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="editing.CanDelete" />
+                        <label class="form-check-label">Eliminar</label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <button class="btn btn-primary btn-sm" type="submit">Guardar permiso</button>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <h5 class="card-title">Permisos existentes</h5>
+        <table class="table table-sm table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Usuario</th>
+                    <th>Rol</th>
+                    <th>Menú</th>
+                    <th>Ver</th>
+                    <th>Crear</th>
+                    <th>Editar</th>
+                    <th>Eliminar</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in list)
+                {
+                    <tr>
+                        <td>@p.UserName</td>
+                        <td>@p.Role</td>
+                        <td>@p.MenuKey</td>
+                        <td>@(p.CanView ? "?" : "—")</td>
+                        <td>@(p.CanCreate ? "?" : "—")</td>
+                        <td>@(p.CanEdit ? "?" : "—")</td>
+                        <td>@(p.CanDelete ? "?" : "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private MenuPermission editing = new();
+    private List<MenuPermission> list = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        list = (await Service.GetAllAsync()).ToList();
+    }
+
+    private async Task SaveAsync()
+    {
+        // Limpieza básica: si se define usuario, dejar rol vacío, y viceversa
+        if (!string.IsNullOrWhiteSpace(editing.UserName)) editing.Role = null;
+        else if (!string.IsNullOrWhiteSpace(editing.Role)) editing.UserName = null;
+
+        editing.MenuKey = editing.MenuKey?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(editing.MenuKey)) return;
+        await Service.UpsertAsync(editing);
+        editing = new MenuPermission();
+        await LoadAsync();
+        StateHasChanged();
+    }
+}

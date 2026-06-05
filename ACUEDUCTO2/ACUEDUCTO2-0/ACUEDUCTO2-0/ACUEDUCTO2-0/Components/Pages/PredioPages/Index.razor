@@ -1,0 +1,149 @@
+﻿@page "/predios"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO2-0.Compartir.MODELS
+@using ACUEDUCTO2-0.Data
+@implements IAsyncDisposable
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+@rendermode InteractiveServer
+
+<PageTitle>Predios Servicio Acueducto</PageTitle>
+
+<div class="container-fluid py-2 py-md-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Predios</h1>
+            <small class="text-muted">Servicio Acueducto</small>
+        </div>
+    </div>
+
+    <div class="row g-2 align-items-center mb-1">
+        <div class="col-12 col-md-6">
+            <input type="search" class="form-control" autofocus @bind=filterText @bind:event="oninput" placeholder="Buscar por usuario, dirección, cedcatastral o ruta..." />
+        </div>
+        <div class="col-12 col-md-6 text-md-end small text-muted">
+            <span>Items: <span class="badge bg-secondary">@filterPredios.Count()</span></span>
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="editarObservaciones" @bind="editarObservaciones">
+            <label class="form-check-label" for="editarObservaciones">Ver Observaciones Predio</label>
+        </div>
+        <div class="ms-auto d-flex flex-wrap gap-2 small">
+            <a class="btn btn-outline-primary btn-sm" href="/predios/pueaa-general" target="_blank">PUEAA GENERAL</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/estratos" target="_self">Estratos</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/tarifas" target="_self">Tarifas</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/periodos" target="_self">Periodos</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/tipoconsumos" target="_self">Tipo Consumo</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-hover table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Predio</th>
+                        <th>Ruta</th>
+                        <th>Dirección</th>
+                        <th>En Seguimiento</th>
+                        <th>Activo</th>
+                        <th>Tipo Consumo</th>
+                        <th>PUEAA</th>
+                        @if (editarObservaciones)
+                        {
+                            <th>Observaciones</th>
+                        }
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var predio in filterPredios)
+                    {
+                        <tr class="@(GetRowClass(predio))">
+                            <td>@predio.ApellidosNombresUsuario</td>
+                            <td>@predio.Ruta</td>
+                            <td>@predio.Direccion</td>
+                            <td>@(predio.ContadorEnSeguimiento == true ? "Sí" : "No")</td>
+                            <td>@(predio.Activo == true ? "Sí" : "No")</td>
+                            <td>@predio.TipoConsumoCategoria</td>
+                            <td>
+                                <a class="btn btn-outline-primary btn-sm" href="/predios/pueaa?idpredio=@predio.Idpredio" target="_blank">PUEAA</a>
+                            </td>
+                            @if (editarObservaciones)
+                            {
+                                <td>@predio.Observaciones</td>
+                            }
+                            <td class="text-end">
+                                <a class="btn btn-link btn-sm" href="/predios/edit?idpredio=@predio.Idpredio" target="_blank">Editar</a>
+                                <span class="text-muted">|</span>
+                                <a class="btn btn-link btn-sm" href="/predios/details?idpredio=@predio.Idpredio" target="_blank">Detalles</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+@*     <Paginator State="@pagination" />
+ *@</div>
+
+<!-- Botón flotante Crear Predio -->
+<a href="/predios/create" class="fab-create" title="Crear predio" aria-label="Crear predio">
+    <img src="/img/plus.svg" alt="Crear" onerror="this.onerror=null;this.outerHTML='+';" />
+</a>
+
+@code {
+    private ApplicationDbContext context = default!;
+    private string? filterText = string.Empty;
+    private bool editarObservaciones = false;
+
+    // PaginationState pagination = new PaginationState { ItemsPerPage = 10 };
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+
+    IQueryable<PredioViewModel> filterPredios => context.Predio
+        .Include(c => c.TipoConsumoNavigation)
+        .Where(x => (x.ApellidosNombresUsuario ?? string.Empty).Contains(filterText!)
+                 || (x.Direccion ?? string.Empty).Contains(filterText!)
+                 || (x.Ruta != null && x.Ruta.ToString().Contains(filterText!))
+                 || (x.NumeroCatastral ?? string.Empty).Contains(filterText!)
+                 || (x.InformacionCatastral ?? string.Empty).Contains(filterText!)
+                 || (x.Observaciones ?? string.Empty).Contains(filterText!))
+        .OrderBy(u => (u.ApellidosNombresUsuario ?? ""))
+        .ThenBy(u => (u.Direccion ?? ""))
+        .Select(p => new PredioViewModel
+        {
+            Idpredio = p.IdPredio,
+            ApellidosNombresUsuario = p.ApellidosNombresUsuario,
+            Ruta = p.Ruta,
+            Direccion = p.Direccion,
+            ContadorEnSeguimiento = p.ContadorEnSeguimiento,
+            Activo = p.Activo,
+            TipoConsumoCategoria = p.TipoConsumoNavigation!.Categoria,
+            Observaciones = p.Observaciones
+        });
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+
+    private class PredioViewModel
+    {
+        public string Idpredio { get; set; } = string.Empty;
+        public string? ApellidosNombresUsuario { get; set; }
+        public double? Ruta { get; set; }
+        public string? Direccion { get; set; }
+        public bool? ContadorEnSeguimiento { get; set; }
+        public bool? Activo { get; set; }
+        public string? TipoConsumoCategoria { get; set; }
+        public string? Observaciones { get; set; }
+    }
+
+    private static string? GetRowClass(PredioViewModel p)
+        => p.Activo == true ? null : "predio-inactivo";
+}

@@ -1,0 +1,93 @@
+﻿@using System
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Identity
+@using ACUEDUCTO2.Data
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IdentityRedirectManager RedirectManager
+
+@if (externalLogins.Length == 0)
+{
+    <div>
+        <p>
+            No hay servicios de autenticación externos configurados. Revise la <a href="https://go.microsoft.com/fwlink/?LinkID=532715">documentación</a> para configurar proveedores externos.
+        </p>
+    </div>
+}
+else
+{
+    <form class="form-horizontal" action="Account/PerformExternalLogin" method="post">
+        <div>
+            <AntiforgeryToken />
+            <input type="hidden" name="ReturnUrl" value="@ReturnUrl" />
+            <p>
+                @foreach (var provider in externalLogins)
+                {
+                    var key = provider.Name ?? provider.DisplayName ?? string.Empty;
+                    var (friendly, icon) = ResolveProviderInfo(key, provider.DisplayName);
+                    <button type="submit" class="btn btn-outline-secondary d-inline-flex align-items-center me-2" name="provider" value="@provider.Name" title=$"Regístrese con {friendly}">
+                        @if (!string.IsNullOrEmpty(icon))
+                        {
+                            <img src="@icon" alt="@friendly" style="height:24px;width:24px;object-fit:contain;" class="me-2" />
+                        }
+                        <span>Regístrese con @friendly</span>
+                    </button>
+                }
+            </p>
+        </div>
+    </form>
+}
+
+@code {
+    private AuthenticationScheme[] externalLogins = [];
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        externalLogins = (await SignInManager.GetExternalAuthenticationSchemesAsync()).ToArray();
+    }
+
+    private static string GetProviderIcon(string provider)
+    {
+        provider = provider ?? string.Empty;
+        if (provider.Contains("google", StringComparison.OrdinalIgnoreCase))
+        {
+            return "/images/google.svg";
+        }
+        if (provider.Contains("facebook", StringComparison.OrdinalIgnoreCase))
+        {
+            return "/images/facebook.svg";
+        }
+        if (provider.Contains("twitter", StringComparison.OrdinalIgnoreCase) || provider.Equals("x", StringComparison.OrdinalIgnoreCase))
+        {
+            return "/images/twitter.svg";
+        }
+        if (provider.Contains("instagram", StringComparison.OrdinalIgnoreCase))
+        {
+            return "/images/instagram.svg";
+        }
+        if (provider.Contains("snapchat", StringComparison.OrdinalIgnoreCase))
+        {
+            return "/images/snapchat.svg";
+        }
+
+        // Default: no icon (falls back to text-only button)
+        return string.Empty;
+    }
+
+    private static (string FriendlyName, string IconUrl) ResolveProviderInfo(string key, string? displayName)
+    {
+        var k = (key ?? string.Empty).ToLowerInvariant();
+        if (k.Contains("google")) return ("Google", GetProviderIcon("google"));
+        if (k.Contains("facebook")) return ("Facebook", GetProviderIcon("facebook"));
+        if (k.Contains("twitter") || k == "x") return ("X / Twitter", GetProviderIcon("twitter"));
+        if (k.Contains("instagram")) return ("Instagram", GetProviderIcon("instagram"));
+        if (k.Contains("snapchat")) return ("Snapchat", GetProviderIcon("snapchat"));
+
+        // fallback to provided displayName or raw key
+        var name = !string.IsNullOrWhiteSpace(displayName) ? displayName! : key;
+        return (name ?? key, GetProviderIcon(key));
+    }
+}

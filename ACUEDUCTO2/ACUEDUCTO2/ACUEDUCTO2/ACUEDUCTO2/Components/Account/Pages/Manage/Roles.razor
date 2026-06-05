@@ -1,0 +1,47 @@
+@page "/Account/Manage/Roles"
+
+@using System.Security.Claims
+
+<PageTitle>Roles</PageTitle>
+
+<h3>Roles del usuario</h3>
+
+@if (roles.Count == 0)
+{
+    <div class="alert alert-info">No tiene roles asignados.</div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Rol</th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (int i = 0; i < roles.Count; i++)
+            {
+                <tr>
+                    <td>@(i + 1)</td>
+                    <td>@roles[i]</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<string> roles = [];
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        roles = HttpContext.User.Claims
+            .Where(c => c.Type == ClaimTypes.Role)
+            .Select(c => c.Value)
+            .ToList();
+    }
+}

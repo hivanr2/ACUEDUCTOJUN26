@@ -1,0 +1,512 @@
+﻿@page "/planillas/details"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JsRuntime
+
+@rendermode InteractiveServer
+
+<PageTitle>Detalles</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+            <h1 class="h4 mb-1">Detalles de Planilla</h1>
+            @if (planilla is not null)
+            {
+                <div class="small text-muted d-flex align-items-center gap-2 flex-wrap">
+                    <span>Id: <strong>@planilla.Idplanilla</strong></span>
+                    <span class="badge bg-primary-subtle text-primary border">Periodo: <strong>@planilla.IdperiodoNavigation?.DescripcionLarga</strong></span>
+                    @if (planilla.Abierta)
+                    {
+                        <span class="badge bg-success">Abierta</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">Cerrada</span>
+                    }
+                </div>
+            }
+        </div>
+        <div class="d-flex gap-2">
+            @if (planilla is not null)
+            {
+                <a class="btn btn-outline-primary btn-sm" href="@($"/planillas/edit?idplanilla={planilla.Idplanilla}")"><i class="bi bi-pencil-square"></i> Editar</a>
+            }
+            <a class="btn btn-outline-secondary btn-sm" href="/planillas" onclick="return cerrarVentana('/planillas');"><i class="bi bi-arrow-left"></i> Cerrar</a>
+        </div>
+    </div>
+
+    @if (mensajeActualizaciones is not null)
+    {
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            @mensajeActualizaciones
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (planilla is null)
+    {
+        <div class="text-center text-muted py-5"><em>Cargando...</em></div>
+    }
+    else
+    {
+        <div class="row g-3">
+            <div class="col-12 col-xxl-8">
+                <!-- General -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-light"><strong>General</strong></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-8">
+                                <div class="small text-muted">Descripción</div>
+                                <div class="fw-semibold">@planilla.Descripcion</div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <div class="small text-muted">Periodo</div>
+                                <div class="fw-semibold">@planilla.IdperiodoNavigation?.DescripcionCorta</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Encargado Registro Consumos</div>
+                                <div class="fw-semibold">@planilla.EncargadoRegistroConsumos</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Encargado Facturación</div>
+                                <div class="fw-semibold">@planilla.EncargadoFacturacion</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">% Mora</div>
+                                <div class="fw-semibold">@(planilla.PorcentajeMora?.ToString())%</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">% Subsidio</div>
+                                <div class="fw-semibold">@(planilla.PorcentajeSubsidio?.ToString())%</div>
+                            </div>
+                            <div class="col-12">
+                                <span class="badge @(planilla.Abierta ? "bg-success" : "bg-secondary")">@(planilla.Abierta ? "Abierta" : "Cerrada")</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fechas -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-light"><strong>Fechas</strong></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Fecha Registro Consumo</div>
+                                <div class="fw-semibold">@planilla.FechaHoraRegistroConsumo</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Fecha Registro Consumos</div>
+                                <div class="fw-semibold">@planilla.FechaHoraRegistroConsumos</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Fecha Facturación</div>
+                                <div class="fw-semibold">@planilla.FechaHoraFacturacion</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Fecha Límite Pago</div>
+                                <div class="fw-semibold">@planilla.FechaLimitePago</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Fecha Suspensión</div>
+                                <div class="fw-semibold">@planilla.FechaSuspension</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Totales y acumulados -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-light"><strong>Totales y acumulados</strong></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-6 col-md-4">
+                                <div class="small text-muted">Total Predios</div>
+                                <div class="fw-semibold">@planilla.TotalPredios</div>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <div class="small text-muted">Consumo M3 total</div>
+                                <div class="fw-semibold">@planilla.CantidadConsumoM3total</div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <div class="small text-muted">Última Factura Registrada</div>
+                                <div class="fw-semibold">@planilla.UltimaFacturaRegistrada</div>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <div class="small text-muted">Total Consumo Básico</div>
+                                <div class="fw-semibold">@planilla.ValorTotalConsumoBasico?.ToString("C0")</div>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <div class="small text-muted">Total Consumo Adicional</div>
+                                <div class="fw-semibold">@planilla.ValorTotalConsumoAdicional?.ToString("C0")</div>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <div class="small text-muted">Total Consumo M3</div>
+                                <div class="fw-semibold">@planilla.ValorTotalConsumoM3?.ToString("C0")</div>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <div class="small text-muted">Total Mora</div>
+                                <div class="fw-semibold">@planilla.ValorTotalMora?.ToString("C0")</div>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <div class="small text-muted">Total Sobretasa</div>
+                                <div class="fw-semibold">@planilla.ValorTotalSobreTasa?.ToString("C0")</div>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <div class="small text-muted">Total Subsidio</div>
+                                <div class="fw-semibold">@planilla.ValorTotalSubsidio?.ToString("C0")</div>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <div class="small text-muted">Total Otros</div>
+                                <div class="fw-semibold">@planilla.ValorTotalOtros?.ToString("C0")</div>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <div class="small text-muted">Total Planilla</div>
+                                <div class="fw-semibold">@planilla.ValorTotalPlanilla?.ToString("C0")</div>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <div class="small text-muted">Total Recaudo</div>
+                                <div class="fw-semibold">@planilla.ValorTotalRecaudo?.ToString("C0")</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Observaciones -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-light"><strong>Observaciones</strong></div>
+                    <div class="card-body">
+                        <div class="fw-semibold">@planilla.Observaciones</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mt-2">
+            <div class="card-header bg-light d-flex align-items-center justify-content-between">
+                    <strong>Registros de Facturación</strong>
+                    @if (planilla is not null)
+                    {
+                        <div class="d-flex align-items-center gap-2">
+                            @if (planilla.FechaHoraFacturacion.HasValue && planilla.FechaHoraFacturacion.Value > DateTime.Now)
+                            {
+                                <button type="button" class="btn btn-danger btn-sm" @onclick="ConfirmDeleteFacturacionsAsync" disabled="@isDeleting">BORRAR REGISTROS FACTURACIÓN</button>
+                            }
+                            <span class="badge bg-secondary">@planilla.Facturacions?.Count() registros</span>
+                        </div>
+                    }
+                </div>
+            <div class="card-body">
+                @if (planilla == null)
+                {
+                    <div class="text-muted">Llamando...</div>
+                }
+                else if (planilla.Facturacions == null || !planilla.Facturacions.Any())
+                {
+                    <div class="text-muted"><em>No hay registros de facturación.</em></div>
+                }
+                else
+                {
+                    <div class="table-container table-responsive">
+                        <table class="table table-sm table-hover table-striped align-middle fixed-header">
+                            <thead class="table-light">
+                                <tr>
+                                    <th scope="col">Factura</th>
+                                    <th scope="col">Predio</th>
+                                    <th scope="col">Código Usuario</th>
+                                    <th scope="col">Medición Anterior</th>
+                                    <th scope="col">Medición Actual</th>
+                                    <th scope="col">ConsumoM3</th>
+                                    <th scope="col">Valor Consumo</th>
+                                    <th scope="col">Cargo Fijo</th>
+                                    <th scope="col">% SobreTasa</th>
+                                    <th scope="col">Valor SobreTasa</th>
+                                    <th scope="col">% Mora</th>
+                                    <th scope="col">Valor Mora</th>
+                                    <th scope="col">% Subsidio</th>
+                                    <th scope="col">Valor Subsidio</th>
+                                    <th scope="col">Otros Valores</th>
+                                    <th scope="col">Valor Periodo</th>
+                                    <th scope="col">Deuda Anterior</th>
+                                    <th scope="col">Recaudo Periodo Total</th>
+                                    <th scope="col">Deuda Pasa</th>
+                                    <th scope="col">Notas Factura</th>
+                                    <th scope="col">Notas Recaudo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var factura in planilla.Facturacions)
+                                {
+                                    <tr>
+                                        <td>@factura.CodigoFactura</td>
+                                        <td>@factura.IdpredioNavigation.ApellidosNombresUsuario</td>
+                                        <td>@factura.CodigoUsuario</td>
+                                        <td>@factura.MedicionAnterior?.ToString()</td>
+                                        <td>@factura.MedicionActual?.ToString()</td>
+                                        <td>@factura.ConsumoM3?.ToString()</td>
+                                        <td>@factura.ValorConsumo?.ToString("C0")</td>
+                                        <td>@factura.CargoFijo?.ToString("C0")</td>
+                                        <td>@(factura.PorcentajeSobreTasa?.ToString())%</td>
+                                        <td>@factura.ValorSobreTasa?.ToString("C0")</td>
+                                        <td>@(factura.PorcentajeMora?.ToString())%</td>
+                                        <td>@factura.ValorMora?.ToString("C0")</td>
+                                        <td>@(factura.PorcentajeSubsidio?.ToString())%</td>
+                                        <td>@factura.ValorSubsidio?.ToString("C0")</td>
+                                        <td>@factura.OtrosValores?.ToString("C0")</td>
+                                        <td>@factura.ValorPeriodo?.ToString("C0")</td>
+                                        <td>@factura.DeudaAnterior?.ToString("C0")</td>
+                                        <td>@factura.RecaudoPeriodoTotal?.ToString("C0")</td>
+                                        <td>@factura.DeudaPasa?.ToString("C0")</td>
+                                        <td>@factura.NotasFactura</td>
+                                        <td>@factura.NotasRecaudo</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <style>
+                        .table-container { max-height: 70vh; overflow: auto; }
+                        .fixed-header thead th, .fixed-header thead td { position: sticky; top: 0; background-color: var(--bs-light); z-index: 5; }
+                    </style>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@* Confirmation modal *@
+@if (showConfirmModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirmar borrado</h5>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="(()=> showConfirmModal = false)"></button>
+                </div>
+                <div class="modal-body">
+                    @if (hasBlockingRecords)
+                    {
+                        <p class="fw-bold text-danger">@modalMessage</p>
+                        <p>Se encontraron <strong>@blockingCount</strong> recibos/ingresos asociados a las facturas de la planilla <strong>@planilla?.Descripcion</strong>.</p>
+                        <p>Para proceder debe eliminar o desvincular primero esos recibos/consumos.</p>
+                    }
+                    else
+                    {
+                        <p>¿Está seguro de borrar los registros de facturación de la planilla <strong>@planilla?.Descripcion</strong>?</p>
+                        <p>¡Está acción es irreversible!</p>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="(()=> showConfirmModal = false)">Cancelar</button>
+                    @if (!hasBlockingRecords)
+                    {
+                        <button class="btn btn-danger" @onclick="OnConfirmDeleteClicked" disabled="@isDeleting">Borrar</button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Planilla? planilla;
+    private string? mensajeActualizaciones;
+    private bool isDeleting = false;
+    private bool showConfirmModal = false;
+    private bool hasBlockingRecords = false;
+    private int blockingCount = 0;
+    private string modalTitle = "Confirmar borrado";
+    private string modalMessage = string.Empty;
+
+    [SupplyParameterFromQuery]
+    private string Idplanilla { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        planilla = await context.Planillas
+            .Include(p => p.Facturacions.OrderBy(p => p.IdpredioNavigation.ApellidosNombresUsuario))
+            .ThenInclude(c => c.IdpredioNavigation)
+            .Include(f => f.IdperiodoNavigation)
+            .FirstOrDefaultAsync(m => m.Idplanilla == Idplanilla);
+
+        if (planilla is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+            return;
+        }
+
+        // Recalcular totales y actualizar si hay diferencias
+        await RecalcularYActualizarSiNecesarioAsync();
+    }
+
+    private static double Sum(IEnumerable<double?> source) => source.Sum(v => v ?? 0);
+    private static bool Diferente(double? a, double? b) => Math.Abs((a ?? 0) - (b ?? 0)) > 0.0001;
+    private static bool DiferenteInt(int? a, int? b) => (a ?? 0) != (b ?? 0);
+
+    private async Task RecalcularYActualizarSiNecesarioAsync()
+    {
+        if (planilla is null) return;
+
+        var fact = planilla.Facturacions?.ToList() ?? new List<Facturacion>();
+
+        var totalPredios = fact.Count;
+        var sumaConsumo = Sum(fact.Select(f => f.ConsumoM3));
+        var sumaConsumoValor = Sum(fact.Select(f => f.ValorConsumo));
+        var sumaMora = Sum(fact.Select(f => f.ValorMora));
+        var sumaSobreTasa = Sum(fact.Select(f => f.ValorSobreTasa));
+        var sumaSubsidio = Sum(fact.Select(f => f.ValorSubsidio));
+        var sumaOtros = Sum(fact.Select(f => f.OtrosValores));
+        var sumaPeriodo = Sum(fact.Select(f => f.ValorPeriodo));
+        var sumaRecaudo = Sum(fact.Select(f => f.RecaudoPeriodoTotal));
+
+        var camposActualizados = new List<string>();
+
+        // Comparar con los valores actuales y preparar actualización local
+        if (DiferenteInt(totalPredios, planilla.TotalPredios)) { planilla.TotalPredios = totalPredios; camposActualizados.Add("Total Predios"); }
+        if (Diferente(sumaConsumo, planilla.CantidadConsumoM3total)) { planilla.CantidadConsumoM3total = sumaConsumo; camposActualizados.Add("Consumo M3 total"); }
+        if (Diferente(sumaConsumoValor, planilla.ValorTotalConsumoM3)) { planilla.ValorTotalConsumoM3 = sumaConsumoValor; camposActualizados.Add("Total Consumo M3"); }
+        if (Diferente(sumaMora, planilla.ValorTotalMora)) { planilla.ValorTotalMora = sumaMora; camposActualizados.Add("Total Mora"); }
+        if (Diferente(sumaSobreTasa, planilla.ValorTotalSobreTasa)) { planilla.ValorTotalSobreTasa = sumaSobreTasa; camposActualizados.Add("Total Sobretasa"); }
+        if (Diferente(sumaSubsidio, planilla.ValorTotalSubsidio)) { planilla.ValorTotalSubsidio = sumaSubsidio; camposActualizados.Add("Total Subsidio"); }
+        if (Diferente(sumaOtros, planilla.ValorTotalOtros)) { planilla.ValorTotalOtros = sumaOtros; camposActualizados.Add("Total Otros"); }
+        if (Diferente(sumaPeriodo, planilla.ValorTotalPlanilla)) { planilla.ValorTotalPlanilla = sumaPeriodo; camposActualizados.Add("Total Planilla"); }
+        if (Diferente(sumaRecaudo, planilla.ValorTotalRecaudo)) { planilla.ValorTotalRecaudo = sumaRecaudo; camposActualizados.Add("Total Recaudo"); }
+
+        if (camposActualizados.Count == 0)
+        {
+            mensajeActualizaciones = null; // nada que informar
+            return;
+        }
+
+        // Persistir cambios en BD usando un nuevo contexto
+        await using var ctx = DbFactory.CreateDbContext();
+        var entity = await ctx.Planillas.FirstOrDefaultAsync(p => p.Idplanilla == planilla.Idplanilla);
+        if (entity is null) return;
+
+        entity.TotalPredios = planilla.TotalPredios;
+        entity.CantidadConsumoM3total = planilla.CantidadConsumoM3total;
+        entity.ValorTotalConsumoM3 = planilla.ValorTotalConsumoM3;
+        entity.ValorTotalMora = planilla.ValorTotalMora;
+        entity.ValorTotalSobreTasa = planilla.ValorTotalSobreTasa;
+        entity.ValorTotalSubsidio = planilla.ValorTotalSubsidio;
+        entity.ValorTotalOtros = planilla.ValorTotalOtros;
+        entity.ValorTotalPlanilla = planilla.ValorTotalPlanilla;
+        entity.ValorTotalRecaudo = planilla.ValorTotalRecaudo;
+
+        await ctx.SaveChangesAsync();
+
+        mensajeActualizaciones = $"Se actualizaron: {string.Join(", ", camposActualizados)}.";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Task ConfirmDeleteFacturacionsAsync()
+    {
+        // Before showing confirmation, check for recibos/consumos linked to this planilla
+        return CheckBlockingRecordsAndShowModalAsync();
+    }
+
+    private async Task CheckBlockingRecordsAndShowModalAsync()
+    {
+        if (planilla is null)
+        {
+            return;
+        }
+
+        // gather factura ids for this planilla
+        var facturaIds = planilla.Facturacions?.Select(f => f.Idfactura).Where(id => !string.IsNullOrWhiteSpace(id)).ToList() ?? new List<string>();
+
+        // default no blocking
+        hasBlockingRecords = false;
+        blockingCount = 0;
+        modalTitle = "Confirmar borrado";
+        modalMessage = string.Empty;
+
+        if (facturaIds.Any())
+        {
+            await using var ctx = DbFactory.CreateDbContext();
+
+            // Count Recaudos (recibos) linked to any factura of this planilla
+            var recaudosCount = await ctx.Recaudos.CountAsync(r => r.Idfactura != null && facturaIds.Contains(r.Idfactura));
+
+            // Count Ingresos linked to any factura of this planilla (also considered recibos)
+            var ingresosCount = await ctx.Ingresos.CountAsync(i => i.Idfactura != null && facturaIds.Contains(i.Idfactura));
+
+            blockingCount = recaudosCount + ingresosCount;
+
+            if (blockingCount > 0)
+            {
+                hasBlockingRecords = true;
+                modalTitle = "EXISTEN REGISTROS DE CONSUMOS O RECIBOS DE CAJA PARA ÉSTA PLANILLA";
+                modalMessage = "NO SE PUEDEN BORRAR ESTOS REGISTROS";
+            }
+        }
+
+        showConfirmModal = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnConfirmDeleteClicked()
+    {
+        showConfirmModal = false;
+        await DeleteFacturacionsAsync();
+    }
+
+    private async Task DeleteFacturacionsAsync()
+    {
+        if (planilla is null) return;
+
+        isDeleting = true;
+        await InvokeAsync(StateHasChanged);
+
+        await using var ctx = DbFactory.CreateDbContext();
+        var facturas = await ctx.Facturacions.Where(f => f.Idplanilla == planilla.Idplanilla).ToListAsync();
+        if (facturas == null || !facturas.Any())
+        {
+            mensajeActualizaciones = "No se encontraron registros de facturación para borrar.";
+            isDeleting = false;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        ctx.Facturacions.RemoveRange(facturas);
+
+        // Optionally update planilla totals to zero
+        var planEntity = await ctx.Planillas.FirstOrDefaultAsync(p => p.Idplanilla == planilla.Idplanilla);
+        if (planEntity != null)
+        {
+            planEntity.TotalPredios = 0;
+            planEntity.CantidadConsumoM3total = 0;
+            planEntity.ValorTotalConsumoM3 = 0;
+            planEntity.ValorTotalMora = 0;
+            planEntity.ValorTotalSobreTasa = 0;
+            planEntity.ValorTotalSubsidio = 0;
+            planEntity.ValorTotalOtros = 0;
+            planEntity.ValorTotalPlanilla = 0;
+            planEntity.ValorTotalRecaudo = 0;
+        }
+
+        await ctx.SaveChangesAsync();
+        isDeleting = false;
+        mensajeActualizaciones = $"Se borraron {facturas.Count} registros de facturación.";
+        // reload planilla in UI
+        planilla.Facturacions = new List<Facturacion>();
+        planilla.TotalPredios = 0;
+        planilla.CantidadConsumoM3total = 0;
+        planilla.ValorTotalConsumoM3 = 0;
+        planilla.ValorTotalMora = 0;
+        planilla.ValorTotalSobreTasa = 0;
+        planilla.ValorTotalSubsidio = 0;
+        planilla.ValorTotalOtros = 0;
+        planilla.ValorTotalPlanilla = 0;
+        planilla.ValorTotalRecaudo = 0;
+
+        await InvokeAsync(StateHasChanged);
+    }
+}

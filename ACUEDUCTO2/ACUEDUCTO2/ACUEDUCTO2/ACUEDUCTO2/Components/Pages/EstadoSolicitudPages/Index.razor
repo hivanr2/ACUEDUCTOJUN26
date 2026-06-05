@@ -1,0 +1,61 @@
+@page "/estado-solicitud"
+@using ACUEDUCTO2.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Estados de solicitud</PageTitle>
+
+<h3>Estados de solicitud</h3>
+<div class="mb-3">
+    <button class="btn btn-secondary me-2" @onclick="Volver">Volver a solicitudes</button>
+    <button class="btn btn-primary" @onclick="Nuevo">Nuevo estado</button>
+</div>
+
+@if (estados == null)
+{
+    <p>Cargando...</p>
+}
+else if (!estados.Any())
+{
+    <p>No hay estados definidos.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var e in estados)
+            {
+                <tr>
+                    <td>@e.NombreEstadoSolicitud</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning me-1" @onclick="() => Editar(e.Guid)">Editar</button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => Eliminar(e.Guid)">Eliminar</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<EstadoSolicitud>? estados;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = DbFactory.CreateDbContext();
+        estados = await db.EstadoSolicitud.AsNoTracking().ToListAsync();
+    }
+
+    void Nuevo() => Navigation.NavigateTo("/estado-solicitud/crear");
+    void Editar(string guid) => Navigation.NavigateTo($"/estado-solicitud/editar/{guid}");
+    void Eliminar(string guid) => Navigation.NavigateTo($"/estado-solicitud/eliminar/{guid}");
+    void Volver() => Navigation.NavigateTo("/solicitud");
+}

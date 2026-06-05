@@ -1,0 +1,136 @@
+﻿@page "/admin/borra-archivo"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Services
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject FileDeletionService FileDeletionService
+@rendermode InteractiveServer
+
+<h3>BorraArchivoComponent</h3>
+
+<div class="mb-3">
+    <label for="prefix" class="form-label">Prefijo de archivos a borrar:</label>
+    <input type="text" id="prefix" class="form-control" @bind="filePrefix" placeholder="Ej: 06-25" />
+</div>
+
+@if (isProcessing)
+{
+    <div class="alert alert-info">
+        Procesando... @currentPredio
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-success">@message</div>
+}
+
+@if (errors.Any())
+{
+    <div class="alert alert-danger">
+        <strong>Errores:</strong>
+        <ul>
+            @foreach (var error in errors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    </div>
+}
+
+@if (predios.Any())
+{
+    <button class="btn btn-danger" @onclick="DeleteFilesForAllPredios" disabled="@isProcessing">
+        Borrar archivos "@filePrefix"*.pdf para todos los predios
+    </button>
+
+    <table class="table table-striped mt-3">
+        <thead>
+            <tr>
+                <th>Código Usuario</th>
+                <th>Nombre</th>
+                <th>Archivos Borrados</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var predio in predios)
+            {
+                <tr>
+                    <td>@predio.CodigoUsuario</td>
+                    <td>@predio.ApellidosNombresUsuario</td>
+                    <td>@(results.ContainsKey(predio.CodigoUsuario ?? "") ? $"{results[predio.CodigoUsuario ?? ""].DeletedCount} archivos" : "-")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else
+{
+    <p>No hay predios con código usuario.</p>
+}
+
+@code {
+    private List<Predio> predios = new();
+    private Dictionary<string, FileDeletionService.DeletionResult> results = new();
+    private List<string> errors = new();
+    private string? message;
+    private bool isProcessing = false;
+    private string? currentPredio;
+    private string filePrefix = "06-25";
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        predios = await context.Predios
+            .Where(p => !string.IsNullOrEmpty(p.CodigoUsuario))
+            .OrderBy(p => p.CodigoUsuario)
+            .ToListAsync();
+    }
+
+    private async Task DeleteFilesForAllPredios()
+    {
+        if (string.IsNullOrWhiteSpace(filePrefix))
+        {
+            errors.Add("El prefijo no puede estar vacío.");
+            StateHasChanged();
+            return;
+        }
+
+        isProcessing = true;
+        message = null;
+        errors.Clear();
+        results.Clear();
+        StateHasChanged();
+
+        int totalDeleted = 0;
+
+        foreach (var predio in predios)
+        {
+            if (string.IsNullOrEmpty(predio.CodigoUsuario)) continue;
+
+            currentPredio = predio.CodigoUsuario;
+            StateHasChanged();
+
+            try
+            {
+                var result = await FileDeletionService.DeleteSpecificPdfsAsync(predio.CodigoUsuario, filePrefix);
+                results[predio.CodigoUsuario] = result;
+                totalDeleted += result.DeletedCount;
+
+                if (result.Errors.Any())
+                {
+                    errors.AddRange(result.Errors.Select(e => $"{predio.CodigoUsuario}: {e}"));
+                }
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{predio.CodigoUsuario}: {ex.Message}");
+            }
+        }
+
+        currentPredio = null;
+        isProcessing = false;
+        message = $"Proceso completado. Total archivos borrados: {totalDeleted}";
+        StateHasChanged();
+    }
+}

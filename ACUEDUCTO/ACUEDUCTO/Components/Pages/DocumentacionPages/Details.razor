@@ -1,0 +1,70 @@
+﻿@page "/documentacions/details"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Detalles documento</PageTitle>
+
+<div class="container py-2">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Detalles del documento</h1>
+            <small class="text-muted">TRD - Tabla de retención documental</small>
+        </div>
+        <div>
+            <a class="btn btn-secondary" href="/documentacions" onclick="return cerrarVentana('/documentacions');">Cerrar</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            @if (documentacion is null)
+            {
+                <p><em>Loading...</em></p>
+            }
+            else
+            {
+                <dl class="row mb-0">
+                    <dt class="col-sm-3 col-md-2">Serie</dt>
+                    <dd class="col-sm-9 col-md-10">@documentacion.Idserie</dd>
+                    <dt class="col-sm-3 col-md-2">Tipo</dt>
+                    <dd class="col-sm-9 col-md-10">@documentacion.Idtipo</dd>
+                    <dt class="col-sm-3 col-md-2">Código</dt>
+                    <dd class="col-sm-9 col-md-10">@documentacion.Codigo</dd>
+                    <dt class="col-sm-3 col-md-2">Archivo Gestión (Años)</dt>
+                    <dd class="col-sm-9 col-md-10">@documentacion.TiempoArchivoGestion</dd>
+                    <dt class="col-sm-3 col-md-2">Archivo Central (Años)</dt>
+                    <dd class="col-sm-9 col-md-10">@documentacion.TiempoArchivoCentral</dd>
+                    <dt class="col-sm-3 col-md-2">Disposición final</dt>
+                    <dd class="col-sm-9 col-md-10">@documentacion.DisposicionFinal</dd>
+                    <dt class="col-sm-3 col-md-2">Observaciones</dt>
+                    <dd class="col-sm-9 col-md-10">@documentacion.Observaciones</dd>
+                </dl>
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                    <a class="btn btn-primary" href="@($"/documentacions/edit?id={documentacion.Id}")">Editar</a>
+                    <a class="btn btn-light" href="/documentacions" onclick="return cerrarVentana('/documentacions');">Cerrar</a>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private Documentacion? documentacion;
+
+    [SupplyParameterFromQuery]
+    private string Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        documentacion = await context.Documentacions.FirstOrDefaultAsync(m => m.Id == Id);
+
+        if (documentacion is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+}

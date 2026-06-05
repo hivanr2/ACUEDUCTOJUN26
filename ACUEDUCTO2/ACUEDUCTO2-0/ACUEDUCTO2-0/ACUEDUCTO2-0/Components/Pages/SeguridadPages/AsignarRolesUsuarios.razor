@@ -1,0 +1,154 @@
+@page "/proceso/Asignar Roles a Usuarios"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using ACUEDUCTO2-0_0.Data
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@attribute [Authorize(Roles = "Administradores")]
+
+@inject ACUEDUCTO2-0_0.Data.SeguridadService SeguridadService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h3>Asignar Roles a Usuarios</h3>
+<p class="text-muted">Administre la asignación de roles a cada usuario del sistema.</p>
+
+@if (!string.IsNullOrEmpty(mensaje))
+{
+    <div class="alert @(esError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+        @mensaje
+        <button type="button" class="btn-close" @onclick="() => mensaje = null"></button>
+    </div>
+}
+
+@if (usuarios == null || roles == null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>Usuario</th>
+                <th>Email</th>
+                <th>Roles Asignados</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var usuario in usuarios)
+            {
+                var userId = usuario.Id;
+                var userRoles = rolesDeUsuarios.ContainsKey(userId) ? rolesDeUsuarios[userId] : new List<string>();
+
+                <tr>
+                    <td>@(usuario.UserName ?? usuario.Email)</td>
+                    <td>@usuario.Email</td>
+                    <td>
+                        @if (userRoles.Any())
+                        {
+                            @foreach (var rol in userRoles)
+                            {
+                                <span class="badge @(rol == "Administradores" ? "bg-warning text-dark" : "bg-primary") me-1">@rol</span>
+                            }
+                        }
+                        else
+                        {
+                            <span class="text-muted">Sin roles</span>
+                        }
+                    </td>
+                    <td>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                Gestionar Roles
+                            </button>
+                            <ul class="dropdown-menu p-2" style="min-width: 250px;">
+                                @foreach (var role in roles)
+                                {
+                                    var roleName = role.Name!;
+                                    var asignado = userRoles.Contains(roleName);
+                                    <li class="mb-1">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox"
+                                                   checked="@asignado"
+                                                   @onchange="e => ToggleRolUsuario(userId, roleName, (bool)e.Value!)" />
+                                            <label class="form-check-label">
+                                                @roleName
+                                            </label>
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<ApplicationUser>? usuarios;
+    private List<IdentityRole>? roles;
+    private Dictionary<string, List<string>> rolesDeUsuarios = new();
+    private string? mensaje;
+    private bool esError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDatos();
+    }
+
+    private async Task CargarDatos()
+    {
+        usuarios = await SeguridadService.ObtenerUsuariosAsync();
+        roles = await SeguridadService.ObtenerRolesAsync();
+        rolesDeUsuarios.Clear();
+
+        foreach (var usuario in usuarios)
+        {
+            var userRoles = await SeguridadService.ObtenerRolesDeUsuarioAsync(usuario.Id);
+            rolesDeUsuarios[usuario.Id] = userRoles.ToList();
+        }
+    }
+
+    private async Task ToggleRolUsuario(string userId, string roleName, bool asignar)
+    {
+        IdentityResult result;
+        if (asignar)
+        {
+            result = await SeguridadService.AsignarRolAUsuarioAsync(userId, roleName);
+        }
+        else
+        {
+            result = await SeguridadService.RemoverRolDeUsuarioAsync(userId, roleName);
+        }
+
+        if (result.Succeeded)
+        {
+            // Update local state
+            if (asignar)
+            {
+                if (!rolesDeUsuarios.ContainsKey(userId))
+                    rolesDeUsuarios[userId] = new List<string>();
+                if (!rolesDeUsuarios[userId].Contains(roleName))
+                    rolesDeUsuarios[userId].Add(roleName);
+            }
+            else
+            {
+                if (rolesDeUsuarios.ContainsKey(userId))
+                    rolesDeUsuarios[userId].Remove(roleName);
+            }
+
+            var userName = usuarios?.FirstOrDefault(u => u.Id == userId)?.Email ?? userId;
+            mensaje = asignar
+                ? $"Role '{roleName}' assigned to '{userName}'."
+                : $"Role '{roleName}' removed from '{userName}'.";
+            esError = false;
+        }
+        else
+        {
+            mensaje = string.Join(" ", result.Errors.Select(e => e.Description));
+            esError = true;
+        }
+    }
+}

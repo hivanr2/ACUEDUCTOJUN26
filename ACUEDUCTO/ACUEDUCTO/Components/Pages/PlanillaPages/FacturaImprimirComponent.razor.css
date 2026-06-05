@@ -1,0 +1,38 @@
+/* Single thin internal lines, larger text, and thicker outer border */
+.compact-table {
+    border-collapse: collapse;          /* ensures a single line between cells */
+    font-size: 1.15rem;                 /* larger text */
+    border-left: 2px solid #333;        /* outer left border */
+    border-right: 2px solid #333;       /* outer right border */
+    border-top: 2px solid #333;         /* outer top border */
+    border-bottom: 2px solid #333;      /* outer bottom border */
+}
+
+.compact-table th,
+.compact-table td {
+    padding: 4px 8px;
+    line-height: 1.2;
+    border: 1px solid #999;             /* thin internal borders */
+    vertical-align: middle;
+}
+
+/* Optional header background */
+.compact-table thead th {
+    background: #f8f9fa;
+}
+
+/* Print styles */
+@media print {
+    .compact-table {
+        font-size: 14px;
+        border-left: 2px solid #000;
+        border-right: 2px solid #000;
+        border-top: 2px solid #000;
+        border-bottom: 2px solid #000;
+    }
+    .compact-table th,
+    .compact-table td {
+        border: 1px solid #000;         /* keep thin internal borders on print */
+        padding: 3px 6px;
+    }
+}

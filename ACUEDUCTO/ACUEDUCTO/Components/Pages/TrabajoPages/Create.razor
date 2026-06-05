@@ -1,0 +1,162 @@
+﻿@page "/trabajos/create"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+@rendermode InteractiveServer
+<PageTitle>Crear Trabajo</PageTitle>
+
+<div class="container py-2">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Crear trabajo</h1>
+            <small class="text-muted">Registra un nuevo trabajo</small>
+        </div>
+        <div>
+            <a class="btn btn-secondary" href="/trabajos" onclick="return cerrarVentana('/trabajos');">Cerrar</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <EditForm method="post" Model="Trabajo" OnValidSubmit="AddTrabajo">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" />
+
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label for="planilla" class="form-label">Planilla</label>
+                        <InputSelect id="planilla" @bind-Value="Trabajo.Idplanilla" class="form-select">
+                            <option value="">Seleccione una planilla</option>
+                            @foreach (var p in Planillas)
+                            {
+                                <option value="@p.Idplanilla">@(!string.IsNullOrWhiteSpace(p.Descripcion) ? p.Descripcion : p.Idplanilla)
+                                </option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="() => Trabajo.Idplanilla" class="text-danger" />
+                    </div>
+
+                    <div class="col-12 col-md-3">
+                        <label for="fechainicio" class="form-label">Fecha inicio</label>
+                        <InputDate id="fechainicio" @bind-Value="Trabajo.FechaInicio" class="form-control" />
+                        <ValidationMessage For="() => Trabajo.FechaInicio" class="text-danger" />
+                    </div>
+
+                    <div class="col-12 col-md-3">
+                        <label for="fechafin" class="form-label">Fecha fin</label>
+                        <InputDate id="fechafin" @bind-Value="Trabajo.FechaFinalizacion" class="form-control" />
+                        <ValidationMessage For="() => Trabajo.FechaFinalizacion" class="text-danger" />
+                    </div>
+
+                    <div class="col-12">
+                        <label for="descripcion" class="form-label">Descripción</label>
+                        <InputText id="descripcion" @bind-Value="Trabajo.Descripcion" class="form-control" />
+                        <ValidationMessage For="() => Trabajo.Descripcion" class="text-danger" />
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <label for="tipotrabajo" class="form-label">Tipo de trabajo</label>
+                        <InputSelect id="tipotrabajo" @bind-Value="Trabajo.TipoTrabajo" class="form-select">
+                            <option value="">Seleccione un tipo</option>
+                            @foreach (var tt in TiposTrabajo)
+                            {
+                                <option value="@tt.IdTipoTrabajo">@tt.Nombre</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="() => Trabajo.TipoTrabajo" class="text-danger" />
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <label for="predio" class="form-label">Predio</label>
+                        <InputSelect id="predio" @bind-Value="Trabajo.IdPredio" class="form-select">
+                            <option value="">Seleccione un predio</option>
+                            @foreach (var pr in Predios)
+                            {
+                                <option value="@pr.Idpredio">
+                                    @((pr.ApellidosNombresUsuario ?? pr.Direccion) ?? pr.Idpredio)
+                                </option>
+                            }
+                        </InputSelect>
+                        <small class="text-muted">Se muestra por nombre del usuario del predio.</small>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <label for="inventario" class="form-label">Inventario</label>
+                        <InputSelect id="inventario" @bind-Value="Trabajo.IdInventario" class="form-select">
+                            <option value="">Seleccione un inventario</option>
+                            @foreach (var inv in Inventarios)
+                            {
+                                <option value="@inv.Idinventario">
+                                    @((inv.DescripcionCorta ?? inv.Codigo) ?? inv.Idinventario)
+                                </option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label for="estado" class="form-label">Estado</label>
+                        <InputText id="estado" @bind-Value="Trabajo.Estado" class="form-control" />
+                        <ValidationMessage For="() => Trabajo.Estado" class="text-danger" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label for="observaciones" class="form-label">Observaciones</label>
+                        <InputTextArea id="observaciones" @bind-Value="Trabajo.Observaciones" class="form-control" />
+                        <ValidationMessage For="() => Trabajo.Observaciones" class="text-danger" />
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                    <a class="btn btn-light" href="/trabajos" onclick="return cerrarVentana('/trabajos');">Cerrar</a>
+                    <button type="submit" class="btn btn-primary">Crear</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private Trabajo Trabajo { get; set; } = new();
+    private List<TiposTrabajo> TiposTrabajo { get; set; } = new();
+    private List<Planilla> Planillas { get; set; } = new();
+    private List<Predio> Predios { get; set; } = new();
+    private List<Inventario> Inventarios { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        TiposTrabajo = await context.TiposTrabajos
+            .AsNoTracking()
+            .OrderBy(t => t.Nombre)
+            .ToListAsync();
+
+        Planillas = await context.Planillas
+            .AsNoTracking()
+            .OrderBy(p => p.FechaHoraRegistroConsumo)
+            .ToListAsync();
+
+        Predios = await context.Predios
+            .AsNoTracking()
+            .OrderBy(p => p.ApellidosNombresUsuario)
+            .ToListAsync();
+
+        Inventarios = await context.Inventarios
+            .AsNoTracking()
+            .OrderBy(i => i.DescripcionLarga)
+            .ToListAsync();
+    }
+
+    private async Task AddTrabajo()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Trabajos.Add(Trabajo);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/trabajos");
+    }
+}
+

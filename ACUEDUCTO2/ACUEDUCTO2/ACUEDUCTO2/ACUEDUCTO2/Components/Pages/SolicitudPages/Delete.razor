@@ -1,0 +1,79 @@
+@page "/solicitud/eliminar/{guid}"
+
+@using ACUEDUCTO2.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Eliminar Solicitud</PageTitle>
+
+<h3>Eliminar Solicitud</h3>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-danger">@ErrorMessage</div>
+}
+
+@if (solicitud == null)
+{
+    if (string.IsNullOrEmpty(ErrorMessage))
+    {
+        <p>Cargando...</p>
+    }
+}
+else
+{
+    <div class="alert alert-warning">
+        <p>¿Está seguro que desea eliminar la solicitud <strong>@solicitud.Guid</strong>?</p>
+        <p class="mb-2"><small>Esta acción no se puede deshacer.</small></p>
+        <button type="button" class="btn btn-danger" disabled="@IsProcessing" @onclick="EliminarAsync">Eliminar</button>
+        <button type="button" class="btn btn-secondary ms-2" disabled="@IsProcessing" @onclick="Cancelar">Cancelar</button>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string guid { get; set; } = string.Empty;
+
+    private Solicitud? solicitud;
+    private bool IsProcessing { get; set; }
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        using var db = DbFactory.CreateDbContext();
+        solicitud = await db.Solicitud.AsNoTracking().FirstOrDefaultAsync(s => s.Guid == guid);
+        ErrorMessage = solicitud is null ? "La solicitud indicada no existe o ya fue eliminada." : null;
+    }
+
+    private async Task EliminarAsync()
+    {
+        if (IsProcessing)
+        {
+            return;
+        }
+
+        IsProcessing = true;
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var entity = await db.Solicitud.FirstOrDefaultAsync(s => s.Guid == guid);
+            if (entity is null)
+            {
+                ErrorMessage = "La solicitud indicada no existe o ya fue eliminada.";
+                return;
+            }
+
+            db.Solicitud.Remove(entity);
+            await db.SaveChangesAsync();
+            Navigation.NavigateTo("/solicitud", forceLoad: true, replace: true);
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
+    }
+
+    void Cancelar() => Navigation.NavigateTo("/solicitud", forceLoad: true);
+}

@@ -1,0 +1,72 @@
+@page "/procesos/create"
+@using ACUEDUCTO2.Share.Models
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@inject ACUEDUCTO2.Services.ProcesoServices.ProcesoService ProcesoService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<h3>Crear proceso</h3>
+
+<EditForm Model="proceso" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label class="form-label">Nombre</label>
+        <InputText @bind-Value="proceso.Nombre" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Objeto</label>
+        <InputText @bind-Value="proceso.Objeto" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Tipo de Proceso</label>
+        <InputSelect @bind-Value="proceso.IdTipoProceso" class="form-select">
+            <option value="0">Seleccione un tipo...</option>
+            @foreach (var tipo in tiposProceso)
+            {
+                <option value="@tipo.Id">@tipo.Nombre</option>
+            }
+        </InputSelect>
+    </div>
+
+    <button type="submit" class="btn btn-primary" disabled="@isSaving">Crear</button>
+    <button type="button" class="btn btn-secondary ms-2" @onclick='() => Navigation.NavigateTo("/procesos")'>Cancelar</button>
+</EditForm>
+
+@code {
+    private Proceso proceso = new Proceso();
+    private List<TipoProceso> tiposProceso = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        tiposProceso = await ProcesoService.GetTiposProcesoAsync();
+    }
+    private bool isSaving;
+
+    private async Task HandleValidSubmit()
+    {
+        if (isSaving)
+        {
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(proceso.Id))
+                proceso.Id = Guid.NewGuid().ToString();
+
+            await ProcesoService.CreateAsync(proceso);
+            Navigation.NavigateTo("/procesos", forceLoad: true);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

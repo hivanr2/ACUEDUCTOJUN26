@@ -1,0 +1,881 @@
+﻿
+
+PM> Add-Migration [migration name]
+PM> Update-Database
+
+
+Scaffold-DbContext "YourConnectionString" Microsoft.EntityFrameworkCore.SqlServer -OutputDir Models -Force
+  
+  
+Server=SRV2021\\SQLEXPRESS;DataBase=ACUEDUCTO;User Id=sa;Password=Z!x2c3v4b5n6;TrustServerCertificate=true;
+
+// desarrollo
+"DefaultConnection": "Server=sql2022-001.adaptivewebhosting.com;Initial Catalog=xcursoro_acueducto;Persist Security Info=False;User ID=xcursoro_acu_db;Password=24i2m5a^V;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;"
+
+"DefaultConnection": "Server=SRV2021\\SQLEXPRESS;DataBase=ACUEDUCTO;User Id=sa;Password=v&bF9s228;TrustServerCertificate=True;"
+
+
+
+Scaffold-DbContext "Server=SRVSQL2022;DataBase=xcursoro_acueducto;User Id=sa;Password=Z!x2c3v4b5n6;TrustServerCertificate=true;" Microsoft.EntityFrameworkCore.SqlServer -OutputDir Models -Force
+
+Scaffold-DbContext "Server='SRV2021\SQLSRV2022';DataBase=xcursoro_acueducto;User Id=sa;Password=Z!x2c3v4b5n6;TrustServerCertificate=true;" Microsoft.EntityFrameworkCore.SqlServer -OutputDir Models -Force
+
+sql2022-001.adaptivewebhosting.com
+xcursoro_acu_db
+v&bF9s228
+
+acceso web seguro
+usuario : acueductojac
+pass : w_5t4nO90
+
+xcursoro
+C3hr3AkqE0&$7K  -  b~wGv3981
+
+
+estadisticas
+11?fE_KlFde4wlpn
+
+cuenta envio y recepcion de facturas y recibos por correo
+acueducto@xcursor.org
+q71wf~9P1
+
+
+facturacionacueductotobiachica@gmail.com
+
+!Q2w3e4r5t
+
+hbic brlb lhgj zmfp
+
+
+hdtk ysbf gxyd cmaj  MARZ2026
+
+3258 1622
+7276 8920
+9244 8868
+0022 5719
+5739 8028
+5469 0001
+6072 1131
+4005 6071
+3034 9418
+5136 1412
+
+
+FTP  servidor
+acueducto_ftp   i%7J0h52s
+
+**************INICIO*****SE APRENDIO EN EL PROCESO*******************************:
+
+1. Que si se pasan cobros de otras cosas que no sea el consumo en las facturas, 
+despues *****los totales de ingresos pueden doblarse en cuentas****, y despues 
+descuadrar el total contablemente haría falta dinero
+
+2. Al guardar iddocumento pierde el formato original IDDocumento en las class y toca verificarlo en muchas partes al igual que idmov.
+
+****************FIN*****SE APRENDIO EN EL PROCESO*******************************:
+
+
+
+
+
+******************************************************************************************************************************
+******************************************************************************************************************************
+Issue seems to be related to the way the Self-signed certificate gets generated from IIS. My issue got resolved after I used powershell to create the self-signed certificate.
+
+Run Powershell as admin
+
+Paste the following command: New-SelfSignedCertificate -FriendlyName YourCertifcateName -DnsName YourServer -KeyUsage DigitalSignature -NotAfter (Get-Date).AddYears(20)
+
+New-SelfSignedCertificate -FriendlyName AcueductoJAC -DnsName Acueducto -KeyUsage DigitalSignature -NotAfter (Get-Date).AddYears(20)
+
+Replace the “YourCertificateName” to one of your choice.
+
+Replace the “YourServer” to the hostname of the server.
+
+Then press Enter.
+
+The self-signed cert gets created and saved and is now available in IIS.
+
+Open IIS and bind the newly created certificate to the website on the https port.
+
+Refresh your webpage.
+******************************************************************************************************************************
+******************************************************************************************************************************
+
+
+Hello Ivan,
+
+To send an email from your server to another SMTP server like smtp.gmail.com using ASP.NET, you can follow these steps. Please note that you need to ensure that your server allows outbound connections on port 587 and that your Gmail account settings allow access from less secure apps.
+
+1. **Set Up Your Email Message**: Use the `System.Net.Mail` namespace in ASP.NET to create and configure your email message.
+
+2. **Configure SMTP Client**: Set up your SMTP client with Gmail's SMTP server details.
+
+Here's a sample code snippet in C#:
+
+```csharp
+using System.Net.Mail;
+
+// Set up the email message
+MailMessage message = new MailMessage();
+message.From = new MailAddress("your-email@gmail.com");
+message.To.Add(new MailAddress("recipient@example.com"));
+message.Subject = "Test Email";
+message.Body = "This is a test email sent from ASP.NET.";
+
+// Configure SMTP client
+SmtpClient client = new SmtpClient("smtp.gmail.com", 587);
+client.Credentials = new System.Net.NetworkCredential("your-email@gmail.com", "your-password");
+client.EnableSsl = true;
+
+// Send the email
+client.Send(message);
+```
+
+**Important Notes**:
+- Replace `"your-email@gmail.com"` and `"your-password"` with your actual Gmail credentials.
+- Ensure that your server allows outbound connections on port 587.
+- Make sure your Gmail account settings allow access from less secure apps.
+
+If you encounter any issues, please check the following:
+- Verify your Gmail credentials.
+- Ensure that your server's firewall settings allow outbound connections on port 587.
+- Check if your Gmail account settings allow access from less secure apps.
+
+If the issue persists, please provide more details about the error message you are receiving, and we will be happy to assist you further.
+
+For more detailed information, please refer to our Knowledge Base article: [How do I send an email using ASP.NET?](https://cp.adaptivewebhosting.com/index.php?rp=/knowledgebase/50/How+do+I+send+an+email+using+ASP.NET%3F.html)
+
+If you have any further questions or need additional assistance, please feel free to reach out.
+
+Best regards,
+Adaptive Web Hosting Support
+
+----------------------------------------------
+Ticket ID: #BYH-833702
+Subject: Sendemail from server to other smtp
+Status: Answered
+Ticket URL: https://cp.adaptivewebhosting.com/viewticket.php?tid=BYH-833702&c=oHAtn1IU
+----------------------------------------------
+
+version 1.10 
+- Visualización de Fechas de Consumos, ultimo día pago en plantillas.
+- Edición de ruta en consumo.
+- Se corrigen en Home los valores de fechas y se agrega fecha de corte que no estaba.
+- Facturacion impresion formato se agrega fechas de consumo, pago y corte.
+- Se esta Ajustando valores de coutas de cxc el proceso de
+	"verificación de cxc" en facturación. 
+	(Se toman de cxc de cc o id de usuario las facturas en CUOTASporpagar con EnFactura activo mayor a 0,
+	y se divide el valordebe por el numero de COUTASporpagar, ese valor se pone en otros de 
+	factura actual y despues se baja en uno el numero de coutas por pagar, y se suma 1 en coutas pagadas,
+	 y en valorPagado se aumenta el valor)
+- Se pusieron los títulos de la página de FACTURACION la descripción corta de la planilla.
+- Se pusieron los títulos de la página de RECAUDO la descripción corta de la planilla.
+- Se pusieron los títulos de la página de CONSUMO la descripción corta de la planilla.
+---------------
+commit source 22/may/2025
+---------------
+- Se pusieron en detalles de usuario las cuentas por cobrar y las cuentas por pagar
+que se tengan del usuario.2:23PM
+---------------
+commit source 23/may/2025
+---------------
+
+
+
+1. **Use Our SMTP Server**: You need to use our SMTP server instead of Gmail's. Update your SMTP settings in the appsettings.json file.
+
+```json
+"EmailSettings": {
+"SmtpServer": "awh-plesk1-win2022.adaptivewebhosting.com",
+"SmtpPort": 587,
+"SmtpUser": "acueducto@xcursor.org",
+"SmtpPassword": "your-email-password"
+}
+```
+
+***********INICIO FASE FACTURACIÓN************************************************************************************************
+
+
+Versión 1.11 
+(Hecho)
+- Se puso otros colores de fondo y degradado de menu.
+- Se volvio a poner sistema desde github por perdida de datos de discos duros.
+
+
+Versión 1.12 
+(Hecho)
+- Se ajustaron los valores de DeudaViene de las facturas generadas automáticamente.
+- Se ajustaron los valores de DeudaPasa de las facturas generadas automáticamente.
+
+Versión 1.13
+(Hecho)
+- Correjir enlaces de footer para home
+- Se puso enlace a ver predio en listado consumos ya que faltaba.
+- Se pone otros Valores para que se vea en casilla.
+- Se pone el valor de Ruta en casilla de ruta en consumo.
+- Se pone la SIC como entidad protectora de derechos de protección de datos Colombia
+   En paginasExternas.
+- Se cambia el nombre del sistema a "ACUEDUCTO COMUNITARIO ORG-v1.13".
+	No sale completo en Menu pantalla grande.
+- Se cambia el  nombre del sistema a "Acueducto ORG-V1.13"
+(FIN:15/JUN/2025 5:00 PM)
+
+Versión 1.14
+- Poner texto en Nota de facturacion y reacudo en "consuno" y "facturacion"
+- Poner Notas factura en sitio de factura en impresion.
+- Poner Observaciones Formato Impresion Facturacion
+(FIN:16/JUN/2025 6:43 AM)
+
+Versión 1.15
+- Se puso orden alfabético lista de usuartios en seguimiento.
+- Se pusieron en Observaciones de 161 Predios el tipo de CONSUMO para cada cliente 
+	y se deja en "Seguimiento" 19 de los predios con diferentes casos de consumo.
+- Se puso un campo para InformacionCatastral para que no influyera en Observaciones Predio.
+(FIN:17/JUN/2025 2:40 AM)
+
+Versión 1.16
+- Se puso gráfico consumos en impresion de factura
+- Que se envíe el correo electrónico adjunta factura al oprimir boton en facturación o consumo para Gmail.
+(FIN:17/JUN/2025 12:10 PM)
+
+Versión 1.17
+(Hecho)
+- Se puso Marca y estado medidor en facturación.
+- Se puso boton de cxc en recaudo.
+- Se puede editar si se ve o no las observaciones del predio en "consumos".
+- Se puede editar si se ve o no las observaciones del predio en "recaudos".
+- Se puso el estado del predio en detalles de Predio ya q faltaba.
+- Poner selector para que se vea o no listado de consumo "Observaciones Predio". 
+- Se pusieron totales al final del listado TOTALES de facturas Y PROMEDIO CONSUMOS en detalle de Predio.
+- Se puso mas grande texto de CUENTA BANCO en factura Impresa.
+(FIN:18/JUN/2025 1:37 AM)
+
+Versión 1.18
+- Se estan poniendo los MANTENIMIENTOS por bimiestre para control.
+- Se activa en el menu y se espera retroalimentación de necesidad de info requerida.
+(FIN:18/JUN/2025 4:27 AM)
+
+
+Versión 1.19
+(Hecho)
+- ****OJO SOLO SE PUEDE MODIFICAR LA IDENTIFICACION DEL USUARIO SI SE MODIFICAN LOS CAMBIOS EN CXC, CXP Y FACTURACION 
+	******MANUALMENTE CON ACCESO A LA BD.****
+- Que se manengan los valores correctos de Saldo o Valor en "ACTUALIZA CXC" que viene de factura anterior para la que se modifica o crea.
+- Poner a ver boton de recibo en recaudo a formato de impresión.
+- Poner a ver boton de cxc en recaudo a formato de impresión.
+- Se quitaron las cajas de texto de los listados en donde estan ya en "CONSUMO" O "RECAUDO"
+(FIN:23/JUN/2025 2:37 PM)
+
+Versión 1.20
+- Verificando ***************EDICION PREDIO aparece ERROR ************25/06/2025.9:45AM-12:31PM,5:00PM-7:10PM
+	FINALIZA : 1/JUL/2025 10:37AM 
+		- Se desconecto Usuario de facturación y se puso IDUsuarioFacturacion en Predio como string o texto referencia a usuario.
+		- Se hizo de nuevo scafoolfing de Predio para que el IDUsuario facturación se pusiera correctamente. 
+(FIN:1/JUL/2025 10:43 AM)
+
+Versión 1.21
+(Hecho)
+- ORGANIZAR DUPLICADO DE CARPETA Y ENLACES, PERO  YA FUNCIONA EDICIÓN 
+	CORRECTAMENTE CON IDENTIFICACIÓN DE USUARIO EN TEXTO Y NO EN SELECCIÓN DE USUARIO.
+- Se pone fondo en detalle predio en cuenta verde y rojo.
+- Se agrega tabla TipoConsumo.
+- Que el predio tenga Tipificación_Consumo bimestral
+	1. Extremadamente Alto 200M3 adelante:
+	2. Alto Entre 100 y 199M3:
+	3. Extremadamente Irregular: De Extremadamente alto a cero.(FDS) Fin De Semana.
+	4. Irregular: De Alto  a cero.(FDS) Fin De Semana.
+	5. Normal Alto: Entre 50  a 100M3.
+	6. Normal : Entre 10 y 50M
+	7. Normal Bajo: Entre 0 y 10M3
+	8. Extremaamente Bajo.: Menos de 5M Año.
+- Se agrego  la edición del tipo consumo para Predio.
+- Se agrego en el Home el reporte por tipo de consumo.
+(FIN:4/JUL/2025 9:11 PM)
+
+Versión 1.22
+(Hecho)
+- Se agrego el Rango al listado de Tipos de consumo. FECHA:4-JUL-2025 10:19PM
+- Se ajusta edicion de Predio para tarjet _blank y que se pueda ver en otra ventana. FECHA:4-JUL-2025 10:36PM
+(FIN:4/JUL/2025 11:21 PM)
+
+
+Versión 1.23
+(Hecho)
+- Se ajustó Edición de Predio ya cambia Tipo Consumo y Checkbox, no cambiaban.
+- Se ordenaron los Tipos Consumo por Orden de Id de creación en ReporteTipoConsumoComponent.
+- Se puso el mnu hamburgesa en pantalla pequeña.
+(FIN:5/JUL/2025 11:37 AM)
+
+Versión 1.24
+(Hecho)
+- Se hizo el componente version en menú para cambiar solo un archivo de version en los diferentes loyouts.
+- Se puso Menu SGS y se estan configurando la edición y la creación.
+- Se puso inputtextarea para Observaciones Predial en Edición de Predio.
+- Ya se puede crear la Solicitud.
+- Se geolocaliza correctamente de nuevo en Predio Editar.FECHAHORA:6/07/2025 3:22PM.
+(FIN:6/JUL/2025 4:01 PM)
+
+Versión 1.25
+(Hecho)
+- Se modifico crear SOLICITUD para tipo solicitud, estado y usuario.7:56PM 6/JUL/2025.
+- Se quito Menu Inicio para espacio queda logo con enlace a inicio.
+- Ya se puede editar el usuario. 8.24PM 07/JUL/2025.
+- Ya funcionar editar en facturación.
+- Poner los colores de fondo de las columnas de la facturacion de acuerdo al excel anterior.
+(FIN:7/JUL/2025 8:25PM)
+
+Versión 1.26
+(Hecho)
+- Se puede editar la factura desde el listado.
+- Ya se puede crear un Predio Nuevo sin que salgan errores.
+- Se configuró formato el Listado de de solicitudes.
+- Se ve el saldo correcto saldo que viene de la factura anterior.
+- Se pueden editar las solicitudes del SGS.
+(FIN:9/JUL/2025 5:18PM)
+
+Versión 1.27
+(Hecho)
+- Se pueda ver el listado de facturación bimestral los datos que se registran en el sistema como tipificación consumo.
+- Ya funciona la creación de Solicitudes en el SGS correctamente. 8.08AM 10/JUL/2025
+(FIN:10/JUL/2025 8:10AM)
+
+Versión 1.28
+(Hecho)
+- Se puede editar los consumos de un predio desde el listado de consumos. 11/07/2025 3:10PM
+(FIN:11/JUL/2025 4:51PM)
+
+Versión 1.29
+(Hecho)
+- Al editar valores en RECAUDO se actualiza el valor de  DEUDAANTERIOR del siguiente periodo.
+- Al editar valores en CONSUMO se actualiza el valor de CosumoAnterior del siguiente periodo.
+(FIN:12/JUL/2025 1:42PM)
+
+Versión 1.30
+(Hecho)
+- Editar SGS las cajas de texto deben ser textarea y no input de las solicitudes.
+- Se elabora un reporte de solictudes por tipo y estado antes del listado.
+- Se ordenó el listado de solicitudes.
+(FIN:14/JUL/2025 1:00PM)
+
+
+Versión 1.31
+(Hecho)
+- Ya se puede ver en el listado de solicitudes por palabra clave, la cantidad y tipo de solicitud.
+- YA NO Se crean varios registros de cxc de la misma factura AL  poner VERIFICA CXC.
+- Ya esta funcionando la creación de Tipos en SGS. 
+- Ya esta funcionando la edicion de Tipos en SGS.
+- Ya esta funcionando la creación de Estados en SGS. 
+- Ya esta funcionando la edicion de Estados en SGS.
+- *** Pruebas***** Creacion de Soicitud ***** Resultado : Correcta **********
+- No se ha podido subir correctamente, perece q la base de datos no esta sincronizada como localmente.
+(FIN:14/JUL/2025 11:30PM)
+
+
+Versión 1.32
+(Hecho)
+- Que al ""Verificando el CXC"" verificar de facturacion se hace de forma correcta
+el valor de la factura y el saldo de la cuenta por cobrar.24/06/2025.
+3.46pm : 9:17PM-11PM.
+************NO FUNCIONA SGS EN SERVIDOR *********
+************NO FUNCIONA SGS EN SERVIDOR *********12:05AM 15/JUL/2025.
+**solución: SE HABÍA CREADO UN REGISTRO CON NULL EN LOS 2 CAMPOS DE TIPO Y AL QUITARLO FUNCIONÓ CORRRECTAMENTE SGS.
+localmente el estado se crea correctamente y en servidor no.******EN ESTO VOY**********.
+- Ya funciona la creacion de usuario que no funcionaba.
+- *******PRUEBAS: de creación de Predio ***********correcta.*********************1:00PM 15/07/2025
+- *********ojoooooooooo*******************No subio correcamente al servidor toca intentar de nuevo.11:45pm 14/jul/2025.
+- ****Si subía correctamente:
+					- era unos registros de Tipo o Estado que quedaron creados con NULL de contenido
+						y al retirarlas ya funcionó *****
+- Se esta ajustando la creación de Estado no funciona correctamente. 25/07/2025 9:04AM
+- Se modificó la impresión de factura para que salieran mas obscuros los datos del cliente. 25/07/2025 9:26AM
+*********************NO HA HABIDO LUZ EN TODA LA SEMANA************************************
+*********************NO HA HABIDO LUZ EN TODA LA SEMANA************************************
+(FIN:25/JUL/2025 9:35AM)
+
+Versión 1.33
+(Hecho)
+- Se ajustó editar de solicitud ya funciona, por que no se actualizaba el estado.
+- Ya funciona la creación de Trabajos.
+(FIN:27/JUL/2025 2:38PM)
+
+
+Versión 1.34
+(Hecho)
+- Se vea correcto el formato impreso de factura.
+- El editar Trabajo ya muestra el tipo trabajo y no el id 
+- Ya funciona serie documentacion al crear y todos no tenia IntectiveServer
+- Ya funciona la creacion de Estado.  Y ya se había ajustado hace 2 días. 14 jul.
+- Igual TipoDocumentacion ya se  puede crear, editar y borrar.
+- Ya se puede editar el Ingreso de caja.
+(FIN:28/JUL/2025 3:49PM)
+
+Versión 1.35
+(Hecho)
+- Ya se editan los campos de solicudes, si el estado pero lo demas no.
+- Se ajusto la edicion de consumos para que se pueda ver valores de mas campos y ajustar.
+(FIN:30/JUL/2025 2:00AM)
+
+Versión 1.36
+(Hecho)
+- Ya se puede ver el nombre del tipo de trabajo en trabajos.
+- Ya se actualiza la fechahoraREGISTRO de la elaboración factura en consumo. 12/08/2025 2:36AM
+- Ya se verificó que el listado de facturacion actualizara el campo de cargo fijo con el valor del mes anterior al poner VERIFICAR CXC
+- ya se puede abri ventana llevando al usuario a elaborar el recibo de ingreso desde el listado de facturación. 29/ago/2025. 6.06PM
+- Se creo la cuenta facturacionacueductotobiachica@gmail.com  claves y accesos arriba de este documento para envio de correos de faturación.
+- Se puso el checkbox para que al hace toma datos en consumos se pueda poner si se quiere que se muestren datos o no.
+- Se ajustó la subida del archivo de excel por que se revalido la licencia de componente comunity para subirlo.31/ago/2025. 8.35PM.
+(FIN:03/SEP/2025 10:04PM)
+
+
+Versión 1.37
+(Hecho)
+- Se ajusto que el valor de una factura modificada afectara la factura siguiente.
+- Ya se puede filtrar por NO PAGO en listado de RECAUDO.
+- Que se vea el valor mora en la factura desde el listado de facturación si el valor pagado es menor al valor debido.
+- Al editar una planilla se actualice la fecha de registro de factura de todas las facturas de la misma planilla. 
+- Que se Puedan ver solo los que no han pagado en el listado de facturación con un checkbox.
+- Se desactivaron las actualizaciones bimestre a bimestre en consumos tanto en facturacion.
+(FIN:06/SEP/2025 6:33PM)
+
+Versión 1.38
+(Hecho)
+- ya se ajusta el texto de recauda factura y nota recaudo para que pongan el mensaje de factura dependiendo del tipo de abono.
+- al actualizar consumos del bimestre pase al siguiente bimestre el consumo anterior.
+- Se quitaron las cjas de  texto en los listados que no se usan al no estar en edición.
+- Se hace filtro de Solicitudes or palabra clave
+- Ya suma correctamente cuando se cambia el recaudo  la deuda que pasa.
+- Hace filtro con letras en caja para recaudo y analisis de bimestre mucho más rápido.
+- Hace filtro de letras en codigo usuario en recaudo.
+- Se actualizo eñ formato Recibo con los numeros de Ingreso.
+- Se pusueron las aproximaciones a 100 para recaudo que no tenía correcto los valores, la IA quita cosas cuando se usa.
+- Ya se envía el formato correcto al correo electrónico.
+(FIN:19/SEP/2025 5:50AM)
+
+Version 1.39
+(Hecho)
+- Se crearon las carpetas y subida de archivos para cada predio e inventario del sistema.
+- Se ajustó la subida de archivos para que se guarden en la carpeta del predio o inventario correspondiente.
+- Solicitud 20 : Se puso un boton en cada predio e inventario, 
+		en el que se guardan las imágenes que suban los usuarios por cada uno de ellos. 
+		(Se establece el directorio a guardar las imágenes en 
+				wwwroot/imagenes/predios o inventario(CodigoUsuario ó Codigo Inventario))
+- Ya se puede ver en el menu principal el enlace a trabajos funcionando correctamente y se
+	depliegan los trabajos e igualmente de editan borran y ven detalles de cada uno.
+- Y se pueden ver arupados por estado abiertos y cerrados y con filtro por descripción.
+(FIN:3/OCT/2025 11:30AM)
+
+Version 1.40
+(Hecho)
+- Se hace gráfico de recaudo diario y acumulado en pagina principal.
+- Se agrego el valor del bimestre anterior en el reporte de recaudo diario.
+- Sololicitud# Ya se puede ver en listado de ingresos el registro del codigo de la factura del bimestre anterior que se esta cancelando o abonando.
+- Se agregaron las lineas al gráfico de ultifecha de pago y suspension.
+- Se hizo que el menu de pie se desapareciera cuando no se mueva el mouse y reparezca cuando se mueva de nuevo.
+- Se puso kamban y mejor presentación de index de SGS.
+- Se puso presentacion mejorada de solicitudes.
+(FIN:10/OCT/2025 3:00PM))
+
+Version 1.5.0
+(Hecho)
+- Presentacion Predios y otros ajustada.
+- Presentacion detalles de Predios ajustada y edita predio.
+- Presentacion Usuario, edicion y detalles actualizada a diseño moderno.
+- Se ven los botones de tipo y estado en solicitudes index.
+- Se ven iconos en menu.
+- Se acondicionó diseño de varias páginas y detalles.
+- Se ajusto el diseño de varias partes de edicion y detalles de imagenes para predio e inventario.
+(FIN:11/OCT/2025 4:30PM)
+
+Version 1.5.1
+(Hecho)
+- Se mejoro la carga de imagenes en los detalles de inventario.
+- Se optimizo el rendimiento de la pagina de detalles de inventario.
+- Se adecuó nuevo diseño a creación de usuario.
+- Se aceptaron archivos multimedia para imagenes en inventario y predios.
+- Se arreglo enlace de documentacion a series y tipos.
+- Se ajusto un error de laysyloading en inventarios.
+(FIN:12/OCT/2025 1:39PM)
+
+Version 1.5.2
+(Hecho)
+- Se estan haciendo los pdf desde facturación para cada usuario.
+- Se estan haciendo los pdf desde facturación para cada usuario (FUNCIONA LOCAL SERVER NO).
+- Se pone otro grupo en detalle de usuario para las Solicitudes del SGS que tenga.
+- EL DETALLE DE LA PLANTILLA PONLE EL DISEÑO BASADO EN LA DISTRIBUCION DE LA EDICION DE LA PLANTILLA.
+- Ya se puede hacer elarchivo pdf de la factura y se guarda en la carpeta de codigoCliente unitariamente y para todos.
+- SE ESTA CUADRANDO EL FORMATO PARA IMPRESIÓN DE FACTURA EN IMPRESORA DE ROLLO.
+- Se incluyeron los campos de identificación catastral y descripcion catastral y observaciones en la búsueda d predio.
+(FIN:19/OCT/2025 11:23PM)
+
+
+Version 1.5.3
+(Hecho)
+- Se incluyeron los campos de PUEAA para cada usuario y 
+	un panel de control	para ver el cumplimiento todos los usuarios.
+- Se ajusto el formato de tipo y estado de solicitud para q se viera mejor presentada.
+- Se ajusta el icono de aplicación.
+- El predio inactivo se vea en rojo en el listado de predios.
+- Cuando se ven los detalles de una planilla se actualizan los totales de la planilla con los registros que tenga en facturación.
+- PONE FORMATO FACTURA IMPRESA EN TERMICA.
+- PONE FORMATO FACTURA IMPRESA EN TERMICA.
+- PONE FORMATO FACTURA IMPRESA EN TERMICA.
+- PONE FORMATO FACTURA IMPRESA EN TERMICA.
+- PONE FORMATO FACTURA IMPRESA EN TERMICA.
+
+Version 1.5.4
+(Hecho)
+- Se hizo que no hubiera márgenes cuando se pone toma datos en el consumos
+
+
+Version 1.6.2
+(Hecho)
+- Se pusieron filtros para consumos y se arreglaron los de recaudo.
+- Se ocultan loas informaciones de fechas en consumos y recaudos por 5 segundos para mejor concentración en labor.
+- Se pone mayo tamaño de trabajo cuando se pone TomDatos en Consumos.
+- Se ordena ruta por botones de arriba abajo.
+- Se quita el boton de ver recibo de recaudo cuando es cero el recaudo y cuando se pone valor si aparece el boton.
+- Se cambian enlaces iniciales a siguiente bimestre para que salga actual.
+
+Versión 1.6.4
+(Hecho)
+- Se evita que se puedan enviar emails repetidos tanto en el detalle del predio como en consumo
+- Se quita boton switch de Editar Valores en listado de recaudo.
+
+Versión 1.6.5
+(Hecho)
+- Se envia el reporte de PUEAA por correo a cada usuario.
+- Se filtra cerradas y abiertas en SGS para mostrar solo abiertas en matriz tambien, solo mostraba en listado.
+
+Versión 1.6.7
+(Hecho)
+- Con boton de actualizar valores totales predio por periodo actual
+- Se pone borde azul en campos de deuda anterior y valor pagado en recaudo para que se vean mejor.
+- Se hacen componentes para poner nombres a archivos pdf de FACTURAS dentro de la carpeta y copiarlos a cada carpeta de usuario
+ con el codigoCliente.
+- Se hace componente para borrar archivos pdf de FACTURAS dentro de la carpeta con el codigoCliente.
+
+Versión 1.6.8
+(Hecho)
+- Se puso filtro por predio y codigo cliente en facturacion.
+- Se quito imprimir factura o ver si no hay pdf en recaudos.
+- Se ajusto error de filtro en facturación.
+
+Versión 1.6.9
+(Hecho)
+- Que se pueda tener un -Listado de Usuarios para Asistencia de Reuniones- en donde se listan los predios
+sobre los cuales se hace representación, donde salga el nombre del predio, espacio para la firma o nombre 
+y otro espacio para que el usuario ponga por escrito la cedula.  Y en el listado de Actualización de datos,
+éste se hace sobre la tabla Usuario, donde los únicos datos que salen del usuario son el nombreapellido y 
+codigoUsuario, para las siguientes, solo se dejan los espacios para escribirlos en la hoja :
+Nit o cédula, nombre, correo electrónico y observaciones.
+
+Versión 1.7.0
+(Hecho)
+- Se oculta mensaje de actualización de saldos en facturación. OK.
+- Se agregó firma y nombre aparte en listado de asistencia a reuniones.
+- Se muestra el nombre cliente en la ventana de ver detalles del predio.
+- Se ponen los enlaces desde Inicio de Menu a que se vean en otra ventana, para que el cliente no pierda la página de inicio.
+- Se pone la descripción corta de planilla en detalles de planilla y no el id
+(4/ENE/2026 3:12PM)
+
+Version 1.7.1 
+(Hecho)
+- Se pone que el filtro de usuario listado incluya la búsqueda en observaciones para incluir las personas que habitan el predio.
+- Se crea ACUEDUCTO.API, ACUEDUCTO.COMPARTIR para hacer la solución base para otros proyectos.
+- Se unifica el proceso OCR en SERVIDOR.
+
+Versión 1.7.2
+(Hecho)
+- Se incluyen los numeros factura en el listado de respaldo de planillas.
+- Se agregó el total m3 consumidos en el listado de respaldo de planillas.
+- Se puso en el listado de planillas si esta activo o no el periodo a editar.
+
+Versión 1.7.3
+(Hecho)
+- Se puso correctamente el titulo de facturación para identificar el bimestre que se está facturando.
+- Se pusieron nuevas margenes y se eliminar columnas para la impresion de facturacion bimestral para contadora.
+(12/MAR/2026 11:30AM)
+
+Versión 1.7.4
+(Hecho)
+- Se cambio el orden  de los enlaces para establecer el orden cronológico de los procesos naturalmente.
+- Se puso el comportamiento de pagos en el listado de Predios para cada predio.
+(14/MAR/2026 1:00PM)
+
+Versión 1.7.5
+(Hecho)
+- Se puso componente de reporte de predios afuera del listado de predios para que se cargue  más rápido.
+- 
+
+Versión 1.7.6
+(Hecho)
+- Se actualizó la versión del componente de reporte de facturacion de predios para mejorar la carga y visualización en movil y pantalla grande.
+- Se puso el enlace en el listado de predios para que se pueda ver el reporte de facturación de cada predio en otra ventana.
+(21Marzo2026 8:05PM)
+
+Versión 1.7.7 
+(Hecho)
+- Se organizó por objetos y luego por reportes.
+(15/ABRIL/2026)
+
+Versión  1.7.8
+(Hecho)
+- Totales y promedio listado impreso conumos bimestrales.
+
+
+
+Versión  1.7.11
+(Hecho)
+- 
+- 
+
+
+
+(Falta cuadrar con Ruth Y directivas)
+- NUEVO ALCANCE PROCEDIMIENTOS NUEVOS PARA CAJA Y CXC
+
+***********FIN FASE FACTURACIÓN************************************************************************************************
+- Hacer instructivo de presentacion del sistema.
+	- Hacer instructivo de creación de planillas.
+		- Para crear las planillas de facturación bimestral, se debe hacer click en el Menu principal sobre Planillas.
+		- Luego se debe hacer click en el botón "Crear Planilla para un Periodo".
+		- Se debe llenar la información solicitada en el formulario que aparece.
+			- Nombre de la Planilla: Se debe usar el año y el bimestre que se está creando.
+				EJ: "2023-02 ENERO - FEBRERO" Para el Primer bimestre del año 2023, 
+				para el segundo bimestre sería "2023-04 MARZO - ABRIL" y así sucesivamente.
+			- Descripción Corta: Ej: "ENE-FEB"
+			- Descripción Larga: Ej: "ENERO - FEBRERO"
+			- Fecha de Consumos: Fecha límite para el registro de consumo del bimestre.
+			- Fecha de Pago: Fecha en la que se realizará el pago de facturas de bimestres anteriores.
+			- Fecha de Suspensión Servicio: Fecha que indica el que el servicio será suspendido.
+
+		- Se deben crear las planillas de facturación correspondientes siempre con datos posteriores a la última planilla creada.
+		- Abierta la planilla se pueden registrar los consumos de los usuarios y posteriormente generar las facturas.
+			Se debe quitar Abierta para que ya no se puedan hacer cambios en consumos y facturación.
+- Hacer instructivo de creación de usuarios y predios.
+- Hacer el instructivo de facturación y recaudo.
+- Hacer el instructivo de consumos.
+- Hacer el instructivo de SGS y Mantenimiento.
+
+- Entregables:
+	- Instructivos.
+	- Base de datos.
+	- Código fuente.
+	- Hosting y dominio por 1 año. Despues $10.0USMes
+	- Capacitación en línea por 2 horas.
+
+***********INICIO**FASE****CAJA***********************************************************************************************
+
+(Falta hacer)
+- Que se pueda enviar adjunta la factura al número de WHATSAPP al oprimir boton en facturacion o consumo., 
+		cuando ya se autorice por la persona que se le pueden enviar mensajes desde el cel del cliente.
+
+************FASE****MANTENIMIENTO**********************************************************************************************
+
+- Que se pueda crear y editar la info necesaria y correcta para el registro de 
+		mantenimiento de un acueducto comunitario.
+- Que se ajuste el tipoConsumo de forma automática para la factura dependiendo del consumo del bimestre.
+- 
+
+************FASE****SGS********************************************************************************************************
+
+-
+
+
+
+Quiero generar un promt para una IA que denominaremos BASE, que genere un sistema completo de gestión de usuarios y autenticación
+en Blazor Server API/webassembly versión 9 .NET, para que pueda ser usada como "BASE" para integrar otros proyectos que ya se vuelven
+especificos, es decir dejarás lista esta solución para que se le integren mas funcionalidades especificas de programación,
+cumpliendo con los siguientes requisitos:
+
+Tecnologías:
+Este prompt debe crear un sistema en Blazor Server API/webassembly versión 9 .NET utilizando herramientas free, para identificar y validar el usuario.
+
+Solución Base: 
+Se usan 3 proyectos para la solución.  
+1. Blazor Server con API con controladores.
+2. Blazor library para .net, que guardará los procesos compartidos entre el servidor y el cliente, los modelos y uso de DTO se guardarán en ese proyecto.  
+3. WebAssembly el que va a contener TODO el proyecto de la parte cliente, todas la interfases gráficas, que conectan al servidor desde el cliente. Se deben usar Servicios tanto en server como en cliente para desplegar la información y modificarla.
+
+Seguridad:
+Deber identificar a los usuarios y dar accesos por perfil de usuario con Tokens JWT.
+Se debe usar Identity para la gestión de usuarios y roles.
+El sistema debe permitir la creación de usuarios, roles y asignación de permisos a los roles.
+El sistema debe permitir la autenticación y autorización de usuarios mediante JWT.
+El sistema debe permitir la gestión de contraseñas, incluyendo el restablecimiento de contraseñas y la verificación de correo electrónico.
+El sistema debe registrar todas las actividades de los usuarios, incluyendo inicios de sesión, cambios de contraseña y modificaciones de datos.
+El sistema debe implementar medidas de seguridad para proteger contra ataques comunes, como inyección SQL, XSS y CSRF.
+El sistema debe cumplir con las normativas de protección de datos aplicables, como el GDPR o la CCPA.
+
+Funcionalidades:
+El sistema debe permitir a los usuarios registrarse y crear una cuenta.
+El sistema debe permitir a los usuarios iniciar sesión y cerrar sesión.
+El sistema debe permitir a los usuarios ver y editar su perfil.
+El sistema debe permitir a los administradores gestionar usuarios y roles.
+El sistema debe permitir a los usuarios cambiar su contraseña.
+El sistema debe permitir a los usuarios recuperar su contraseña en caso de olvido.
+El sistema debe permitir a los administradores asignar permisos a los roles.
+El sistema debe permitir a los usuarios ver un historial de sus actividades.
+El sistema debe permitir a los administradores ver un historial de actividades de los usuarios.
+El sistema debe permitir a los usuarios autenticarse mediante proveedores externos, como Google o Facebook.
+El sistema debe permitir a los administradores configurar políticas de seguridad, como la longitud mínima de la contraseña y la expiración de la sesión.
+El sistema debe permitir a los usuarios configurar la autenticación de dos factores para mayor seguridad.
+El sistema debe permitir a los administradores monitorear y auditar la seguridad del sistema.
+El sistema debe permitir a los usuarios gestionar sus sesiones activas y cerrar sesiones en otros dispositivos.
+El sistema debe permitir a los administradores bloquear o eliminar cuentas de usuario en caso de actividad sospechosa.
+El sistema debe permitir a los usuarios ver y aceptar los términos y condiciones antes de crear una cuenta.
+El sistema debe permitir a los administradores personalizar la página de inicio de sesión y el proceso de registro.
+
+Requisitos técnicos:
+El sistema debe estar desarrollado en Blazor Server API/webassembly versión 9 .NET.
+El sistema debe utilizar una base de datos relacional para almacenar la información de los usuarios y roles.
+El sistema debe utilizar Entity Framework Core para la gestión de la base de datos.
+El sistema debe utilizar ASP.NET Core Identity para la gestión de usuarios y roles.
+El sistema debe utilizar JWT para la autenticación y autorización de usuarios.
+El sistema debe utilizar HTTPS para todas las comunicaciones.
+El sistema debe ser escalable y capaz de manejar un gran número de usuarios simultáneos.
+El sistema debe ser compatible con los principales navegadores web.
+El sistema debe ser probado exhaustivamente para garantizar su seguridad y funcionalidad.
+El sistema debe contar con documentación técnica detallada y un manual de usuario.
+El sistema debe ser desplegado en un entorno seguro y confiable, como Azure o AWS.
+
+Instrucciones adicionales:
+El código debe estar bien estructurado y seguir las mejores prácticas de desarrollo de software.
+El código debe estar documentado para facilitar su mantenimiento y actualización.
+El sistema debe ser diseñado con una interfaz de usuario intuitiva y fácil de usar.
+El sistema debe ser probado en diferentes escenarios para garantizar su robustez y fiabilidad.
+El sistema debe ser desarrollado con un enfoque en la seguridad desde el diseño, siguiendo el principio de "seguridad por defecto".
+El sistema debe ser desarrollado con un enfoque en la accesibilidad, asegurando que sea usable por personas con discapacidades.
+El sistema debe ser desarrollado con un enfoque en el rendimiento, optimizando el tiempo de carga y la eficiencia del sistema.
+El sistema debe ser desarrollado con un enfoque en la usabilidad, realizando pruebas de usuario para mejorar la experiencia del usuario.
+El sistema debe ser desarrollado con un enfoque en la mantenibilidad, facilitando futuras actualizaciones y mejoras.
+El sistema debe ser desarrollado con un enfoque en la internacionalización, permitiendo la adaptación a diferentes idiomas y regiones.
+El sistema debe ser desarrollado con un enfoque en la compatibilidad, asegurando que funcione correctamente en diferentes dispositivos y plataformas.
+El sistema debe ser desarrollado con un enfoque en la privacidad, protegiendo los datos personales de los usuarios y cumpliendo con las normativas de protección de datos.
+Genera el código necesario para crear este sistema completo, incluyendo todos los proyectos, configuraciones, modelos, controladores, servicios, componentes y vistas necesarios para cumplir con los requisitos especificados. Asegúrate de que el código sea funcional y pueda ser desplegado en un entorno de producción.
+
+Iterfase gráfica:
+El sistema debe contar con las siguientes vistas y componentes en la interfaz gráfica:
+- Página de inicio de sesión.
+- Página de registro de usuario.
+- Página de perfil de usuario.
+- Página de gestión de usuarios (solo para administradores).
+- Página de gestión de roles y permisos (solo para administradores).
+- Componente de cambio de contraseña.
+- Componente de recuperación de contraseña.
+- Componente de historial de actividades.
+- Componente de autenticación de dos factores.
+- Componente de gestión de sesiones activas.
+- Componente de términos y condiciones.
+- Componente de configuración de políticas de seguridad.
+- Componente de monitoreo y auditoría de seguridad.
+Genera el código necesario para crear estos componentes y vistas, asegurándote de que estén integrados correctamente con la lógica 
+del sistema y cumplan con los requisitos especificados. 
+Asegúrate de que la interfaz gráfica sea intuitiva y fácil de usar, siguiendo las mejores prácticas de diseño de interfaces de usuario.
+
+-------------------------------------------prompts----------------------------------------------------
+-------------------------------------------prompts----------------------------------------------------
+-------------------------------------------prompts----------------------------------------------------
+# Prompt maestro (incluye sugerencia de empaquetado en ZIP)
+
+Eres **BASE**, una IA generadora de código. Tu tarea: **crear automáticamente una solución completa y funcional** en .NET 9 que sirva como *BASE* para integrar proyectos posteriores. Debes generar **todo el código, configuración, scripts y documentación** para una solución de autenticación y gestión de usuarios en Blazor (Server API + WebAssembly + biblioteca compartida) **usando solo herramientas gratuitas**. La entrega debe ser un repositorio listo para ejecutar y desplegar en producción (incluye Dockerfile(s), scripts de migración y README con instrucciones de despliegue).
+
+---
+
+# Requerimientos generales
+1. Genera **3 proyectos** dentro de una única solución `.sln`:
+   - `MyBase.Server` — Blazor **Server** con API (controladores REST) y todos los servicios del lado servidor.
+   - `MyBase.Shared` — Blazor **Library** / proyecto .NET estándar que contiene DTOs, modelos, validaciones compartidas, constantes y reglas de negocio reutilizables.
+   - `MyBase.Client` — Blazor **WebAssembly** (WASM) que contiene toda la interfaz de usuario (componentes, páginas, servicios cliente HTTP).
+2. Usa **Entity Framework Core** con una base de datos relacional (SQL Server por defecto; incluye scripts/alternativa para PostgreSQL). Proporciona `DbContext`, migraciones EF y seed inicial para roles y usuario administrador.
+3. Implementa **ASP.NET Core Identity** para usuarios y roles, extendiendo la entidad `IdentityUser` con campos de perfil (Nombre, Apellidos, FechaNacimiento, Telefono, AceptoTerminos, IsBlocked, LastLogin).
+4. Autenticación basada en **JWT**. Token de acceso y refresh token. Implementa endpoints para login, refresh, logout, register, email confirmation, password reset (token por email), revoke tokens.
+5. Soporta **login con proveedores externos** (Google y Facebook) — implementa la infraestructura y documentación para añadir claves/secretos.
+6. Implementa **2FA** (TOTP — compatible con Google Authenticator / Authenticator apps).
+7. Control de **permisos** mediante claims o entidad `Permission`, asignables a roles.
+8. Registro de **auditoría** con tabla `AuditLogs`.
+9. Logging estructurado básico + endpoint seguro de métricas.
+10. Seguridad contra XSS, CSRF, SQL Injection; CSP headers, HSTS, HTTPS obligatorio.
+11. Funciones básicas GDPR/CCPA: exportación y borrado de datos.
+12. Gestión de sesiones activas y desconexión remota.
+13. UI responsiva y accesible; carga vía `Typed HttpClient`.
+14. Internacionalización (estructura de recursos).
+15. Tests unitarios e integración.
+16. Documentación completa y scripts de despliegue.
+
+---
+
+# Requerimientos funcionales
+Incluye API + UI para:
+- Registro, login, logout.
+- Perfil de usuario.
+- Cambio y recuperación de contraseña.
+- Gestión de usuarios (admin).
+- Gestión de roles y permisos (admin).
+- Auditoría.
+- Autenticación externa.
+- 2FA.
+- Sesiones activas.
+- Políticas de seguridad.
+- Términos y condiciones (obligatorios para crear cuenta).
+
+---
+
+# Librerías obligatorias (todas gratuitas)
+- ASP.NET Identity
+- EF Core (SqlServer y PostgreSQL)
+- JWT Bearer
+- Google/Facebook Auth
+- FluentValidation
+- AutoMapper
+- Swashbuckle (Swagger)
+- Ganss.XSS (o sanitizador propio)
+- xUnit / Moq
+
+---
+
+# Estructura mínima (esperada)
+```
+/MyBase.sln
+/src/MyBase.Server/
+/src/MyBase.Shared/
+/src/MyBase.Client/
+/tests/MyBase.Tests/
+Dockerfile
+docker-compose.yml
+README.md
+scripts/setup.ps1
+scripts/setup.sh
+```
+
+---
+
+# Formato de entrega
+1. Imprime el **árbol del proyecto**.
+2. Imprime el **contenido completo** de los archivos esenciales.
+3. Genera **scripts de migración** o instrucciones completas.
+4. Incluye **tests**.
+5. Incluye una **lista de verificación de seguridad**.
+6. Todos los archivos deben ser **compilables** en .NET 9.
+
+---
+
+# Sugerencia adicional (AGREGADA):
+**Además, empaqueta todo en un archivo llamado `MyBase.zip` y genera un script para su descarga.**
+
+---
+
+# Salida esperada
+- Código completo.
+- Estructura del repositorio.
+- Dockerfiles.
+- Migraciones.
+- Componentes Blazor.
+- Tests.
+- README.
+- ZIP generado.
+
+---
+
+**Fin del prompt.**

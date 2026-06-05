@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{85C98E03-8F45-49D7-8AB7-F28B28158A69}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>ACUEDUCTO2.Share</RootNamespace>
+    <AssemblyName>ACUEDUCTO2.Share</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.Build.Framework" />
+    <Reference Include="System" />
+    <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="MODELS\Autorizado.cs" />
+    <Compile Include="MODELS\Acueducto2LegacyCompatibility.cs" />
+    <Compile Include="MODELS\Cargo.cs" />
+    <Compile Include="MODELS\Consumo.cs" />
+    <Compile Include="MODELS\EstadoSolicitud.cs" />
+    <Compile Include="MODELS\Estrato.cs" />
+    <Compile Include="MODELS\Factura.cs" />
+    <Compile Include="MODELS\FacturaCompatibility.cs" />
+    <Compile Include="MODELS\Inventario.cs" />
+    <Compile Include="MODELS\Periodo.cs" />
+    <Compile Include="MODELS\Predio.cs" />
+    <Compile Include="MODELS\PredioListItem.cs" />
+    <Compile Include="MODELS\Proceso.cs" />
+    <Compile Include="MODELS\ProcesosCatalogo.cs" />
+    <Compile Include="MODELS\Recaudo.cs" />
+    <Compile Include="MODELS\Seguridad.cs" />
+    <Compile Include="MODELS\Solicitud.cs" />
+    <Compile Include="MODELS\Tarifa.cs" />
+    <Compile Include="MODELS\TipoConsumo.cs" />
+    <Compile Include="MODELS\TipoProceso.cs" />
+    <Compile Include="MODELS\TipoSolicitud.cs" />
+    <Compile Include="MODELS\TipoTrabajo.cs" />
+    <Compile Include="MODELS\Trabajos.cs" />
+    <Compile Include="MODELS\TrabajoEquipo.cs" />
+    <Compile Include="MODELS\TrabajoMaterial.cs" />
+    <Compile Include="MODELS\TrabajoPersonal.cs" />
+    <Compile Include="MODELS\Usuario.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="DTO\" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

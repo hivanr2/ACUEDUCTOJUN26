@@ -1,0 +1,269 @@
+@page "/autorizados/edit/{Guid}"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO2.Data
+@using ACUEDUCTO2.Share.Models
+@attribute [Authorize]
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+@inject ILogger<Edit> Logger
+
+<PageTitle>Editar Autorizado</PageTitle>
+
+<div class="container py-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h1 class="h4 mb-0">Editar Autorización</h1>
+            <small class="text-muted">Modificar datos de la autorización</small>
+        </div>
+        <a class="btn btn-outline-secondary" href="/autorizados">Volver</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(mensaje))
+    {
+        <div class="alert @(esError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+            @mensaje
+            <button type="button" class="btn-close" @onclick="() => mensaje = null"></button>
+        </div>
+    }
+
+    @if (!cargado)
+    {
+        <div class="text-center text-muted py-5">Cargando...</div>
+    }
+    else if (autorizado is null)
+    {
+        <div class="alert alert-warning">No se encontró la autorización solicitada.</div>
+        <a class="btn btn-outline-secondary" href="/autorizados">Volver al listado</a>
+    }
+    else if (!puedeEditar)
+    {
+        <div class="alert alert-warning">No tiene permiso para editar esta autorización.</div>
+        <a class="btn btn-outline-secondary" href="/autorizados">Volver al listado</a>
+    }
+    else
+    {
+        <div class="row g-3">
+            <div class="col-12 col-lg-7">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light"><strong>Datos de la Autorización</strong></div>
+                    <div class="card-body">
+                        <EditForm Model="autorizado" OnValidSubmit="GuardarAsync" FormName="editarAutorizado">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="text-danger" />
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Quién Autoriza</label>
+                                <div class="form-control-plaintext">
+                                    @autorizado.QuienAutoriza
+                                    @if (!string.IsNullOrWhiteSpace(nombreQuienAutoriza))
+                                    {
+                                        <small class="text-muted ms-1">(@nombreQuienAutoriza)</small>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">A Quién Autoriza</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" @bind="buscarAQueAutoriza" placeholder="Correo electrónico o identificación..." />
+                                    <button type="button" class="btn btn-outline-secondary" @onclick="VerificarAQueAutorizaAsync">Verificar</button>
+                                </div>
+                                @if (aQueAutorizaInfo is not null)
+                                {
+                                    <div class="mt-2 small text-success">
+                                        ✅ Usuario encontrado: @aQueAutorizaInfo.ApellidosNombres — @aQueAutorizaInfo.Identificacion
+                                    </div>
+                                }
+                                else if (!string.IsNullOrWhiteSpace(buscarAQueAutoriza))
+                                {
+                                    <div class="mt-2 small text-muted">
+                                        ℹ️ Se actualizará con el valor ingresado.
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Observaciones</label>
+                                <InputTextArea @bind-Value="autorizado.Observaciones" class="form-control" rows="3" placeholder="Motivo de la autorización (opcional)" />
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary" disabled="@(string.IsNullOrWhiteSpace(buscarAQueAutoriza) || guardando)">
+                                    @if (guardando) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                                    Guardar Cambios
+                                </button>
+                                <a class="btn btn-outline-secondary" href="/autorizados">Cancelar</a>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-5">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light"><strong>Información del Registro</strong></div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">Identificador</dt>
+                            <dd class="col-sm-7"><code class="small">@autorizado.Guid</code></dd>
+
+                            <dt class="col-sm-5">Fecha Registro</dt>
+                            <dd class="col-sm-7">@autorizado.FechaHoraRegistro.ToString("dd/MM/yyyy HH:mm")</dd>
+
+                            <dt class="col-sm-5">Registrado por</dt>
+                            <dd class="col-sm-7">@(autorizado.IdUsuarioRegistra ?? "—")</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Guid { get; set; } = default!;
+
+    private Autorizado? autorizado;
+    private ApplicationUser? usuarioActual;
+    private bool esAdmin;
+    private bool cargado;
+    private bool puedeEditar;
+    private bool guardando;
+    private string? mensaje;
+    private bool esError;
+
+    private string? nombreQuienAutoriza;
+    private string buscarAQueAutoriza = "";
+    private ApplicationUser? aQueAutorizaInfo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var claimsPrincipal = authState.User;
+
+        if (claimsPrincipal.Identity?.IsAuthenticated != true)
+        {
+            NavigationManager.NavigateTo("/Account/Login");
+            return;
+        }
+
+        esAdmin = claimsPrincipal.IsInRole("Administradores");
+
+        await using var context = await DbFactory.CreateDbContextAsync();
+
+        var userId = UserManager.GetUserId(claimsPrincipal);
+        usuarioActual = await context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (usuarioActual is null)
+        {
+            NavigationManager.NavigateTo("/Account/Login");
+            return;
+        }
+
+        autorizado = await context.Set<Autorizado>().FindAsync(Guid);
+
+        if (autorizado is not null)
+        {
+            puedeEditar = esAdmin || autorizado.QuienAutoriza == usuarioActual.Identificacion;
+            buscarAQueAutoriza = autorizado.AQueAutoriza ?? "";
+            nombreQuienAutoriza = await ResolverNombreAsync(context, autorizado.QuienAutoriza);
+            await VerificarAQueAutorizaAsync();
+        }
+
+        cargado = true;
+    }
+
+    private async Task VerificarAQueAutorizaAsync()
+    {
+        aQueAutorizaInfo = null;
+        if (string.IsNullOrWhiteSpace(buscarAQueAutoriza)) return;
+
+        await using var context = await DbFactory.CreateDbContextAsync();
+        var valor = buscarAQueAutoriza.Trim();
+        aQueAutorizaInfo = await context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Identificacion == valor || u.Email == valor);
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (autorizado is null || string.IsNullOrWhiteSpace(buscarAQueAutoriza)) return;
+
+        guardando = true;
+        mensaje = null;
+
+        try
+        {
+            var nuevoAQueAutoriza = buscarAQueAutoriza.Trim();
+
+            if (string.Equals(autorizado.QuienAutoriza, nuevoAQueAutoriza, StringComparison.OrdinalIgnoreCase))
+            {
+                mensaje = "No puede autorizarse a sí mismo.";
+                esError = true;
+                guardando = false;
+                return;
+            }
+
+            await using var context = await DbFactory.CreateDbContextAsync();
+
+            var entity = await context.Set<Autorizado>().FindAsync(autorizado.Guid);
+            if (entity is null)
+            {
+                mensaje = "La autorización ya no existe.";
+                esError = true;
+                guardando = false;
+                return;
+            }
+
+            // Verificar duplicado si cambió el destinatario
+            if (!string.Equals(entity.AQueAutoriza, nuevoAQueAutoriza, StringComparison.OrdinalIgnoreCase))
+            {
+                var yaExiste = await context.Set<Autorizado>()
+                    .AnyAsync(a => a.QuienAutoriza == entity.QuienAutoriza
+                                && a.AQueAutoriza == nuevoAQueAutoriza
+                                && a.Guid != entity.Guid);
+                if (yaExiste)
+                {
+                    mensaje = $"Ya existe una autorización de {entity.QuienAutoriza} para {nuevoAQueAutoriza}.";
+                    esError = true;
+                    guardando = false;
+                    return;
+                }
+            }
+
+            entity.AQueAutoriza = nuevoAQueAutoriza;
+            entity.Observaciones = autorizado.Observaciones ?? "";
+
+            await context.SaveChangesAsync();
+
+            mensaje = "Autorización actualizada exitosamente.";
+            esError = false;
+        }
+        catch (Exception ex)
+        {
+            var innerMsg = ex.InnerException?.Message ?? ex.Message;
+            mensaje = $"Error al guardar: {innerMsg}";
+            esError = true;
+            Logger.LogError(ex, "Error updating Autorizado {Guid}", Guid);
+        }
+
+        guardando = false;
+    }
+
+    private static async Task<string?> ResolverNombreAsync(ApplicationDbContext context, string? identificacion)
+    {
+        if (string.IsNullOrWhiteSpace(identificacion)) return null;
+        var user = await context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Identificacion == identificacion);
+        return user?.ApellidosNombres;
+    }
+}

@@ -1,0 +1,56 @@
+﻿@page "/materiales/details"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Detalles</PageTitle>
+
+<h1>Detalles</h1>
+
+<div>
+    <h2>Material</h2>
+    <hr />
+    @if (materiale is null)
+    {
+        <p><em>Cargando...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Nombre</dt>
+            <dd class="col-sm-10">@materiale.Nombre</dd>
+            <dt class="col-sm-2">Descripción</dt>
+            <dd class="col-sm-10">@materiale.Descripcion</dd>
+        </dl>
+        <div>
+            <a href="@($"/materiales/edit?idmaterial={materiale.IdMaterial}")">Editar</a> |
+            <a href="@($"/materiales")">Volver a la lista</a>
+        </div>
+    }
+</div>
+
+@code {
+    private Material? materiale;
+
+    [SupplyParameterFromQuery]
+    private int IdMaterial { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        // Evita la carga de propiedades de navegación para prevenir recursión
+        materiale = await context.Materiales
+            .AsNoTracking()
+            .Select(m => new Material {
+                IdMaterial = m.IdMaterial,
+                Nombre = m.Nombre,
+                Descripcion = m.Descripcion
+            })
+            .FirstOrDefaultAsync(m => m.IdMaterial == IdMaterial);
+
+        if (materiale is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+}

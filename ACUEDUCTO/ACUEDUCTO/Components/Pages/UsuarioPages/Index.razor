@@ -1,0 +1,138 @@
+﻿@page "/usuarios"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+
+@rendermode InteractiveServer
+
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+<PageTitle>Usuarios</PageTitle>
+
+<div class="container-fluid py-2 py-md-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Usuarios</h1>
+            <small class="text-muted">Facturación Acueducto</small>
+        </div>
+        <!-- Acciones superiores reemplazadas por FAB -->
+    </div>
+
+    <div class="row g-2 align-items-center mb-2">
+        <div class="col-12 col-md-6">
+            <input type="search" class="form-control" autofocus @bind=filterText @bind:event="oninput" placeholder="Buscar por nombre o identificación..." />
+        </div>
+        <div class="col-12 col-md-6 text-md-end text-muted d-flex flex-wrap gap-3 justify-content-md-end align-items-center">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="filtroSinCedula" @bind="filtroSinCedula" />
+                <label class="form-check-label" for="filtroSinCedula">Sin Cédula</label>
+            </div>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="filtroSinCelular" @bind="filtroSinCelular" />
+                <label class="form-check-label" for="filtroSinCelular">Sin Celular</label>
+            </div>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="filtroSinCorreo" @bind="filtroSinCorreo" />
+                <label class="form-check-label" for="filtroSinCorreo">Sin Correo</label>
+            </div>
+            <span>Items: <span class="badge bg-secondary">@UsuariosFiltered.Count()</span></span>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <QuickGrid Class="table table-hover table-sm align-middle mb-0" Items="UsuariosFiltered" Pagination="@pagination">
+                <PropertyColumn Property="usuario => usuario.ApellidosNombres" Title=":::::: APELLIDOS Y NOMBRES ::::::" Sortable="true" />
+                <TemplateColumn Context="usuario" Title="Identificación">
+                    <div>@MaskIdent(usuario.Identificacion)</div>
+                </TemplateColumn>
+                <TemplateColumn Context="usuario" Title="Acciones">
+                    <div class="text-end">
+                        <a class="btn btn-link btn-sm" href="@($"usuarios/edit?identificacion={usuario.Identificacion}")" target="_blank">Editar</a>
+                        <span class="text-muted">|</span>
+                        <a class="btn btn-link btn-sm" href="@($"usuarios/details?identificacion={usuario.Identificacion}")" target="_blank">Detalles</a>
+                    </div>
+                </TemplateColumn>
+            </QuickGrid>
+        </div>
+    </div>
+
+    <Paginator State="@pagination" />
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+</div>
+
+<!-- Botón flotante Crear -->
+<a href="/usuarios/create" class="fab-create" title="Crear usuario" aria-label="Crear usuario">
+    <img src="/img/plus.svg" alt="Crear" onerror="this.onerror=null;this.outerHTML='+';" />
+</a>
+
+@code {
+    private AcueductoContext context = default!;
+    private string? filterText = string.Empty;
+    private string? errorMessage = null;
+
+    private bool filtroSinCedula = false;
+    private bool filtroSinCelular = false;
+    private bool filtroSinCorreo = false;
+
+    PaginationState pagination = new PaginationState { ItemsPerPage = 10 };
+
+    protected override async Task OnInitializedAsync()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+
+    IQueryable<Usuario> UsuariosFiltered
+        => ApplyFilters(context.Usuarios);
+
+    private IQueryable<Usuario> ApplyFilters(IQueryable<Usuario> query)
+    {
+        // Texto
+        if (!string.IsNullOrWhiteSpace(filterText))
+        {
+            var ft = filterText!;
+            query = query.Where(x => (x.ApellidosNombres ?? string.Empty).Contains(ft)
+                                  || (x.Identificacion ?? string.Empty).Contains(ft)
+                                  || (x.Observaciones ?? string.Empty).Contains(ft));
+        }
+
+        // Sin Cédula: usuarios cuya identificación es exactamente 5 dígitos
+        if (filtroSinCedula)
+        {
+            query = query.Where(u => u.Identificacion != null
+                                  && u.Identificacion.Length == 5
+                                  && EF.Functions.Like(u.Identificacion, "[0-9][0-9][0-9][0-9][0-9]"));
+        }
+
+        // Sin Celular
+        if (filtroSinCelular)
+        {
+            query = query.Where(u => u.Celular == null || u.Celular == "" || u.Celular == "0");
+        }
+
+        // Sin Correo
+        if (filtroSinCorreo)
+        {
+            query = query.Where(u => u.CorreoElectronico == null || u.CorreoElectronico == "");
+        }
+
+        return query.OrderBy(u => u.ApellidosNombres);
+    }
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+
+    private static string MaskIdent(string? ident)
+    {
+        if (string.IsNullOrWhiteSpace(ident)) return string.Empty;
+        var cleaned = ident.Trim();
+        if (cleaned.Length <= 3) return new string('•', cleaned.Length);
+        var last = cleaned[^3..];
+        var masked = new string('•', cleaned.Length - 3) + last;
+        return masked;
+    }
+}

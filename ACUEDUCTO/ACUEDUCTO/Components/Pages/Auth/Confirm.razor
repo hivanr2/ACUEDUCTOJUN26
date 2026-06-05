@@ -1,0 +1,66 @@
+@page "/auth/confirm"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Services
+@inject NavigationManager Nav
+@inject EmailTokenService Tokens
+@inject IDbContextFactory<AcueductoContext> DbFactory
+
+<h3>Confirmación de autorización</h3>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert @alertClass">@message</div>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? token { get; set; }
+
+    private string message = string.Empty;
+    private string alertClass = "alert-info";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            Fail("Token ausente.");
+            return;
+        }
+
+        if (!Tokens.TryValidate(token, out var userId))
+        {
+            Fail("Token inválido o expirado.");
+            return;
+        }
+
+        try
+        {
+            await using var db = DbFactory.CreateDbContext();
+            var user = await db.Usuarios.FirstOrDefaultAsync(u => u.Identificacion == userId);
+            if (user is null)
+            {
+                Fail("Usuario no encontrado.");
+                return;
+            }
+
+            // Marca observación o crea permisos por defecto (público con acceso básico)
+            user.Observaciones = "AUTORIZADO";
+            db.Usuarios.Update(user);
+            await db.SaveChangesAsync();
+
+            message = $"Autorización activada para {user.ApellidosNombres}. Puede cerrar esta ventana.";
+            alertClass = "alert-success";
+        }
+        catch (Exception ex)
+        {
+            Fail($"Error: {ex.Message}");
+        }
+    }
+
+    private void Fail(string msg)
+    {
+        message = msg;
+        alertClass = "alert-danger";
+    }
+}

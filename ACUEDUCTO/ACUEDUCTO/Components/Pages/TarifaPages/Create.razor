@@ -1,0 +1,60 @@
+﻿@page "/tarifas/create"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create</PageTitle>
+
+<h1>Create</h1>
+
+<h2>Tarifa</h2>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <EditForm method="post" Model="Tarifa" OnValidSubmit="AddTarifa" FormName="create" Enhance>
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert"/>
+            <div class="mb-3">
+                <label for="desde" class="form-label">Tipo:</label>
+                <InputText id="tipo" @bind-Value="Tarifa.Tipo" class="form-control" />
+                <ValidationMessage For="() => Tarifa.Tipo" class="text-danger" />
+            </div>
+            <div class="mb-3">
+                <label for="desde" class="form-label">Desde:</label>
+                <InputNumber id="desde" @bind-Value="Tarifa.Desde" class="form-control" />
+                <ValidationMessage For="() => Tarifa.Desde" class="text-danger" />
+            </div>
+            <div class="mb-3">
+                <label for="hasta" class="form-label">Hasta:</label> 
+                <InputNumber id="hasta" @bind-Value="Tarifa.Hasta" class="form-control" /> 
+                <ValidationMessage For="() => Tarifa.Hasta" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="valorunidad" class="form-label">ValorUnidad:</label> 
+                <InputNumber id="valorunidad" @bind-Value="Tarifa.ValorUnidad" class="form-control" /> 
+                <ValidationMessage For="() => Tarifa.ValorUnidad" class="text-danger" /> 
+            </div>        
+            <button type="submit" class="btn btn-primary">Create</button>
+        </EditForm>
+    </div>
+</div>
+
+<div>
+    <a class="btn btn-outline-secondary btn-sm" href="" onclick="return cerrarVentana('');">Cerrar</a>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private Tarifa Tarifa { get; set; } = new();
+
+    // To protect from overposting attacks, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task AddTarifa()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Tarifas.Add(Tarifa);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/tarifas");
+    }
+}

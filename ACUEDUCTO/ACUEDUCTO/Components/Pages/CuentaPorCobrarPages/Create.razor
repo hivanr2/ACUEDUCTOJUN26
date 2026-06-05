@@ -1,0 +1,113 @@
+﻿@page "/cuentaporcobrars/create"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create</PageTitle>
+
+<h1>Create</h1>
+
+<h2>CuentaPorCobrar</h2>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <EditForm method="post" Model="CuentaPorCobrar" OnValidSubmit="AddCuentaPorCobrar" FormName="create" Enhance>
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert"/>
+            <div class="mb-3">
+                <label for="numero" class="form-label">Numero:</label> 
+                <InputNumber id="numero" @bind-Value="CuentaPorCobrar.Numero" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorCobrar.Numero" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="identificacion" class="form-label">Identificacion:</label> 
+                <InputText id="identificacion" @bind-Value="CuentaPorCobrar.Identificacion" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorCobrar.Identificacion" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="descripción" class="form-label">Descripcion:</label> 
+                <InputText id="descripción" @bind-Value="CuentaPorCobrar.Descripcion" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorCobrar.Descripcion" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="fechahora" class="form-label">FechaHora:</label> 
+                <InputDate id="fechahora" @bind-Value="CuentaPorCobrar.FechaHora" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorCobrar.FechaHora" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="vencimiento" class="form-label">Vencimiento:</label> 
+                <InputDate id="vencimiento" @bind-Value="CuentaPorCobrar.Vencimiento" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorCobrar.Vencimiento" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="valordebe" class="form-label">ValorDebe:</label> 
+                <InputNumber id="valordebe" @bind-Value="CuentaPorCobrar.ValorDebe" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorCobrar.ValorDebe" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="valorpagado" class="form-label">ValorPagado:</label> 
+                <InputNumber id="valorpagado" @bind-Value="CuentaPorCobrar.ValorPagado" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorCobrar.ValorPagado" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="cuotastotales" class="form-label">CuotasTotales:</label> 
+                <InputNumber id="cuotastotales" @bind-Value="CuentaPorCobrar.CuotasTotales" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorCobrar.CuotasTotales" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="cuotaspagadas" class="form-label">CuotasPagadas:</label> 
+                <InputNumber id="cuotaspagadas" @bind-Value="CuentaPorCobrar.CuotasPagadas" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorCobrar.CuotasPagadas" class="text-danger" /> 
+            </div>
+
+            <div class="mb-3">
+                <label for="enviacorreo" class="form-label">Se cobra EN FACTURA CONSUMO:</label>
+                <InputCheckbox id="enviacorreo" @bind-Value="EnFactura" class="form-check-input" />
+                <ValidationMessage For="() => CuentaPorCobrar.EnFactura" class="text-danger" />
+            </div>
+
+
+            <button type="submit" class="btn btn-primary">Create</button>
+        </EditForm>
+    </div>
+</div>
+
+<div>
+    <a href="/cuentaporcobrars">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private CuentaPorCobrar CuentaPorCobrar { get; set; } = new();
+
+    private bool EnFactura { get; set; } = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        // facturas = await context.Facturacions.Include(c => c.IdpredioNavigation).ToListAsync();
+        if (CuentaPorCobrar.Numero == null || CuentaPorCobrar.Numero == 0)
+        {
+            // Ingreso.FechaHora = DateTime.Now;
+            int siguienteNumero = 1; // Valor por defecto en caso de que no haya registros
+
+            if (context.CuentaPorCobrars.Any() && context.CuentaPorCobrars != null)
+            {
+                siguienteNumero = (context.CuentaPorCobrars.Where(a => a.Numero > 0).Select(a => a.Numero).Max().Value) + 1;
+
+            }
+            CuentaPorCobrar.Numero = siguienteNumero;
+        }
+    }
+
+
+    private async Task AddCuentaPorCobrar()
+    {
+        using var context = DbFactory.CreateDbContext();
+        CuentaPorCobrar.IdcuentaxC = Guid.NewGuid().ToString();
+        context.CuentaPorCobrars.Add(CuentaPorCobrar);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/cuentaporcobrars");
+    }
+}

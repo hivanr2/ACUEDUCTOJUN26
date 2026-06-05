@@ -1,0 +1,194 @@
+﻿@page "/solicitudes/edit2"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Edit</PageTitle>
+
+<h1>Edit</h1>
+
+<h2>Solicitud</h2>
+<hr />
+@if (Solicitud is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-4">
+            <EditForm method="post" Model="Solicitud" OnValidSubmit="UpdateSolicitud" FormName="edit" Enhance>
+                <ValidationSummary role="alert"/>
+                <input type="hidden" name="Solicitud.Id" value="@Solicitud.Id" />
+                <div class="mb-3">
+                    <label for="idususario" class="form-label">IdUsusario:</label>
+                    <InputText id="idususario" @bind-Value="Solicitud.IdUsuario" class="form-control" />
+                    <ValidationMessage For="() => Solicitud.IdUsuario" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="codigo" class="form-label">Codigo:</label>
+                    <InputText id="codigo" @bind-Value="Solicitud.Codigo" class="form-control" />
+                    <ValidationMessage For="() => Solicitud.Codigo" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="tipo" class="form-label">Tipo:</label>
+                    <InputNumber id="tipo" @bind-Value="Solicitud.Tipo" class="form-control" />
+                    <ValidationMessage For="() => Solicitud.Tipo" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="fechahorarecepcion" class="form-label">FechaHoraRecepcion:</label>
+                    <InputDate id="fechahorarecepcion" @bind-Value="Solicitud.FechaHoraRecepcion" class="form-control" />
+                    <ValidationMessage For="() => Solicitud.FechaHoraRecepcion" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="estado" class="form-label">Estado:</label>
+                    <InputNumber id="estado" @bind-Value="Solicitud.EstadoID" class="form-control" />
+                    <ValidationMessage For="() => Solicitud.EstadoID" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="descripción" class="form-label">Descripción:</label>
+                    <InputTextArea id="descripción" @bind-Value="Solicitud.Descripción" class="form-control" />
+                    <ValidationMessage For="() => Solicitud.Descripción" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="planear" class="form-label">Planear:</label>
+                    <InputText id="planear" @bind-Value="Solicitud.Planear" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="usuarioplanear" class="form-label">UsuarioPlanear:</label>
+                    <InputNumber id="usuarioplanear" @bind-Value="Solicitud.UsuarioPlanear" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="fechahoraplanear" class="form-label">FechaHoraPlanear (opcional):</label>
+                    <InputDate @bind-Value="Solicitud.FechaHoraPlanear"
+                               id="fechahoraplanear"
+                               class="form-control" />
+                    <small class="form-text text-muted">Este campo es opcional.</small>
+                    <ValidationMessage For="() => Solicitud.FechaHoraPlanear" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="hacer" class="form-label">Hacer:</label>
+                    <InputTextArea id="hacer" @bind-Value="Solicitud.Hacer" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="usuariohacer" class="form-label">UsuarioHacer (opcional):</label>
+                    <InputNumber @bind-Value="Solicitud.UsuarioHacer"
+                                 id="usuariohacer"
+                                 class="form-control" />
+                    <small class="form-text text-muted">Este campo es opcional.</small>
+                    <ValidationMessage For="() => Solicitud.UsuarioHacer" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="fechahorahacer" class="form-label">FechaHoraHacer:</label>
+                    <InputDate id="fechahorahacer" @bind-Value="Solicitud.FechaHoraHacer" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="verificar" class="form-label">Verificar:</label>
+                    <InputTextArea id="verificar" @bind-Value="Solicitud.Verificar" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="usuarioverifica" class="form-label">UsuarioVerifica:</label>
+                    <InputNumber id="usuarioverifica" @bind-Value="Solicitud.UsuarioVerifica" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="fechahoraverifica" class="form-label">FechaHoraVerifica:</label>
+                    <InputDate id="fechahoraverifica" @bind-Value="Solicitud.FechaHoraVerifica" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="actuarmejora" class="form-label">ActuarMejora:</label>
+                    <InputTextArea id="actuarmejora" @bind-Value="Solicitud.ActuarMejora" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="usuarioactuamejora" class="form-label">UsuarioActuaMejora:</label>
+                    <InputNumber id="usuarioactuamejora" @bind-Value="Solicitud.UsuarioActuaMejora" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="fechahoraactuamejora" class="form-label">FechaHoraActuaMejora:</label>
+                    <InputDate id="fechahoraactuamejora" @bind-Value="Solicitud.FechaHoraActuaMejora" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="cerrada" class="form-label">Cerrada:</label>
+                    <InputCheckbox id="cerrada" @bind-Value="Cerrada" class="form-check-input" />
+                </div>
+                <div class="mb-3">
+                    <label for="usuariocerrada" class="form-label">UsuarioCerrada:</label>
+                    <InputNumber id="usuariocerrada" @bind-Value="Solicitud.UsuarioCerrada" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="fechahoracerrada" class="form-label">FechaHoraCerrada:</label>
+                    <InputDate id="fechahoracerrada" @bind-Value="Solicitud.FechaHoraCerrada" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="observaciones" class="form-label">Observaciones:</label>
+                    <InputTextArea id="observaciones" @bind-Value="Solicitud.Observaciones" class="form-control" />
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<div>
+    <a href="/solicituds">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private int Id { get; set; }
+
+    [SupplyParameterFromForm]
+    private Solicitud? Solicitud { get; set; }
+    private bool Cerrada { get; set; } = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Solicitud ??= await context.Solicitudes.FirstOrDefaultAsync(m => m.Id == Id);
+
+        if (Solicitud is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+            return;
+        }
+        else
+        {
+            Cerrada = Solicitud.Cerrada ?? false;
+        }
+    }
+
+    // To protect from overposting attacks, enable the specific properties you want to bind to.
+    // For more information, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task UpdateSolicitud()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Solicitud.Cerrada = Cerrada;
+        
+        context.Attach(Solicitud!).State = EntityState.Modified;
+
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (!SolicitudExists(Solicitud!.Id))
+            {
+                NavigationManager.NavigateTo("notfound");
+            }
+            else
+            {
+                throw;
+            }
+        }
+
+        NavigationManager.NavigateTo("/solicituds");
+    }
+
+    private bool SolicitudExists(int id)
+    {
+        using var context = DbFactory.CreateDbContext();
+        return context.Solicitudes.Any(e => e.Id == id);
+    }
+}

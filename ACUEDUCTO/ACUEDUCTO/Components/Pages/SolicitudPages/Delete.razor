@@ -1,0 +1,141 @@
+﻿@page "/solicitudes/delete"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Delete</PageTitle>
+
+<h1>Delete</h1>
+
+<p>Are you sure you want to delete this?</p>
+<div>
+    <h2>Solicitud</h2>
+    <hr />
+    @if (solicitud is null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">IdUsusario</dt>
+            <dd class="col-sm-10">@solicitud.IdUsuario</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Codigo</dt>
+            <dd class="col-sm-10">@solicitud.Codigo</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Tipo</dt>
+            <dd class="col-sm-10">@solicitud.Tipo</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">FechaHoraRecepcion</dt>
+            <dd class="col-sm-10">@solicitud.FechaHoraRecepcion</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Estado</dt>
+            <dd class="col-sm-10">@solicitud.EstadoID</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Descripción</dt>
+            <dd class="col-sm-10">@solicitud.Descripción</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Planear</dt>
+            <dd class="col-sm-10">@solicitud.Planear</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">UsuarioPlanear</dt>
+            <dd class="col-sm-10">@solicitud.UsuarioPlanear</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">FechaHoraPlanear</dt>
+            <dd class="col-sm-10">@solicitud.FechaHoraPlanear</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Hacer</dt>
+            <dd class="col-sm-10">@solicitud.Hacer</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">UsuarioHacer</dt>
+            <dd class="col-sm-10">@solicitud.UsuarioHacer</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">FechaHoraHacer</dt>
+            <dd class="col-sm-10">@solicitud.FechaHoraHacer</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Verificar</dt>
+            <dd class="col-sm-10">@solicitud.Verificar</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">UsuarioVerifica</dt>
+            <dd class="col-sm-10">@solicitud.UsuarioVerifica</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">FechaHoraVerifica</dt>
+            <dd class="col-sm-10">@solicitud.FechaHoraVerifica</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ActuarMejora</dt>
+            <dd class="col-sm-10">@solicitud.ActuarMejora</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">UsuarioActuaMejora</dt>
+            <dd class="col-sm-10">@solicitud.UsuarioActuaMejora</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">FechaHoraActuaMejora</dt>
+            <dd class="col-sm-10">@solicitud.FechaHoraActuaMejora</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Cerrada</dt>
+            <dd class="col-sm-10">@solicitud.Cerrada</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">UsuarioCerrada</dt>
+            <dd class="col-sm-10">@solicitud.UsuarioCerrada</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">FechaHoraCerrada</dt>
+            <dd class="col-sm-10">@solicitud.FechaHoraCerrada</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Observaciones</dt>
+            <dd class="col-sm-10">@solicitud.Observaciones</dd>
+        </dl>
+        <EditForm method="post" Model="solicitud" OnValidSubmit="DeleteSolicitud" FormName="delete" Enhance>
+            <button type="submit" class="btn btn-danger" disabled="@(solicitud is null)">Delete</button> |
+            <a class="btn btn-light" href="" onclick="return cerrarVentana('');">Close</a>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private Solicitud? solicitud;
+
+    [SupplyParameterFromQuery]
+    private int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        solicitud = await context.Solicitudes.FirstOrDefaultAsync(m => m.Id == Id);
+
+        if (solicitud is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    private async Task DeleteSolicitud()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Solicitudes.Remove(solicitud!);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/solicitudes");
+    }
+}

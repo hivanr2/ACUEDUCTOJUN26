@@ -1,0 +1,58 @@
+﻿@page "/ingresos/details"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Details</PageTitle>
+
+<h1>Details</h1>
+
+<div>
+    <h2>Ingreso</h2>
+    <hr />
+    @if (ingreso is null)
+    {
+        <p><em>Llamando...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">FechaHora</dt>
+            <dd class="col-sm-10">@ingreso.FechaHora</dd>
+            <dt class="col-sm-2">Idcliente</dt>
+            <dd class="col-sm-10">@ingreso.Idcliente</dd>
+            <dt class="col-sm-2">Idfactura</dt>
+            <dd class="col-sm-10">@ingreso.Idfactura</dd>
+            <dt class="col-sm-2">Idcxc</dt>
+            <dd class="col-sm-10">@ingreso.Idcxc</dd>
+            <dt class="col-sm-2">Concepto</dt>
+            <dd class="col-sm-10">@ingreso.Concepto</dd>
+            <dt class="col-sm-2">Valor</dt>
+            <dd class="col-sm-10">@ingreso.Valor</dd>
+        </dl>
+        <div>
+            <a href="@($"/ingresos/edit?idingreso={ingreso.Idingreso}")">Edit</a> |
+            <a href="/ingresos" onclick="return cerrarVentana('/ingresos');">Cerrar</a>
+        </div>
+    }
+</div>
+
+@code {
+    private Ingreso? ingreso;
+
+    [SupplyParameterFromQuery]
+    private string Idingreso { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        ingreso = await context.Ingresos.FirstOrDefaultAsync(m => m.Idingreso == Idingreso);
+
+        if (ingreso is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+}

@@ -1,0 +1,214 @@
+@page "/desperdicio-inspector"
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.COMPARTIR.DTO
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<AcueductoContext> DbFactory
+@inject IWebHostEnvironment Env
+@rendermode InteractiveServer
+
+<PageTitle>Inspector Desperdicio</PageTitle>
+
+@if (!Env.IsDevelopment())
+{
+    <div class="alert alert-warning">Esta herramienta solo está disponible en Development.</div>
+}
+else if (string.IsNullOrWhiteSpace(Idpredio))
+{
+    <div class="container py-3">
+        <h5>Probar predio</h5>
+        <p>Pasa el parámetro <code>?Idpredio=...</code> en la URL con el Idpredio a inspeccionar.</p>
+        <p>Ejemplo: <code>/desperdicio-inspector?Idpredio=5C921FD0-5B4E-4309-BB56-00660509CB7B</code></p>
+    </div>
+}
+else if (isLoading)
+{
+    <div class="text-muted">Cargando datos...</div>
+}
+else if (facturacion == null || !facturacion.Any())
+{
+    <div class="text-muted">No se encontraron facturas para el predio <strong>@Idpredio</strong>.</div>
+}
+else
+{
+    <div class="container py-3">
+        <h4>Inspector Desperdicio - @Idpredio</h4>
+        <div class="mb-3 small text-muted">Promedio calculado: <strong>@promedio.ToString("0.##")</strong> (redondeado: <strong>@promedioRedondeado</strong>)</div>
+
+        <h5>Facturas (cronológico descendente)</h5>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr><th>Periodo</th><th>FechaFacturacion</th><th>FechaRegistroConsumo</th><th class="text-end">Consumo</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var f in facturacion.OrderByDescending(x => x.IdplanillaNavigation?.FechaHoraRegistroConsumo ?? x.IdplanillaNavigation?.FechaHoraFacturacion))
+                    {
+                        <tr>
+                            <td>@(f.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionCorta ?? f.IdplanillaNavigation?.Descripcion ?? "-")</td>
+                            <td>@(f.IdplanillaNavigation?.FechaHoraFacturacion?.ToString("yyyy-MM-dd") ?? "-")</td>
+                            <td>@(f.IdplanillaNavigation?.FechaHoraRegistroConsumo?.ToString("yyyy-MM-dd") ?? "-")</td>
+                            <td class="text-end">@(f.ConsumoM3?.ToString("0.##") ?? "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <h5 class="mt-3">Consumos considerados para promedio (últimos @DesperdicioConfig.Window consumos &gt;0)</h5>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead><tr><th>Periodo</th><th>Fecha</th><th class="text-end">Consumo</th></tr></thead>
+                <tbody>
+                    @foreach (var f in consumos)
+                    {
+                        <tr>
+                            <td>@(f.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionCorta ?? f.IdplanillaNavigation?.Descripcion ?? "-")</td>
+                            <td>@(f.IdplanillaNavigation?.FechaHoraFacturacion?.ToString("yyyy-MM-dd") ?? "-")</td>
+                            <td class="text-end">@(f.ConsumoM3?.ToString("0.##") ?? "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <h5 class="mt-3">Bimestres marcados como arriba (según umbral)</h5>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead><tr><th>Periodo</th><th>Fecha</th><th class="text-end">Consumo</th><th>Clave</th></tr></thead>
+                <tbody>
+                    @foreach (var b in marked)
+                    {
+                        <tr>
+                            <td>@(b.Periodo ?? "-")</td>
+                            <td>@(b.Fecha?.ToString("yyyy-MM-dd") ?? "-")</td>
+                            <td class="text-end">@b.Consumo.ToString("0.##")</td>
+                            <td>@(bKeyLookup.TryGetValue($"{(b.Periodo ?? "")}|{(b.Fecha?.ToString("o") ?? "")}|{b.Consumo}", out var k) ? k : "")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <h5 class="mt-3">Consecutividad detectada (most recent backward)</h5>
+        @if (consecutive.Count == 0)
+        {
+            <div class="text-muted">Ninguna consecutividad detectada.</div>
+        }
+        else
+        {
+            <ul>
+                @foreach (var c in consecutive)
+                {
+                    <li>@(c.Periodo ?? "-") - @(c.Fecha?.ToString("yyyy-MM-dd") ?? "-") - @c.Consumo m³</li>
+                }
+            </ul>
+        }
+
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    public string Idpredio { get; set; }
+
+    private bool isLoading = true;
+    private List<Facturacion> facturacion = new();
+    private List<Facturacion> consumos = new();
+    private List<AboveBimestreInfo> marked = new();
+    private List<AboveBimestreInfo> consecutive = new();
+    private Dictionary<string, string> bKeyLookup = new();
+    private double promedio = 0.0;
+    private double promedioRedondeado = 0.0;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Idpredio)) return;
+        isLoading = true;
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            facturacion = await db.Facturacions
+                .Where(f => f.Idpredio == Idpredio)
+                .Include(f => f.IdplanillaNavigation)
+                    .ThenInclude(p => p.IdperiodoNavigation)
+                .OrderByDescending(f => f.IdplanillaNavigation!.FechaHoraRegistroConsumo ?? f.IdplanillaNavigation!.FechaHoraFacturacion)
+                .ToListAsync();
+
+            consumos = facturacion
+                .Where(f => f.ConsumoM3.HasValue && f.ConsumoM3 > 0 && f.IdplanillaNavigation?.FechaHoraFacturacion != null)
+                .OrderByDescending(f => f.IdplanillaNavigation!.FechaHoraFacturacion)
+                .Take(DesperdicioConfig.Window)
+                .OrderBy(f => f.IdplanillaNavigation!.FechaHoraFacturacion)
+                .ToList();
+
+            if (consumos.Any())
+            {
+                promedio = consumos.Average(f => f.ConsumoM3 ?? 0.0);
+                promedioRedondeado = Math.Ceiling(promedio);
+
+                static string FactKey(Facturacion f)
+                {
+                    if (!string.IsNullOrWhiteSpace(f.Idfactura)) return f.Idfactura!;
+                    var dt = f.IdplanillaNavigation?.FechaHoraFacturacion ?? f.IdplanillaNavigation?.FechaHoraRegistroConsumo ?? DateTime.MinValue;
+                    return dt.Ticks.ToString();
+                }
+
+                marked = consumos
+                    .Where(f => ((f.ConsumoM3 ?? 0.0) - promedioRedondeado) >= 2.0)
+                    .OrderByDescending(f => f.IdplanillaNavigation!.FechaHoraFacturacion)
+                    .Select(f => new AboveBimestreInfo
+                    {
+                        Periodo = f.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionCorta ?? f.IdplanillaNavigation?.Descripcion,
+                        Fecha = f.IdplanillaNavigation?.FechaHoraRegistroConsumo ?? f.IdplanillaNavigation?.FechaHoraFacturacion,
+                        Consumo = f.ConsumoM3 ?? 0.0
+                    }).ToList();
+
+                // build key lookup for display: use a stable composite string key to map to factura key
+                bKeyLookup = consumos.Where(f => ((f.ConsumoM3 ?? 0.0) - promedioRedondeado) >= 2.0)
+                    .Select(f => new { Key = (string.IsNullOrWhiteSpace(f.Idfactura) ? (f.IdplanillaNavigation?.FechaHoraFacturacion ?? f.IdplanillaNavigation?.FechaHoraRegistroConsumo ?? DateTime.MinValue).Ticks.ToString() : f.Idfactura), Fact = f })
+                    .ToDictionary(x =>
+                        $"{(x.Fact.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionCorta ?? x.Fact.IdplanillaNavigation?.Descripcion)}|{(x.Fact.IdplanillaNavigation?.FechaHoraRegistroConsumo?.ToString("o") ?? x.Fact.IdplanillaNavigation?.FechaHoraFacturacion?.ToString("o") ?? "")}|{(x.Fact.ConsumoM3 ?? 0.0)}",
+                        x => x.Key);
+
+                // detect consecutividad on timeline
+                var timeline = facturacion
+                    .Where(f => f.IdplanillaNavigation != null && (f.IdplanillaNavigation.FechaHoraFacturacion != null || f.IdplanillaNavigation.FechaHoraRegistroConsumo != null))
+                    .OrderByDescending(f => f.IdplanillaNavigation!.FechaHoraRegistroConsumo ?? f.IdplanillaNavigation!.FechaHoraFacturacion)
+                    .Take(DesperdicioConfig.Window + 1)
+                    .ToList();
+
+                int startIndex = -1;
+                bool IsAbove(Facturacion f) => marked.Any(m => (m.Consumo == (f.ConsumoM3 ?? 0.0)) && (m.Fecha == (f.IdplanillaNavigation?.FechaHoraRegistroConsumo ?? f.IdplanillaNavigation?.FechaHoraFacturacion)));
+
+                if (timeline.Count > 0)
+                {
+                    if (IsAbove(timeline[0])) startIndex = 0;
+                    else if (timeline.Count > 1 && IsAbove(timeline[1])) startIndex = 1;
+                }
+
+                if (startIndex >= 0)
+                {
+                    if (startIndex == 1)
+                    {
+                        var f0 = timeline[0];
+                        consecutive.Add(new AboveBimestreInfo { Periodo = f0.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionCorta ?? f0.IdplanillaNavigation?.Descripcion, Fecha = f0.IdplanillaNavigation?.FechaHoraRegistroConsumo ?? f0.IdplanillaNavigation?.FechaHoraFacturacion, Consumo = f0.ConsumoM3 ?? 0.0 });
+                    }
+
+                    for (int i = startIndex; i < timeline.Count; i++)
+                    {
+                        var f = timeline[i];
+                        if (((f.ConsumoM3 ?? 0.0) - promedioRedondeado) >= 2.0)
+                        {
+                            consecutive.Add(new AboveBimestreInfo { Periodo = f.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionCorta ?? f.IdplanillaNavigation?.Descripcion, Fecha = f.IdplanillaNavigation?.FechaHoraRegistroConsumo ?? f.IdplanillaNavigation?.FechaHoraFacturacion, Consumo = f.ConsumoM3 ?? 0.0 });
+                        }
+                        else break;
+                    }
+                }
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

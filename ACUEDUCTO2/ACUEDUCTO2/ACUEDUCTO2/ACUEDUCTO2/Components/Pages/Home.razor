@@ -1,0 +1,184 @@
+﻿@page "/"
+@layout NavMenuBotones
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO2.Data
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Acueducto - Inicio</PageTitle>
+
+<div class="home-container">
+
+    <!-- Hero Section -->
+    <section class="home-hero">
+        <div class="home-hero-icon">💧</div>
+        <h1>Gestión del Acueducto Comunitario</h1>
+        <p>Plataforma centralizada para la administración del servicio de agua, facturación, seguimiento de consumos y solicitudes de la comunidad.</p>
+    </section>
+
+    <AuthorizeView>
+        <Authorized>
+            <!-- Summary Counters -->
+            <section class="home-section">
+                <div class="row g-3 text-center">
+                    <div class="col-6 col-md-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h2 class="display-6 text-primary">@totalPredios</h2>
+                                <small class="text-muted">Predios</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h2 class="display-6 text-success">@prediosActivos</h2>
+                                <small class="text-muted">Activos</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h2 class="display-6 text-info">@totalUsuarios</h2>
+                                <small class="text-muted">Usuarios</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h2 class="display-6 text-warning">@totalSolicitudes</h2>
+                                <small class="text-muted">Solicitudes</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quick Access Dashboard -->
+            <section class="home-section">
+                <h2 class="home-section-title">Acceso Rápido</h2>
+                <div class="home-cards">
+                    <a href="/predios" class="home-card home-card-blue text-decoration-none text-reset">
+                        <div class="home-card-icon">🏠</div>
+                        <h3>Predios</h3>
+                        <p>Administre predios de suscriptores, rutas, medidores e información de contacto.</p>
+                    </a>
+                    <a href="/usuarios" class="home-card home-card-green text-decoration-none text-reset">
+                        <div class="home-card-icon">👤</div>
+                        <h3>Usuarios</h3>
+                        <p>Consulte y actualice los datos de los usuarios del sistema de recaudo.</p>
+                    </a>
+                    <a href="/solicitud" class="home-card home-card-red text-decoration-none text-reset">
+                        <div class="home-card-icon">📋</div>
+                        <h3>Solicitudes</h3>
+                        <p>Haga seguimiento a las solicitudes de servicio mediante el ciclo PHVA.</p>
+                    </a>
+                    <a href="/procesos" class="home-card home-card-purple text-decoration-none text-reset">
+                        <div class="home-card-icon">⚙️</div>
+                        <h3>Procesos</h3>
+                        <p>Registre y administre los procesos operativos del acueducto.</p>
+                    </a>
+                </div>
+            </section>
+
+            <!-- Key Features Section -->
+            <section class="home-section">
+                <h2 class="home-section-title">Funcionalidades del Sistema</h2>
+                <div class="home-features">
+                    <div class="home-feature">
+                        <span class="home-feature-icon">📱</span>
+                        <div>
+                            <strong>Lecturas OCR sin conexión</strong>
+                            <p>Capture lecturas de medidores con OCR incluso sin conexión a internet. Los datos se sincronizan automáticamente al reconectarse.</p>
+                        </div>
+                    </div>
+                    <div class="home-feature">
+                        <span class="home-feature-icon">📅</span>
+                        <div>
+                            <strong>Gestión de Períodos</strong>
+                            <p>Defina períodos de facturación con fechas de inicio y fin para cobros y recaudos.</p>
+                        </div>
+                    </div>
+                    <div class="home-feature">
+                        <span class="home-feature-icon">⚖️</span>
+                        <div>
+                            <strong>Tarifas por Estrato y Subsidios</strong>
+                            <p>Configure tarifas por estrato y aplique subsidios y sobretasas de forma automática.</p>
+                        </div>
+                    </div>
+                    <div class="home-feature">
+                        <span class="home-feature-icon">🔒</span>
+                        <div>
+                            <strong>Seguridad por Roles</strong>
+                            <p>Controle el acceso a cada proceso e informe según los permisos del usuario.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </Authorized>
+
+        <NotAuthorized>
+            <!-- Public Information Section -->
+            <section class="home-section">
+                <div class="home-public-info">
+                    <h2>Bienvenido al Sistema del Acueducto Comunitario</h2>
+                    <p>
+                        Esta plataforma apoya las operaciones diarias del acueducto comunitario, incluyendo
+                        la gestión de suscriptores, seguimiento de consumo de agua, facturación, recaudo
+                        y solicitudes de mantenimiento.
+                    </p>
+                    <div class="home-public-actions">
+                        <a href="Account/Login" class="home-btn home-btn-primary">Iniciar Sesión</a>
+                        <a href="Account/Register" class="home-btn home-btn-secondary">Registrarse</a>
+                    </div>
+                </div>
+            </section>
+
+            <section class="home-section">
+                <h2 class="home-section-title">Lo Que Administramos</h2>
+                <div class="home-cards home-cards-small">
+                    <div class="home-card home-card-blue">
+                        <div class="home-card-icon">💧</div>
+                        <h3>Servicio de Agua</h3>
+                        <p>Distribución confiable de agua para todos los predios conectados en la comunidad.</p>
+                    </div>
+                    <div class="home-card home-card-green">
+                        <div class="home-card-icon">📊</div>
+                        <h3>Facturación Justa</h3>
+                        <p>Facturación transparente basada en lecturas reales de medidores y tarifas reguladas.</p>
+                    </div>
+                    <div class="home-card home-card-amber">
+                        <div class="home-card-icon">🔧</div>
+                        <h3>Mantenimiento</h3>
+                        <p>Gestión estructurada de solicitudes para mantener y mejorar la calidad de la infraestructura.</p>
+                    </div>
+                </div>
+            </section>
+        </NotAuthorized>
+    </AuthorizeView>
+</div>
+
+@code {
+    private int totalPredios;
+    private int prediosActivos;
+    private int totalUsuarios;
+    private int totalSolicitudes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            using var context = DbFactory.CreateDbContext();
+            totalPredios = await context.Predio.CountAsync();
+            prediosActivos = await context.Predio.CountAsync(p => p.Activo == true);
+            totalUsuarios = await context.Users.CountAsync();
+            totalSolicitudes = await context.Solicitud.CountAsync();
+        }
+        catch
+        {
+            // Tables may not exist yet during initial setup
+        }
+    }
+}

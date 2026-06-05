@@ -1,0 +1,50 @@
+﻿@page "/personals/details"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Details</PageTitle>
+
+<h1>Details</h1>
+
+<div>
+    <h2>Personal</h2>
+    <hr />
+    @if (personal is null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Nombre</dt>
+            <dd class="col-sm-10">@personal.Nombre</dd>
+            <dt class="col-sm-2">Cargo</dt>
+            <dd class="col-sm-10">@personal.Cargo</dd>
+            <dt class="col-sm-2">Usuario</dt>
+            <dd class="col-sm-10">@personal.Usuario</dd>
+        </dl>
+        <div>
+            <a href="@($"/personals/edit?idpersonal={personal.IdPersonal}")">Edit</a> |
+            <a href="@($"/personals")">Back to List</a>
+        </div>
+    }
+</div>
+
+@code {
+    private Personal? personal;
+
+    [SupplyParameterFromQuery]
+    private int IdPersonal { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        personal = await context.Personals.FirstOrDefaultAsync(m => m.IdPersonal == IdPersonal);
+
+        if (personal is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+}

@@ -1,0 +1,203 @@
+﻿@page "/inventarios/edit"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@using System.IO
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@inject IWebHostEnvironment WebHostEnvironment
+
+@rendermode InteractiveServer
+
+<PageTitle>Editar inventario</PageTitle>
+
+<div class="container py-2">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Editar producto de inventario</h1>
+            <small class="text-muted">Actualiza los datos del item</small>
+        </div>
+        <div>
+            <a class="btn btn-secondary" href="/inventarios" onclick="return cerrarVentana('/inventarios');">Cerrar</a>
+        </div>
+    </div>
+
+    <h2 class="visually-hidden">Inventario</h2>
+    <hr class="visually-hidden" />
+    @if (Inventario is null)
+    {
+        <p><em>Llamando...</em></p>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="mb-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="AbrirGaleriaNuevaVentana">Imágenes o Videos cargados: (@totalArchivos)</button>
+                </div>
+
+                <EditForm method="post" Model="Inventario" OnValidSubmit="UpdateInventario" FormName="edit" Enhance>
+                    <DataAnnotationsValidator />
+                    <ValidationSummary role="alert" />
+                    <input type="hidden" name="Inventario.Idinventario" value="@Inventario.Idinventario" />
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <label for="codigo" class="form-label">Código</label>
+                            <InputText id="codigo" @bind-Value="Inventario.Codigo" class="form-control" />
+                            <ValidationMessage For="() => Inventario.Codigo" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="descripcioncorta" class="form-label">Descripción corta</label>
+                            <InputText id="descripcioncorta" @bind-Value="Inventario.DescripcionCorta" class="form-control" />
+                            <ValidationMessage For="() => Inventario.DescripcionCorta" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="descripcionlarga" class="form-label">Descripción larga</label>
+                            <InputText id="descripcionlarga" @bind-Value="Inventario.DescripcionLarga" class="form-control" />
+                            <ValidationMessage For="() => Inventario.DescripcionLarga" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="unidad" class="form-label">Unidad</label>
+                            <InputText id="unidad" @bind-Value="Inventario.Unidad" class="form-control" />
+                            <ValidationMessage For="() => Inventario.Unidad" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="medida" class="form-label">Medida</label>
+                            <InputText id="medida" @bind-Value="Inventario.Medida" class="form-control" />
+                            <ValidationMessage For="() => Inventario.Medida" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="cantidad" class="form-label">Cantidad</label>
+                            <InputNumber id="cantidad" @bind-Value="Inventario.Cantidad" class="form-control" />
+                            <ValidationMessage For="() => Inventario.Cantidad" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="valorunitario" class="form-label">Valor unitario</label>
+                            <InputNumber id="valorunitario" @bind-Value="Inventario.ValorUnitario" class="form-control" />
+                            <ValidationMessage For="() => Inventario.ValorUnitario" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="valortotal" class="form-label">Valor total</label>
+                            <InputNumber id="valortotal" @bind-Value="Inventario.ValorTotal" class="form-control" />
+                            <ValidationMessage For="() => Inventario.ValorTotal" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="fechahoraregistro" class="form-label">Fecha registro</label>
+                            <InputDate id="fechahoraregistro" @bind-Value="Inventario.FechaHoraRegistro" class="form-control" />
+                            <ValidationMessage For="() => Inventario.FechaHoraRegistro" class="text-danger" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label for="observaciones" class="form-label">Observaciones</label>
+                            <InputTextArea id="observaciones" @bind-Value="Inventario.Observaciones" class="form-control" />
+                            <ValidationMessage For="() => Inventario.Observaciones" class="text-danger" />
+                        </div>
+
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <a class="btn btn-light" href="/inventarios" onclick="return cerrarVentana('/inventarios');">Cerrar</a>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string Idinventario { get; set; }
+
+    [SupplyParameterFromForm]
+    private Inventario? Inventario { get; set; }
+
+    private int totalArchivos = 0;
+    private string? carpetaImagenesInventario;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Inventario ??= await context.Inventarios.FirstOrDefaultAsync(m => m.Idinventario == Idinventario);
+
+        if (Inventario is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+        else
+        {
+            EnsureFolderAndCount();
+        }
+    }
+
+    private async Task AbrirGaleriaNuevaVentana()
+    {
+        EnsureFolderAndCount();
+        var codigo = Inventario?.Codigo ?? string.Empty;
+        var url = NavigationManager.GetUriWithQueryParameters("/archivosgaleria", new Dictionary<string, object?>
+        {
+            ["CodigoInventario"] = codigo
+        });
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+    }
+
+    private void EnsureFolderAndCount()
+    {
+        try
+        {
+            var basePath = Path.Combine(WebHostEnvironment.WebRootPath ?? string.Empty, "imagenes");
+            if (string.IsNullOrEmpty(basePath))
+            {
+                totalArchivos = 0;
+                return;
+            }
+            Directory.CreateDirectory(basePath);
+
+            var folderName = !string.IsNullOrWhiteSpace(Inventario?.Codigo)
+                ? Inventario!.Codigo!.Trim()
+                : (Inventario?.Idinventario ?? "SinCodigo");
+
+            carpetaImagenesInventario = Path.Combine(basePath, folderName);
+            Directory.CreateDirectory(carpetaImagenesInventario);
+
+            totalArchivos = Directory.Exists(carpetaImagenesInventario)
+                ? Directory.GetFiles(carpetaImagenesInventario).Length
+                : 0;
+        }
+        catch
+        {
+            totalArchivos = 0;
+        }
+    }
+
+    private async Task UpdateInventario()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Attach(Inventario!).State = EntityState.Modified;
+
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (!InventarioExists(Inventario!.Idinventario))
+            {
+                NavigationManager.NavigateTo("notfound");
+            }
+            else
+            {
+                throw;
+            }
+        }
+
+        NavigationManager.NavigateTo("/inventarios");
+    }
+
+    private bool InventarioExists(string idinventario)
+    {
+        using var context = DbFactory.CreateDbContext();
+        return context.Inventarios.Any(e => e.Idinventario == idinventario);
+    }
+}

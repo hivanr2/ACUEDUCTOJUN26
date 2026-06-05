@@ -1,0 +1,309 @@
+@page "/admin/migrar-usuarios"
+@page "/proceso/Migrar Usuarios V1"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.Data.SqlClient
+@using ACUEDUCTO2.Data
+@attribute [Authorize(Roles = "Administradores")]
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IConfiguration Configuration
+@inject ILogger<MigrarUsuarios> Logger
+
+<PageTitle>Migrar Usuarios desde ACUEDUCTO V1</PageTitle>
+
+<div class="container py-3">
+    <h1 class="h4 mb-1">Migrar Usuarios desde ACUEDUCTO V1</h1>
+    <p class="text-muted">Lee la tabla <code>Usuario</code> de la base de datos <code>xcursoro_acueducto</code> y crea las cuentas en <code>AspNetUsers</code> de ACUEDUCTO2.</p>
+    <hr />
+
+    @if (!string.IsNullOrEmpty(mensaje))
+    {
+        <div class="alert @(esError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+            @mensaje
+            <button type="button" class="btn-close" @onclick="() => mensaje = null"></button>
+        </div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-auto">
+            <button class="btn btn-outline-primary" @onclick="PreviewUsuariosAsync" disabled="@procesando">
+                @if (procesando) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                Vista Previa
+            </button>
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-primary" @onclick="MigrarAsync" disabled="@(procesando || usuariosV1 is null || !usuariosV1.Any())">
+                @if (procesando) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                Migrar Usuarios
+            </button>
+        </div>
+    </div>
+
+    @if (usuariosV1 is not null)
+    {
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-light d-flex justify-content-between">
+                <strong>Usuarios en V1</strong>
+                <span class="badge bg-secondary">@usuariosV1.Count total</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Identificación</th>
+                                <th>Apellidos y Nombres</th>
+                                <th>Correo</th>
+                                <th>Teléfono</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var u in usuariosV1)
+                            {
+                                <tr>
+                                    <td>
+                                        @if (u.IdCorta)
+                                        {
+                                            <span class="text-decoration-line-through text-muted">@u.IdentificacionOriginal</span>
+                                            <small class="text-warning"> (&lt; 6 dígitos)</small>
+                                        }
+                                        else
+                                        {
+                                            @u.Identificacion
+                                        }
+                                    </td>
+                                    <td>@u.ApellidosNombres</td>
+                                    <td>@(string.IsNullOrWhiteSpace(u.Correo) ? "⚠️ Sin correo (pendiente)" : u.Correo)</td>
+                                    <td>@(u.Telefono ?? "—")</td>
+                                    <td>
+                                        @if (u.YaExiste)
+                                        {
+                                            <span class="badge bg-info">Ya existe</span>
+                                        }
+                                        else if (string.IsNullOrWhiteSpace(u.Correo))
+                                        {
+                                            <span class="badge bg-warning text-dark">Sin correo</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-success">Listo</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-2 text-center">
+            <div class="col-auto"><span class="badge bg-success">Listos (con correo): @usuariosV1.Count(u => !u.YaExiste && !string.IsNullOrWhiteSpace(u.Correo))</span></div>
+            <div class="col-auto"><span class="badge bg-warning text-dark">Sin correo (se migran pendientes): @usuariosV1.Count(u => !u.YaExiste && string.IsNullOrWhiteSpace(u.Correo))</span></div>
+            <div class="col-auto"><span class="badge bg-info">Ya existen: @usuariosV1.Count(u => u.YaExiste)</span></div>
+            <div class="col-auto"><span class="badge bg-secondary">ID corta (limpiada): @usuariosV1.Count(u => u.IdCorta)</span></div>
+        </div>
+    }
+
+    @if (resultados is not null && resultados.Any())
+    {
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-light"><strong>Resultado de Migración</strong></div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Identificación</th>
+                                <th>Correo</th>
+                                <th>Resultado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in resultados)
+                            {
+                                <tr class="@(r.Exito ? "" : "table-danger")">
+                                    <td>@r.Identificacion</td>
+                                    <td>@r.Correo</td>
+                                    <td>@r.Mensaje</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<UsuarioV1>? usuariosV1;
+    private List<ResultadoMigracion>? resultados;
+    private string? mensaje;
+    private bool esError;
+    private bool procesando;
+
+    private async Task PreviewUsuariosAsync()
+    {
+        procesando = true;
+        mensaje = null;
+        resultados = null;
+        StateHasChanged();
+
+        try
+        {
+            usuariosV1 = await LeerUsuariosV1Async();
+
+            // Marcar los que ya existen en AspNetUsers (por email o por identificación)
+            foreach (var u in usuariosV1)
+            {
+                if (!string.IsNullOrWhiteSpace(u.Correo))
+                {
+                    var existing = await UserManager.FindByEmailAsync(u.Correo);
+                    u.YaExiste = existing is not null;
+                }
+                else if (!string.IsNullOrWhiteSpace(u.Identificacion))
+                {
+                    u.YaExiste = await UserManager.Users.AnyAsync(x => x.Identificacion == u.Identificacion);
+                }
+            }
+
+            mensaje = $"Se encontraron {usuariosV1.Count} usuarios en la base V1.";
+            esError = false;
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Error al leer usuarios V1: {ex.Message}";
+            esError = true;
+            Logger.LogError(ex, "Error reading V1 users");
+        }
+
+        procesando = false;
+    }
+
+    private async Task MigrarAsync()
+    {
+        if (usuariosV1 is null) return;
+
+        procesando = true;
+        mensaje = null;
+        resultados = [];
+        StateHasChanged();
+
+        int migrados = 0;
+        int omitidos = 0;
+        int errores = 0;
+
+        foreach (var u in usuariosV1)
+        {
+            if (u.YaExiste)
+            {
+                resultados.Add(new(u.Identificacion, u.Correo, true, "Ya existe en AspNetUsers"));
+                omitidos++;
+                continue;
+            }
+
+            try
+            {
+                // UserName: correo si existe, sino placeholder único
+                var userName = !string.IsNullOrWhiteSpace(u.Correo)
+                    ? u.Correo
+                    : $"pendiente-{(string.IsNullOrWhiteSpace(u.Identificacion) ? Guid.NewGuid().ToString("N")[..8] : u.Identificacion)}@sin-correo.local";
+
+                var user = new ApplicationUser
+                {
+                    UserName = userName,
+                    Email = string.IsNullOrWhiteSpace(u.Correo) ? null : u.Correo,
+                    Identificacion = u.Identificacion ?? "",
+                    ApellidosNombres = u.ApellidosNombres ?? "",
+                    PhoneNumber = u.Telefono,
+                    EmailConfirmed = false
+                };
+
+                var result = await UserManager.CreateAsync(user);
+
+                if (result.Succeeded)
+                {
+                    var nota = string.IsNullOrWhiteSpace(u.Correo) ? "✅ Migrado (sin correo — pendiente)" : "✅ Migrado exitosamente";
+                    resultados.Add(new(u.Identificacion, u.Correo ?? "—", true, nota));
+                    migrados++;
+                }
+                else
+                {
+                    var errorMsg = string.Join(", ", result.Errors.Select(e => e.Description));
+                    resultados.Add(new(u.Identificacion, u.Correo ?? "—", false, errorMsg));
+                    errores++;
+                }
+            }
+            catch (Exception ex)
+            {
+                resultados.Add(new(u.Identificacion, u.Correo ?? "—", false, ex.Message));
+                errores++;
+            }
+        }
+
+        mensaje = $"Migración completada: {migrados} migrados, {omitidos} ya existían, {errores} errores.";
+        esError = errores > 0 && migrados == 0;
+        procesando = false;
+
+        Logger.LogInformation("User migration completed: {Migrated} migrated, {Skipped} skipped, {Errors} errors",
+            migrados, omitidos, errores);
+    }
+
+    private async Task<List<UsuarioV1>> LeerUsuariosV1Async()
+    {
+        var connectionString = Configuration.GetConnectionString("AcueductoV1");
+        ArgumentNullException.ThrowIfNull(connectionString, "AcueductoV1 connection string");
+
+        var usuarios = new List<UsuarioV1>();
+
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync();
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Identificacion, ApellidosNombres, CorreoElectronico, Celular FROM Usuario ORDER BY ApellidosNombres";
+
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var rawId = reader.IsDBNull(0) ? "" : reader.GetString(0).Trim();
+            var idCorta = !string.IsNullOrWhiteSpace(rawId) && rawId.Length < 6;
+
+            usuarios.Add(new UsuarioV1
+            {
+                IdentificacionOriginal = rawId,
+                Identificacion = rawId,
+                IdCorta = idCorta,
+                ApellidosNombres = reader.IsDBNull(1) ? "" : reader.GetString(1).Trim(),
+                Correo = reader.IsDBNull(2) ? null : reader.GetString(2).Trim(),
+                Telefono = reader.IsDBNull(3) ? null : reader.GetString(3).Trim()
+            });
+        }
+
+        // Limpiar correos y teléfonos vacíos o inválidos
+        foreach (var u in usuarios)
+        {
+            if (string.IsNullOrWhiteSpace(u.Correo)) u.Correo = null;
+            if (string.IsNullOrWhiteSpace(u.Telefono) || u.Telefono == "0") u.Telefono = null;
+        }
+
+        return usuarios;
+    }
+
+    private sealed class UsuarioV1
+    {
+        public string IdentificacionOriginal { get; set; } = "";
+        public string Identificacion { get; set; } = "";
+        public bool IdCorta { get; set; }
+        public string ApellidosNombres { get; set; } = "";
+        public string? Correo { get; set; }
+        public string? Telefono { get; set; }
+        public bool YaExiste { get; set; }
+    }
+
+    private sealed record ResultadoMigracion(string? Identificacion, string? Correo, bool Exito, string Mensaje);
+}

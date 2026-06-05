@@ -1,0 +1,123 @@
+﻿@page "/inventarios/create"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Crear Producto Inventario</PageTitle>
+
+<div class="container py-2">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Crear producto de inventario</h1>
+            <small class="text-muted">Registra un nuevo item</small>
+        </div>
+        <div>
+            <a class="btn btn-secondary" href="/inventarios">Volver</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <EditForm method="post" Model="FormModel" OnValidSubmit="AddInventario" FormName="create" Enhance>
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" role="alert"/>
+
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <label for="codigo" class="form-label">Código</label>
+                        <InputText id="codigo" @bind-Value="FormModel.Codigo" class="form-control" />
+                        <ValidationMessage For="() => FormModel.Codigo" class="text-danger" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="descripcioncorta" class="form-label">Descripción corta</label>
+                        <InputText id="descripcioncorta" @bind-Value="FormModel.DescripcionCorta" class="form-control" />
+                        <ValidationMessage For="() => FormModel.DescripcionCorta" class="text-danger" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="descripcionlarga" class="form-label">Descripción larga</label>
+                        <InputText id="descripcionlarga" @bind-Value="FormModel.DescripcionLarga" class="form-control" />
+                        <ValidationMessage For="() => FormModel.DescripcionLarga" class="text-danger" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="unidad" class="form-label">Unidad</label>
+                        <InputText id="unidad" @bind-Value="FormModel.Unidad" class="form-control" />
+                        <ValidationMessage For="() => FormModel.Unidad" class="text-danger" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="medida" class="form-label">Medida</label>
+                        <InputText id="medida" @bind-Value="FormModel.Medida" class="form-control" />
+                        <ValidationMessage For="() => FormModel.Medida" class="text-danger" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="cantidad" class="form-label">Cantidad</label>
+                        <InputNumber id="cantidad" @bind-Value="FormModel.Cantidad" class="form-control" />
+                        <ValidationMessage For="() => FormModel.Cantidad" class="text-danger" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="valorunitario" class="form-label">Valor unitario</label>
+                        <InputNumber id="valorunitario" @bind-Value="FormModel.ValorUnitario" class="form-control" />
+                        <ValidationMessage For="() => FormModel.ValorUnitario" class="text-danger" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="valortotal" class="form-label">Valor total</label>
+                        <InputNumber id="valortotal" @bind-Value="FormModel.ValorTotal" class="form-control" />
+                        <ValidationMessage For="() => FormModel.ValorTotal" class="text-danger" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="fechahoraregistro" class="form-label">Fecha registro</label>
+                        <InputDate id="fechahoraregistro" @bind-Value="FormModel.FechaHoraRegistro" class="form-control" />
+                        <ValidationMessage For="() => FormModel.FechaHoraRegistro" class="text-danger" />
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                    <a class="btn btn-light" href="/inventarios">Cancelar</a>
+                    <button type="submit" class="btn btn-primary">Crear</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private InventarioCreateDto FormModel { get; set; } = new();
+
+    private async Task AddInventario()
+    {
+        using var context = DbFactory.CreateDbContext();
+        var entity = new Inventario
+        {
+            Idinventario = Guid.NewGuid().ToString(),
+            Codigo = FormModel.Codigo,
+            DescripcionCorta = FormModel.DescripcionCorta,
+            DescripcionLarga = FormModel.DescripcionLarga,
+            Unidad = FormModel.Unidad,
+            Medida = FormModel.Medida,
+            Cantidad = FormModel.Cantidad,
+            ValorUnitario = FormModel.ValorUnitario,
+            ValorTotal = FormModel.ValorTotal,
+            FechaHoraRegistro = FormModel.FechaHoraRegistro
+        };
+        // Evitar cargar navegaciones en creación
+        entity.MovimientoInventarios = null;
+
+        context.Inventarios.Add(entity);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/inventarios");
+    }
+
+    private sealed class InventarioCreateDto
+    {
+        public string Codigo { get; set; } = string.Empty;
+        public string? DescripcionCorta { get; set; }
+        public string? DescripcionLarga { get; set; }
+        public string? Unidad { get; set; }
+        public string? Medida { get; set; }
+        public double? Cantidad { get; set; }
+        public double? ValorUnitario { get; set; }
+        public double? ValorTotal { get; set; }
+        public DateTime? FechaHoraRegistro { get; set; }
+    }
+}

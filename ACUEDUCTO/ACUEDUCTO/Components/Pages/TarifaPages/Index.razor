@@ -1,0 +1,38 @@
+﻿@page "/tarifas"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Models
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+<PageTitle>Tarifas</PageTitle>
+
+<h1>Tarifas</h1>
+
+<p>
+    <a href="tarifas/create">Crear Nueva</a>
+</p>
+
+<QuickGrid Class="table" Items="context.Tarifas.OrderBy(c => c.Desde)">
+    <PropertyColumn Property="tarifa => tarifa.Desde" />
+    <PropertyColumn Property="tarifa => tarifa.Hasta" />
+    <PropertyColumn Property="tarifa => tarifa.ValorUnidad" />
+
+    <TemplateColumn Context="tarifa">
+        <a href="@($"tarifas/edit?tipo={tarifa.Tipo}")" target="_blank">Edit</a> |
+        <a href="@($"tarifas/details?tipo={tarifa.Tipo}")" target="_blank">Details</a> |
+        <a href="@($"tarifas/delete?tipo={tarifa.Tipo}")" target="_blank">Delete</a>
+    </TemplateColumn>
+</QuickGrid>
+
+@code {
+    private AcueductoContext context = default!;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}

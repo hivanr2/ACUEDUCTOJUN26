@@ -1,0 +1,151 @@
+@page "/predios/estado-contadores-por-predio"
+@page "/proceso/Listado de Estado de Contadores por Predio"
+
+@using ACUEDUCTO2.Share.Models
+@using ACUEDUCTO2.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<div class="card shadow-sm">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <strong>Estado contadores por predio</strong>
+        <div class="small">
+            <span class="badge bg-warning text-dark" style="padding:.45rem .8rem; font-size:1.05rem; font-weight:600;">@FilteredPredios.Count() registros (@predios.Count total)</span>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="row g-2 mb-3 align-items-center">
+            <div class="col-12 col-md-6">
+                <div class="input-group">
+                    <input class="form-control" placeholder="Buscar por predio, dirección o medidor..." @bind="filtro" @bind:event="oninput" />
+                    @if (!string.IsNullOrWhiteSpace(filtro))
+                    {
+                        <button class="btn btn-outline-secondary" type="button" title="Borrar filtro" @onclick="ClearFilter">×</button>
+                    }
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="soloSeguimiento" @bind="soloSeguimiento" />
+                    <label class="form-check-label" for="soloSeguimiento">Solo en seguimiento</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-sm btn-outline-secondary" @onclick="LoadDataAsync">Actualizar</button>
+            </div>
+        </div>
+
+        @if (cargando)
+        {
+            <div class="text-center text-muted py-4">Cargando...</div>
+        }
+        else if (!predios.Any())
+        {
+            <div class="alert alert-info">No se encontraron predios.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0 estado-contadores-table col-12">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th class="col-2">Predio</th>
+                            <th class="col-1">Medidor</th>
+                            <th class="col-1">Estado medidor</th>
+                            <th class="col-1">En seguimiento</th>
+                            <th class="col-6">Observaciones</th>
+                            <th class="col-1"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in FilteredPredios)
+                        {
+                            <tr>
+                                <td>@p.ApellidosNombresUsuario</td>
+                                <td>@(string.IsNullOrWhiteSpace(p.NumeroMedidor) ? "—" : p.NumeroMedidor)</td>
+                                <td>@(string.IsNullOrWhiteSpace(p.EstadoMedidor) ? "—" : p.EstadoMedidor)</td>
+                                <td>@(p.ContadorEnSeguimiento == true ? "Sí" : "No")</td>
+                                <td title="@(p.Observaciones ?? "")">@(p.Observaciones ?? "—")</td>
+                                <td class="text-end">
+                                    <a class="btn btn-outline-primary btn-sm" href="@($"/predios/details?idpredio={p.IdPredio}")" target="_blank">Ver predio</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Predio> predios = new();
+    private bool cargando = true;
+    private bool soloSeguimiento = false;
+    private string filtro = string.Empty;
+
+    private IEnumerable<Predio> FilteredPredios =>
+        string.IsNullOrWhiteSpace(filtro)
+            ? (soloSeguimiento ? predios.Where(p => p.ContadorEnSeguimiento ?? false) : predios)
+            : predios.Where(p =>
+                (soloSeguimiento ? (p.ContadorEnSeguimiento ?? false) : true)
+                && (
+                    (!string.IsNullOrWhiteSpace(p.ApellidosNombresUsuario) && p.ApellidosNombresUsuario.Contains(filtro, StringComparison.OrdinalIgnoreCase))
+                    || (!string.IsNullOrWhiteSpace(p.Direccion) && p.Direccion.Contains(filtro, StringComparison.OrdinalIgnoreCase))
+                    || (!string.IsNullOrWhiteSpace(p.NumeroMedidor) && p.NumeroMedidor.Contains(filtro, StringComparison.OrdinalIgnoreCase))
+                ));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        cargando = true;
+        try
+        {
+            await using var ctx = await DbFactory.CreateDbContextAsync();
+            var query = ctx.Predio.AsNoTracking().AsQueryable();
+            if (soloSeguimiento)
+            {
+                query = query.Where(p => p.ContadorEnSeguimiento ?? false);
+            }
+
+            predios = await query
+                .OrderBy(p => p.ApellidosNombresUsuario)
+                .ToListAsync();
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ClearFilter()
+    {
+        filtro = string.Empty;
+        // force re-render so FilteredPredios updates immediately
+        StateHasChanged();
+    }
+
+    private static string TruncateObservaciones(string? obs)
+    {
+        // Se mantiene por compatibilidad pero ahora devolvemos la observación completa
+        return string.IsNullOrWhiteSpace(obs) ? "—" : obs!;
+    }
+}
+
+<style>
+    /* Permitir que las celdas muestren todo el contenido y hagan wrap cuando sea necesario */
+    .estado-contadores-table td {
+        white-space: normal !important;
+        word-break: break-word !important;
+    }
+    .estado-contadores-table th {
+        white-space: normal;
+    }
+</style>

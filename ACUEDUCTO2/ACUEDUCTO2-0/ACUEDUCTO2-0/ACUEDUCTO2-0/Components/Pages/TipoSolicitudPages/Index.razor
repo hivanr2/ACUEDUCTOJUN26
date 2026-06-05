@@ -1,0 +1,62 @@
+@page "/tipo-solicitud"
+@using ACUEDUCTO2-0_0.Data
+@using ACUEDUCTO2-0_0.Compartir.MODELS
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Tipos de solicitud</PageTitle>
+
+<h3>Tipos de solicitud</h3>
+<div class="mb-3">
+    <button class="btn btn-secondary me-2" @onclick="Volver">Volver a solicitudes</button>
+    <button class="btn btn-primary" @onclick="Nueva">Nuevo tipo</button>
+</div>
+
+@if (tipos == null)
+{
+    <p>Cargando...</p>
+}
+else if (!tipos.Any())
+{
+    <p>No hay tipos definidos.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var t in tipos)
+            {
+                <tr>
+                    <td>@t.NombreTipoSolicitud</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning me-1" @onclick="() => Editar(t.Guid)">Editar</button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => Eliminar(t.Guid)">Eliminar</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<TipoSolicitud>? tipos;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = DbFactory.CreateDbContext();
+        tipos = await db.TipoSolicitud.AsNoTracking().ToListAsync();
+    }
+
+    void Nueva() => Navigation.NavigateTo("/tipo-solicitud/crear");
+    void Editar(string guid) => Navigation.NavigateTo($"/tipo-solicitud/editar/{guid}");
+    void Eliminar(string guid) => Navigation.NavigateTo($"/tipo-solicitud/eliminar/{guid}");
+    void Volver() => Navigation.NavigateTo("/solicitud");
+}

@@ -1,0 +1,120 @@
+﻿@page "/facturacion"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+@rendermode InteractiveServer
+
+<PageTitle>Facturación</PageTitle>
+
+<h1>Lista de Registros de Facturación</h1>
+
+<p>
+    <a href="facturacion/create">Crear Nueva</a>
+</p>
+
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Codigo Factura</th>
+            <th>Planilla</th>
+            <th>Predio</th>
+            <th>Codigo Usuario</th>
+            <th>Medicion Anterior</th>
+            <th>Medicion Actual</th>
+            <th>Consumo M3</th>
+            <th>Cargo Fijo</th>
+            <th>Valor Consumo</th>
+            <th>Notas Factura</th>
+            <th>Notas Recaudo</th>
+            <th>Control</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var factura in paginatedFacturas)
+        {
+            <tr>
+                <td>@factura.CodigoFactura</td>
+                <td>@factura.IdplanillaNavigation.Descripcion</td>
+                <td>@factura.IdpredioNavigation.ApellidosNombresUsuario</td>
+                <td>@factura.CodigoUsuario</td>
+                <td>@factura.MedicionAnterior</td>
+                <td>@factura.MedicionActual</td>
+                <td>@factura.ConsumoM3</td>
+                <td>@factura.CargoFijo</td>
+                <td>@factura.ValorConsumo</td>
+                <td style="white-space: pre-wrap;">@factura.NotasFactura</td>
+                <td style="white-space: pre-wrap;">@factura.NotasRecaudo</td>
+                <td>
+                    <a href="@($"facturacion/edit?id={factura.Idfactura}")">Editar</a> |
+                    <a href="@($"facturacion/details?idplanilla={factura.Idplanilla}")">Detalles</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<div>
+    <button @onclick="PreviousPage" disabled="@(!pagination.HasPreviousPage)">Anterior</button>
+    <button @onclick="NextPage" disabled="@(!pagination.HasNextPage)">Siguiente</button>
+</div>
+
+@code {
+    private AcueductoContext context = default!;
+    private List<Facturacion> paginatedFacturas = new();
+    private PaginationState pagination = new PaginationState { ItemsPerPage = 5 };
+    private string? filterText = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        context = await DbFactory.CreateDbContextAsync();
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        var query = context.Facturacions
+            .Where(x => x.CodigoFactura.Contains(filterText))
+            .Include(c => c.IdplanillaNavigation)
+            .Include(p => p.IdpredioNavigation)
+            .OrderBy(a => a.Idfactura)
+            .ThenBy(b => b.Idpredio);
+
+        pagination.TotalItems = await query.CountAsync();
+        paginatedFacturas = await query
+            .Skip((pagination.CurrentPage - 1) * pagination.ItemsPerPage)
+            .Take(pagination.ItemsPerPage)
+            .ToListAsync();
+    }
+
+    private async Task PreviousPage()
+    {
+        if (pagination.HasPreviousPage)
+        {
+            pagination.CurrentPage--;
+            await LoadDataAsync();
+        }
+    }
+
+    private async Task NextPage()
+    {
+        if (pagination.HasNextPage)
+        {
+            pagination.CurrentPage++;
+            await LoadDataAsync();
+        }
+    }
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+
+    private class PaginationState
+    {
+        public int CurrentPage { get; set; } = 1;
+        public int ItemsPerPage { get; set; }
+        public int TotalItems { get; set; }
+
+        public bool HasPreviousPage => CurrentPage > 1;
+        public bool HasNextPage => CurrentPage < (TotalItems + ItemsPerPage - 1) / ItemsPerPage;
+    }
+}

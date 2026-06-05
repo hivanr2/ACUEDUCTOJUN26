@@ -1,0 +1,64 @@
+﻿@page "/tipoconsumos/delete"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Delete</PageTitle>
+
+<h1>Delete</h1>
+
+<p>Are you sure you want to delete this?</p>
+<div>
+    <h2>TipoConsumo</h2>
+    <hr />
+    @if (tipoconsumo is null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Categoria</dt>
+            <dd class="col-sm-10">@tipoconsumo.Categoria</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Rango</dt>
+            <dd class="col-sm-10">@tipoconsumo.Rango</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Observaciones</dt>
+            <dd class="col-sm-10">@tipoconsumo.Observaciones</dd>
+        </dl>
+        <EditForm method="post" Model="tipoconsumo" OnValidSubmit="DeleteTipoConsumo" FormName="delete" Enhance>
+            <button type="submit" class="btn btn-danger" disabled="@(tipoconsumo is null)">Delete</button> |
+            <a class="btn btn-outline-secondary btn-sm" href="" onclick="return cerrarVentana('');">Cerrar</a>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private TipoConsumo? tipoconsumo;
+
+    [SupplyParameterFromQuery]
+    private int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        tipoconsumo = await context.TipoConsumos.FirstOrDefaultAsync(m => m.Id == Id);
+
+        if (tipoconsumo is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    private async Task DeleteTipoConsumo()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.TipoConsumos.Remove(tipoconsumo!);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/tipoconsumos");
+    }
+}

@@ -1,0 +1,86 @@
+﻿@page "/ingresos"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+
+@rendermode InteractiveServer
+
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+<PageTitle>INGRESOS</PageTitle>
+
+<h1>INGRESOS</h1>
+
+<p>
+    <a href="ingresos/create" target="_blank">Create New</a>
+</p>
+
+<QuickGrid Class="table" Items="filterFacturacion.OrderByDescending(c => c.Numero)" Pagination="@pagination">
+    <PropertyColumn Property="row => row.Numero" Sortable="true" />
+    <PropertyColumn Property="row => row.FechaHora" Sortable="true" />
+    <PropertyColumn Property="row => row.CodigoFactura" Sortable="true">
+        <ColumnOptions>
+            <div class="search-box">
+                <input type="search" autofocus @bind=filterText @bind:event="oninput" placeholder="Buscar..." />
+            </div>
+        </ColumnOptions>
+    </PropertyColumn>
+    <PropertyColumn Property="row => row.Idcxc" Sortable="true" />
+    <PropertyColumn Property="row => row.Concepto" Sortable="true" />
+    <PropertyColumn Property="row => row.Valor" />
+
+    <TemplateColumn Context="row">
+        <a href="@($"ingresos/edit?idingreso={row.Idingreso}")" target="_blank">Edit</a> |
+        <a href="@($"ingresos/details?idingreso={row.Idingreso}")" target="_blank">Details</a> |
+    </TemplateColumn>
+</QuickGrid>
+<Paginator State="@pagination" />
+
+@code {
+    private AcueductoContext context = default!;
+    private string? filterText = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+
+    }
+    PaginationState pagination = new PaginationState { ItemsPerPage = 10 };
+
+    // Grid row model including CodigoFactura
+    private sealed class IngresoRow
+    {
+        public string Idingreso { get; set; } = string.Empty;
+        public int Numero { get; set; }
+        public DateTime? FechaHora { get; set; }
+        public string? CodigoFactura { get; set; }
+        public string? Idcxc { get; set; }
+        public string? Concepto { get; set; }
+        public double? Valor { get; set; }
+    }
+
+    IQueryable<IngresoRow> filterFacturacion =>
+        context.Ingresos
+            .GroupJoin(
+                context.Facturacions,
+                i => i.Idfactura,
+                f => f.Idfactura,
+                (i, fs) => new { i, fs }
+            )
+            .SelectMany(x => x.fs.DefaultIfEmpty(), (x, f) => new IngresoRow
+            {
+                Idingreso = x.i.Idingreso,
+                Numero = x.i.Numero,
+                FechaHora = x.i.FechaHora,
+                CodigoFactura = f != null ? f.CodigoFactura : null,
+                Idcxc = x.i.Idcxc,
+                Concepto = x.i.Concepto,
+                Valor = x.i.Valor
+            })
+            .Where(r => string.IsNullOrEmpty(filterText) || (r.CodigoFactura != null && r.CodigoFactura.Contains(filterText!)))
+            .OrderBy(r => r.CodigoFactura)
+            .ThenBy(r => r.FechaHora);
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}

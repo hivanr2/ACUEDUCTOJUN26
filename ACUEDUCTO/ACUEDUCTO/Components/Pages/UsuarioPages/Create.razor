@@ -1,0 +1,194 @@
+﻿@page "/usuarios/create"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+@inject EmailService Email
+@inject IJSRuntime JSRuntime
+@inject ACUEDUCTO.Services.EmailTokenService EmailTokens
+
+@rendermode InteractiveServer 
+
+<PageTitle>Crear Usuario</PageTitle>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+<div class="container py-3">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+            <h1 class="h3 mb-1">Crear Usuario</h1>
+            <div class="small text-muted">Complete la información del usuario.</div>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary" href="/usuarios">Volver</a>
+            <!-- Use onclick to trigger validation and submission so header button works when placed outside the form -->
+            <button class="btn btn-primary" type="button" @onclick="OnHeaderCreateClicked">Crear</button>
+        </div>
+    </div>
+
+    <EditForm id="create-form" method="post" EditContext="@editContext" OnValidSubmit="AddUsuario" FormName="create" Enhance>
+        <DataAnnotationsValidator />
+        <ValidationSummary class="alert alert-danger" role="alert" />
+
+        <div class="row g-3">
+            <div class="col-12 col-lg-8">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light"><strong>Identificación</strong></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label for="identificacion" class="form-label">Identificación</label>
+                                <InputText id="identificacion" @bind-Value="Usuario.Identificacion" class="form-control" placeholder="CC/NIT" autofocus />
+                                <ValidationMessage For="() => Usuario.Identificacion" class="text-danger" />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label for="apellidosnombres" class="form-label">Apellidos y Nombres</label>
+                                <InputText id="apellidosnombres" @bind-Value="Usuario.ApellidosNombres" class="form-control" placeholder="Ej: Pérez Gómez Ana" />
+                                <ValidationMessage For="() => Usuario.ApellidosNombres" class="text-danger" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm mt-3">
+                    <div class="card-header bg-light"><strong>Contacto y otros</strong></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label for="celular" class="form-label">Celular</label>
+                                <InputText id="celular" @bind-Value="Usuario.Celular" class="form-control" placeholder="+57 3xx xxx xxxx" />
+                                <ValidationMessage For="() => Usuario.Celular" class="text-danger" />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label for="correoelectronico" class="form-label">Correo electrónico</label>
+                                <InputText id="correoelectronico" @bind-Value="Usuario.CorreoElectronico" class="form-control" placeholder="usuario@correo.com" />
+                                <ValidationMessage For="() => Usuario.CorreoElectronico" class="text-danger" />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label for="niveleducativo" class="form-label">Nivel educativo</label>
+                                <InputText id="niveleducativo" @bind-Value="Usuario.NivelEducativo" class="form-control" placeholder="Básica / Media / Técnica / Profesional" />
+                                <ValidationMessage For="() => Usuario.NivelEducativo" class="text-danger" />
+                            </div>
+                            <div class="col-12">
+                                <label for="observaciones" class="form-label">Observaciones</label>
+                                <InputTextArea id="observaciones" @bind-Value="Usuario.Observaciones" class="form-control" rows="3" placeholder="Notas adicionales" />
+                                <ValidationMessage For="() => Usuario.Observaciones" class="text-danger" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-3">
+                    <button type="submit" class="btn btn-primary">Crear</button>
+                </div>
+            </div>
+        </div>
+    </EditForm>
+
+    <div class="mt-3">
+        <a class="link-secondary" href="/usuarios">Volver a la lista</a>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private UsuarioCreateDto Usuario { get; set; } = new();
+
+    private EditContext editContext;
+    private string? errorMessage;
+
+    protected override void OnInitialized()
+    {
+        editContext = new EditContext(Usuario);
+    }
+
+    private async Task AddUsuario()
+    {
+        try
+        {
+            using var context = DbFactory.CreateDbContext();
+
+            // Validar que la identificación no esté previamente inscrita
+            if (!string.IsNullOrWhiteSpace(Usuario?.Identificacion))
+            {
+                var exists = await context.Usuarios.AnyAsync(u => u.Identificacion == Usuario.Identificacion);
+                if (exists)
+                {
+                    errorMessage = "La cédula ya está registrada. Use una cédula que no esté previamente inscrita.";
+                    // Mostrar mensajes de validación
+                    editContext?.NotifyValidationStateChanged();
+                    return;
+                }
+            }
+            var usuario = new Usuario
+            {
+                Identificacion = Usuario.Identificacion,
+                ApellidosNombres = Usuario.ApellidosNombres,
+                Celular = Usuario.Celular,
+                CorreoElectronico = Usuario.CorreoElectronico,
+                NivelEducativo = Usuario.NivelEducativo,
+                Observaciones = Usuario.Observaciones
+            };
+            usuario.Personals = null;
+            usuario.Predios = null;
+            usuario.Solicitudes = null;
+            context.Usuarios.Add(usuario);
+            await context.SaveChangesAsync();
+
+            // Generar token de autorización y enviar correo
+            if (!string.IsNullOrWhiteSpace(usuario.CorreoElectronico))
+            {
+                var token = EmailTokens.Issue(usuario.Identificacion, TimeSpan.FromDays(3));
+                var callbackUrl = NavigationManager.ToAbsoluteUri($"/auth/confirm?token={Uri.EscapeDataString(token)}").ToString();
+                var html = $@"<p>Hola {System.Net.WebUtility.HtmlEncode(usuario.ApellidosNombres)},</p>
+<p>Se ha creado un acceso para usted en el sistema.</p>
+<p>Para activar su autorización, haga clic en el siguiente enlace:</p>
+<p><a href='{callbackUrl}' target='_blank'>Activar acceso</a></p>
+<p>Si no solicitó este acceso, ignore este mensaje.</p>";
+                await Email.SendEmailAsync(usuario.CorreoElectronico, "Activación de acceso", html);
+            }
+
+            // Mostrar mensaje de éxito y volver a la lista
+            try
+            {
+                // Mostrar toast y esperar antes de navegar para que se vea
+                await JSRuntime.InvokeVoidAsync("showToast", "Usuario creado correctamente.", 1500);
+                await Task.Delay(1600);
+            }
+            catch
+            {
+                // Ignorar si no es posible mostrar el toast en este contexto
+            }
+            NavigationManager.NavigateTo("/usuarios");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error al crear usuario: {ex.Message}");
+        }
+
+    }
+
+    private async Task OnHeaderCreateClicked()
+    {
+        // Validate the current EditContext first; if valid, submit
+        if (editContext == null)
+        {
+            editContext = new EditContext(Usuario);
+        }
+
+        if (editContext.Validate())
+        {
+            await AddUsuario();
+        }
+        else
+        {
+            // Ensure validation messages are shown
+            editContext.NotifyValidationStateChanged();
+        }
+}
+
+}

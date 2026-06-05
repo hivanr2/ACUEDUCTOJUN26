@@ -1,0 +1,160 @@
+﻿@page "/documentacions/edit"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Editar documento</PageTitle>
+
+<div class="container py-2">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Editar documento</h1>
+            <small class="text-muted">TRD - Tabla de retención documental</small>
+        </div>
+        <div>
+            <a class="btn btn-secondary" href="/documentacions" onclick="return cerrarVentana('/documentacions');">Cerrar</a>
+        </div>
+    </div>
+
+    @if (FormModel is null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <EditForm method="post" Model="FormModel" OnValidSubmit="UpdateDocumentacion" FormName="edit" Enhance>
+                    <DataAnnotationsValidator />
+                    <ValidationSummary role="alert" />
+                    <input type="hidden" name="FormModel.Id" value="@FormModel.Id" />
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <label for="codigo" class="form-label">Código</label>
+                            <InputText id="codigo" @bind-Value="FormModel.Codigo" class="form-control" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="idserie" class="form-label">Serie</label>
+                            <InputSelect id="idserie" @bind-Value="FormModel.Idserie" class="form-select">
+                                <option value="">Seleccione una serie</option>
+                                @foreach (var serie in series)
+                                {
+                                    <option value="@serie.Id">@serie.Nombre</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="idtipo" class="form-label">Tipo</label>
+                            <InputSelect id="idtipo" @bind-Value="FormModel.Idtipo" class="form-select">
+                                <option value="">Seleccione un tipo</option>
+                                @foreach (var tipo in tipos)
+                                {
+                                    <option value="@tipo.Id">@tipo.Nombre</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="tiempoarchivogestion" class="form-label">Archivo Gestión (Años)</label>
+                            <InputNumber id="tiempoarchivogestion" @bind-Value="FormModel.TiempoArchivoGestion" class="form-control" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="tiempoarchivocentral" class="form-label">Archivo Central (Años)</label>
+                            <InputNumber id="tiempoarchivocentral" @bind-Value="FormModel.TiempoArchivoCentral" class="form-control" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="disposicionfinal" class="form-label">Disposición final</label>
+                            <InputText id="disposicionfinal" @bind-Value="FormModel.DisposicionFinal" class="form-control" />
+                        </div>
+                        <div class="col-12">
+                            <label for="observaciones" class="form-label">Observaciones</label>
+                            <InputText id="observaciones" @bind-Value="FormModel.Observaciones" class="form-control" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <a class="btn btn-light" href="/documentacions" onclick="return cerrarVentana('/documentacions');">Cerrar</a>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string Id { get; set; }
+
+    [SupplyParameterFromForm]
+    private DocumentacionEditDto? FormModel { get; set; }
+
+    private List<SerieDocumentacion> series = new();
+    private List<TipoDocumentacion> tipos = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        series = await context.SerieDocumentacions.AsNoTracking().ToListAsync();
+        tipos = await context.TipoDocumentacions.AsNoTracking().ToListAsync();
+
+        if (FormModel is null)
+        {
+            // Carga inicial desde la BD a DTO
+            var entity = await context.Documentacions.AsNoTracking().FirstOrDefaultAsync(m => m.Id == Id);
+            if (entity is null)
+            {
+                NavigationManager.NavigateTo("notfound");
+                return;
+            }
+
+            FormModel = new DocumentacionEditDto
+            {
+                Id = entity.Id,
+                Codigo = entity.Codigo,
+                Idserie = entity.Idserie,
+                Idtipo = entity.Idtipo,
+                TiempoArchivoGestion = entity.TiempoArchivoGestion,
+                TiempoArchivoCentral = entity.TiempoArchivoCentral,
+                DisposicionFinal = entity.DisposicionFinal,
+                Observaciones = entity.Observaciones
+            };
+        }
+    }
+
+    private async Task UpdateDocumentacion()
+    {
+        using var context = DbFactory.CreateDbContext();
+        var entity = await context.Documentacions.FirstOrDefaultAsync(d => d.Id == FormModel!.Id);
+        if (entity is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+            return;
+        }
+
+        entity.Codigo = FormModel.Codigo;
+        entity.Idserie = FormModel.Idserie;
+        entity.Idtipo = FormModel.Idtipo;
+        entity.TiempoArchivoGestion = FormModel.TiempoArchivoGestion;
+        entity.TiempoArchivoCentral = FormModel.TiempoArchivoCentral;
+        entity.DisposicionFinal = FormModel.DisposicionFinal;
+        entity.Observaciones = FormModel.Observaciones;
+
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/documentacions");
+    }
+
+    private sealed class DocumentacionEditDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string? Codigo { get; set; }
+        public int? Idserie { get; set; }
+        public int? Idtipo { get; set; }
+        public double? TiempoArchivoGestion { get; set; }
+        public double? TiempoArchivoCentral { get; set; }
+        public string? DisposicionFinal { get; set; }
+        public string? Observaciones { get; set; }
+    }
+}

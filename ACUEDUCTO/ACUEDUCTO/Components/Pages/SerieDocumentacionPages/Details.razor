@@ -1,0 +1,49 @@
+﻿@page "/seriedocumentacions/details"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Details</PageTitle>
+
+<h1>Details</h1>
+
+<div>
+    <h2>SerieDocumentacion</h2>
+    <hr />
+    @if (seriedocumentacion is null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Nombre</dt>
+            <dd class="col-sm-10">@seriedocumentacion.Nombre</dd>
+            <dt class="col-sm-2">Descripcion</dt>
+            <dd class="col-sm-10">@seriedocumentacion.Descripcion</dd>
+        </dl>
+        <div>
+            <a href="@($"/seriedocumentacions/edit?id={seriedocumentacion.Id}")">Edit</a> |
+            <a href="@($"/seriedocumentacions")">Back to List</a>
+        </div>
+    }
+</div>
+
+@code {
+    private SerieDocumentacion? seriedocumentacion;
+
+    [SupplyParameterFromQuery]
+    private int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        seriedocumentacion = await context.SerieDocumentacions.FirstOrDefaultAsync(m => m.Id == Id);
+
+        if (seriedocumentacion is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+}

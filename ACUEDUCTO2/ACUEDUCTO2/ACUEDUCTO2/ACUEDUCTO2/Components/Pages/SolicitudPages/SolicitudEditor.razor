@@ -1,0 +1,256 @@
+@using ACUEDUCTO2.Data
+@using ACUEDUCTO2.Share.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Web
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <EditForm Model="solicitud" OnValidSubmit="OnSubmit" OnInvalidSubmit="OnInvalid">
+            <DataAnnotationsValidator />
+            <div class="row g-3">
+                <div class="col-12 col-md-6">
+                    <h5>Datos generales</h5>
+                    <div class="mb-2">
+                        <label class="form-label">Tipo</label>
+                        <InputSelect class="form-select" @bind-Value="solicitud.IdTipo" @onchange="FieldChanged">
+                            <option value="">Seleccione...</option>
+                            @foreach (var t in Tipos)
+                            {
+                                <option value="@t.Guid">@t.NombreTipoSolicitud</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">Estado</label>
+                        <InputSelect class="form-select" @bind-Value="solicitud.IdEstado" disabled="@(!EstadoEditable)" @onchange="FieldChanged">
+                            @foreach (var e in Estados)
+                            {
+                                <option value="@e.Guid">@e.NombreEstadoSolicitud</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">Descripción</label>
+                        <InputTextArea class="form-control" @bind-Value="solicitud.DescripcionSolicitud" @oninput="FieldChanged" />
+                        <ValidationMessage For="() => solicitud.DescripcionSolicitud" />
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">Registrado por</label>
+                        <input class="form-control mb-1" placeholder="Buscar usuario registrado..." @bind="PersonSearch" @bind:event="oninput" />
+                        @if (FilteredPeople.Any())
+                        {
+                            <div class="list-group position-relative shadow-sm" style="z-index:1000; max-height:200px; overflow:auto;">
+                                @foreach (var p in FilteredPeople.Take(10))
+                                {
+                                    <button type="button" class="list-group-item list-group-item-action" @onclick="() => SelectPerson(p)">
+                                        <div class="fw-semibold">@p.Name</div>
+                                        <small class="text-muted">@p.Source</small>
+                                    </button>
+                                }
+                            </div>
+                        }
+                        <input class="form-control mt-1" value="@solicitud.ApellidosYNombresRegistraSolicitud" disabled />
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-6">
+                    <h5>Acciones (Planear / Hacer / Verificar / Actuar)</h5>
+
+                    <div class="mb-2">
+                        <label class="form-label">Planear</label>
+                        <InputText class="form-control" @bind-Value="solicitud.Planear" @onchange="FieldChanged" />
+                        <small class="text-muted">Usuario: @solicitud.IdUsuarioPlanear - Fecha: @(solicitud.FechaHoraPlanear?.ToString("g") ?? "-")</small>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">Hacer</label>
+                        <InputText class="form-control" @bind-Value="solicitud.Hacer" @onchange="FieldChanged" />
+                        <small class="text-muted">Usuario: @solicitud.IdUsuarioHacer - Fecha: @(solicitud.FechaHoraHacer?.ToString("g") ?? "-")</small>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">Verificar</label>
+                        <InputText class="form-control" @bind-Value="solicitud.Verificar" @onchange="FieldChanged" />
+                        <small class="text-muted">Usuario: @solicitud.IdUsuarioVerificar - Fecha: @(solicitud.FechaHoraVerificar?.ToString("g") ?? "-")</small>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">Actuar / Mejora</label>
+                        <InputText class="form-control" @bind-Value="solicitud.ActuarMejora" @onchange="FieldChanged" />
+                        <small class="text-muted">Usuario: @solicitud.IdUsuarioActuarMejora - Fecha: @(solicitud.FechaHoraActuarMejora?.ToString("g") ?? "-")</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <div>
+                    <button class="btn btn-primary" @onclick="SaveNow">Guardar ahora</button>
+                    <button class="btn btn-secondary ms-2" @onclick="Cancel">Cancelar</button>
+                </div>
+                <div class="text-end small text-muted">
+                    @if (!string.IsNullOrEmpty(StatusMessage))
+                    {
+                        <span>@StatusMessage</span>
+                    }
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string? Id { get; set; }
+
+    private Solicitud solicitud = new();
+    private List<TipoSolicitud> Tipos = new();
+    private List<EstadoSolicitud> Estados = new();
+    private string CurrentUserId = string.Empty;
+    private string StatusMessage = string.Empty;
+    private bool EstadoEditable = false;
+
+    private string PersonSearch { get; set; } = string.Empty;
+    private record PersonItem(string Guid, string Name, string Source);
+    private List<PersonItem> People = new();
+    private IEnumerable<PersonItem> FilteredPeople => string.IsNullOrWhiteSpace(PersonSearch)
+        ? People
+        : People.Where(p => p.Name?.Contains(PersonSearch, StringComparison.OrdinalIgnoreCase) == true);
+
+    private readonly System.Timers.Timer debounceTimer = new(700);
+    private bool disposedValue;
+
+    protected override async Task OnInitializedAsync()
+    {
+        debounceTimer.AutoReset = false;
+        debounceTimer.Elapsed += async (_, __) => await InvokeAsync(SaveDebouncedAsync);
+
+        using var db = DbFactory.CreateDbContext();
+        Tipos = await db.TipoSolicitud.AsNoTracking().ToListAsync();
+        Estados = await db.EstadoSolicitud.AsNoTracking().ToListAsync();
+
+        // Include Identity users (AspNetUsers) so they can be selected as registrante
+        var appUsers = await db.Users.AsNoTracking().OrderBy(u => u.UserName).ToListAsync();
+        People = appUsers.Select(u => new PersonItem(u.Id, u.UserName ?? u.Email ?? u.Id, "AspNetUser")).ToList();
+
+        // set current user
+        try
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            var u = auth.User;
+            if (u?.Identity?.IsAuthenticated == true)
+            {
+                CurrentUserId = u.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+            }
+        }
+        catch { }
+
+        if (!string.IsNullOrWhiteSpace(Id))
+        {
+            // load existing
+            var existing = await db.Solicitud.FindAsync(Id);
+            if (existing != null)
+            {
+                solicitud = existing;
+            }
+        }
+        else
+        {
+            solicitud = new Solicitud();
+            solicitud.Guid = System.Guid.NewGuid().ToString();
+            solicitud.FechaHoraCreacionRegistro = DateTime.Now;
+            solicitud.UsuarioSistemaCreaRegistro = CurrentUserId;
+
+            var abierta = Estados.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.NombreEstadoSolicitud) && x.NombreEstadoSolicitud.ToLowerInvariant().Contains("abier"));
+            if (abierta != null)
+                solicitud.IdEstado = abierta.Guid;
+
+            // assign Codigo on save
+        }
+    }
+
+    private void SelectPerson(PersonItem p)
+    {
+        if (p is null) return;
+        solicitud.UsuarioSistemaCreaRegistro = p.Guid;
+        solicitud.ApellidosYNombresRegistraSolicitud = p.Name;
+        PersonSearch = p.Name;
+    }
+
+    private void FieldChanged(ChangeEventArgs e)
+    {
+        // restart debounce timer for autosave
+        debounceTimer.Stop();
+        debounceTimer.Start();
+    }
+
+    private async Task SaveDebouncedAsync()
+    {
+        try
+        {
+            await SaveAsync();
+            StatusMessage = "Guardado automático";
+            StateHasChanged();
+            await Task.Delay(1500);
+            StatusMessage = string.Empty;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Error al guardar: " + ex.Message;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        using var db = DbFactory.CreateDbContext();
+        // validation server-side minimal
+        if (string.IsNullOrWhiteSpace(solicitud.DescripcionSolicitud))
+            throw new InvalidOperationException("La descripción es obligatoria.");
+
+        // set codigo if new
+        var exists = await db.Solicitud.AnyAsync(s => s.Guid == solicitud.Guid);
+        if (!exists)
+        {
+            var max = await db.Solicitud.MaxAsync(s => (int?)s.CodigoSolicitud) ?? 0;
+            solicitud.CodigoSolicitud = max + 1;
+            db.Add(solicitud);
+        }
+        else
+        {
+            db.Update(solicitud);
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    private async Task SaveNow(MouseEventArgs e)
+    {
+        await SaveAsync();
+        StatusMessage = "Guardado";
+    }
+
+    private Task OnSubmit() => Task.CompletedTask;
+    private Task OnInvalid() { StatusMessage = "Formulario inválido"; return Task.CompletedTask; }
+
+    void Cancel()
+    {
+        Navigation.NavigateTo("/solicitud", forceLoad: true);
+    }
+
+    public void Dispose()
+    {
+        if (!disposedValue)
+        {
+            debounceTimer.Dispose();
+            disposedValue = true;
+        }
+    }
+}

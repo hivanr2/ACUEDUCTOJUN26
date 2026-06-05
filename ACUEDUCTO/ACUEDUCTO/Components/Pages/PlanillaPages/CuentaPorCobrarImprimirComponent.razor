@@ -1,0 +1,89 @@
+﻿@page "/planilla/cuentasporcobrar"
+@using ACUEDUCTO.Components.Layout
+@using ACUEDUCTO.Models
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<AcueductoContext> DbFactory
+@layout PrintLayout
+
+<h3 class="text-center">Cuenta por Cobrar</h3>
+
+@if (factura == null)
+{
+    <div class="text-center">Cargando datos...</div>
+}
+else
+{
+    <div class="container">
+        <div class="row">
+            <div class="col-md-6">
+                <h5>Información del Cliente</h5>
+                <p><strong>Nombre:</strong> @factura.IdpredioNavigation.ApellidosNombresUsuario</p>
+                <p><strong>Predio:</strong> @factura.IdpredioNavigation.Direccion</p>
+                <p><strong>Código Usuario:</strong> @factura.CodigoUsuario</p>
+            </div>
+            <div class="col-md-6 text-right">
+                <h5>Información de la Factura</h5>
+                <p><strong>Número de Factura:</strong> @factura.CodigoFactura</p>
+                <p><strong>Fecha:</strong> @factura.FechaHoraRegistro?.ToString("dd/MM/yyyy")</p>
+                <p><strong>Estado:</strong> @factura.ConsumoM3</p>
+            </div>
+        </div>
+        <hr />
+        <div class="row">
+            <div class="col-md-12">
+                <h5>Detalles de la Cuenta</h5>
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Concepto</th>
+                            <th>Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Deuda Anterior</td>
+                            <td>@FormatCurrency(factura.DeudaAnterior)</td>
+                        </tr>
+                        <tr>
+                            <td>Valor Periodo</td>
+                            <td>@FormatCurrency(factura.ValorPeriodo)</td>
+                        </tr>
+                        <tr>
+                            <td>Recaudo Bimestre</td>
+                            <td>@FormatCurrency(factura.RecaudoPeriodoTotal)</td>
+                        </tr>
+                        <tr>
+                            <td>Deuda Pendiente</td>
+                            <td>@FormatCurrency(factura.DeudaPasa)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    private string idfactura { get; set; }
+
+    private Facturacion factura;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFactura();
+    }
+
+    private async Task LoadFactura()
+    {
+        using var context = DbFactory.CreateDbContext();
+        factura = await context.Facturacions
+            .Include(f => f.IdpredioNavigation)
+            .FirstOrDefaultAsync(f => f.Idfactura == idfactura);
+    }
+
+    private string FormatCurrency(double? value)
+    {
+        return value.HasValue ? $"${value.Value:N0}" : "$0";
+    }
+}

@@ -1,0 +1,210 @@
+@page "/solicitud/editar/{guid}"
+
+@using ACUEDUCTO2-0_0.Data
+@using ACUEDUCTO2-0_0.Compartir.MODELS
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Editar Solicitud</PageTitle>
+
+<h3>Editar Solicitud</h3>
+
+@if (solicitud == null)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <EditForm Model="solicitud" OnValidSubmit="GuardarSolicitud">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+            <div class="mb-3">
+                <label>Código solicitud</label>
+                <InputNumber class="form-control" @bind-Value="solicitud.CodigoSolicitud" Disabled="true" />
+            </div>
+        <div class="mb-3">
+            <label>Tipo</label>
+            <InputSelect class="form-select" @bind-Value="solicitud.IdTipo">
+                <option value="">Seleccione un tipo</option>
+                @foreach (var t in Tipos)
+                {
+                    <option value="@t.Guid">@t.NombreTipoSolicitud</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="mb-3">
+            <label>Estado</label>
+            <InputSelect class="form-select" @bind-Value="solicitud.IdEstado">
+                <option value="">Seleccione un estado</option>
+                @foreach (var e in Estados)
+                {
+                    <option value="@e.Guid">@e.NombreEstadoSolicitud</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="mb-3">
+            <label>Descripción</label>
+            <InputTextArea class="form-control" @bind-Value="solicitud.DescripcionSolicitud" />
+        </div>
+        <h4 class="mt-3">Ciclo PHVA</h4>
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="fw-bold">Planear</h5>
+                <div class="mb-3">
+                    <label>Descripción Planear</label>
+                    <InputTextArea class="form-control" @bind-Value="solicitud.Planear" />
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label>Usuario Planear</label>
+                        <InputSelect class="form-select" @bind-Value="solicitud.IdUsuarioPlanear">
+                            <option value="">(sin asignar)</option>
+                            @foreach (var p in People)
+                            {
+                                <option value="@p.Guid">@p.Name (@p.Source)</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-6">
+                        <label>Fecha Planear</label>
+                        <InputDate class="form-control" @bind-Value="solicitud.FechaHoraPlanear" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="fw-bold">Hacer</h5>
+                <div class="mb-3">
+                    <label>Descripción Hacer</label>
+                    <InputTextArea class="form-control" @bind-Value="solicitud.Hacer" />
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label>Usuario Hacer</label>
+                        <InputSelect class="form-select" @bind-Value="solicitud.IdUsuarioHacer">
+                            <option value="">(sin asignar)</option>
+                            @foreach (var p in People)
+                            {
+                                <option value="@p.Guid">@p.Name (@p.Source)</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-6">
+                        <label>Fecha Hacer</label>
+                        <InputDate class="form-control" @bind-Value="solicitud.FechaHoraHacer" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="fw-bold">Verificar</h5>
+                <div class="mb-3">
+                    <label>Descripción Verificar</label>
+                    <InputTextArea class="form-control" @bind-Value="solicitud.Verificar" />
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label>Usuario Verificar</label>
+                        <InputSelect class="form-select" @bind-Value="solicitud.IdUsuarioVerificar">
+                            <option value="">(sin asignar)</option>
+                            @foreach (var p in People)
+                            {
+                                <option value="@p.Guid">@p.Name (@p.Source)</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-6">
+                        <label>Fecha Verificar</label>
+                        <InputDate class="form-control" @bind-Value="solicitud.FechaHoraVerificar" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="fw-bold">Actuar para mejorar</h5>
+                <div class="mb-3">
+                    <label>Descripción Actuar</label>
+                    <InputTextArea class="form-control" @bind-Value="solicitud.ActuarMejora" />
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label>Usuario Actúa Mejora</label>
+                        <InputSelect class="form-select" @bind-Value="solicitud.IdUsuarioActuarMejora">
+                            <option value="">(sin asignar)</option>
+                            @foreach (var p in People)
+                            {
+                                <option value="@p.Guid">@p.Name (@p.Source)</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-6">
+                        <label>Fecha Actúa Mejora</label>
+                        <InputDate class="form-control" @bind-Value="solicitud.FechaHoraActuarMejora" />
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label>Usuario que registra</label>
+            <InputText class="form-control" @bind-Value="solicitud.UsuarioSistemaCreaRegistro" Disabled="true" />
+            <small class="text-muted">Registrado por: @(People.FirstOrDefault(p => p.Guid == solicitud.UsuarioSistemaCreaRegistro)?.Name ?? solicitud.UsuarioSistemaCreaRegistro)</small>
+        </div>
+        <div class="mb-3">
+            <label>Apellidos y nombres</label>
+            <InputText class="form-control" @bind-Value="solicitud.ApellidosNombresRegistraSolicitud" />
+        </div>
+        <button type="submit" class="btn btn-success">Guardar</button>
+        <button type="button" class="btn btn-secondary ms-2" @onclick="Cancelar">Cancelar</button>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public string guid { get; set; } = string.Empty;
+
+    private Solicitud? solicitud;
+    private List<TipoSolicitud> Tipos { get; set; } = new();
+    private List<EstadoSolicitud> Estados { get; set; } = new();
+    private List<Usuario> Usuarios { get; set; } = new();
+    private List<Autorizado> Autorizados { get; set; } = new();
+
+    private record PersonItem(string Guid, string Name, string Source);
+    private List<PersonItem> People { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = DbFactory.CreateDbContext();
+        Tipos = await db.TipoSolicitud.AsNoTracking().ToListAsync();
+        Estados = await db.EstadoSolicitud.AsNoTracking().ToListAsync();
+        Usuarios = await db.Set<Usuario>().AsNoTracking().OrderBy(u => u.ApellidosNombres).ToListAsync();
+        Autorizados = await db.Set<Autorizado>().AsNoTracking().OrderBy(a => a.QuienAutoriza).ToListAsync();
+
+        // Include Identity users (AspNetUsers) by UserName
+        var appUsers = await db.Users.AsNoTracking().OrderBy(u => u.UserName).ToListAsync();
+
+        People = Usuarios.Select(u => new PersonItem(u.Guid, u.ApellidosNombres, "Usuario")).ToList();
+        People.AddRange(Autorizados.Select(a => new PersonItem(a.Guid, a.QuienAutoriza, "Autorizado")));
+        People.AddRange(appUsers.Select(u => new PersonItem(u.Id, u.UserName ?? u.Email ?? "(sin nombre)", "AspNetUser")));
+
+        solicitud = await db.Solicitud.FirstOrDefaultAsync(s => s.Guid == guid);
+    }
+
+    private async Task GuardarSolicitud()
+    {
+        using var db = DbFactory.CreateDbContext();
+        db.Update(solicitud);
+        await db.SaveChangesAsync();
+        Navigation.NavigateTo("/solicitud");
+    }
+
+    void Cancelar() => Navigation.NavigateTo("/solicitud");
+}
+

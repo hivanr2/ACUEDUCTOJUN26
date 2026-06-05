@@ -1,0 +1,432 @@
+@page "/ingresos/createrecaudo"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+@rendermode InteractiveServer
+
+<PageTitle>Create</PageTitle>
+
+<h1>Create</h1>
+
+<h2>Ingreso</h2>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <EditForm method="post" Model="Ingreso" OnValidSubmit="AddIngreso" FormName="create">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert" />
+            <div class="mb-3">
+                <label for="fechahora" class="form-label">FechaHora:</label>
+                <InputDate id="fechahora" @bind-Value="Ingreso.FechaHora" class="form-control" />
+                <ValidationMessage For="() => Ingreso.FechaHora" class="text-danger" />
+            </div>
+            <div class="mb-3">
+                <label for="numero" class="form-label">Numero:</label>
+                <InputNumber id="numero" @bind-Value="Ingreso.Numero" class="form-control" />
+                <ValidationMessage For="() => Ingreso.Numero" class="text-danger" />
+            </div>
+            <div class="mb-3">
+                <label for="idcliente" class="form-label">Usuario Facturaci�n:</label>
+                <InputSelect id="idcliente" @bind-Value="Ingreso.Idcliente" class="form-control">
+                    <option value="">Seleccione un usuario</option>
+                    @foreach (var usuario in Usuarios)
+                    {
+                        <option value="@usuario.Identificacion">@usuario.ApellidosNombres</option>
+                    }
+                </InputSelect>
+                <ValidationMessage For="() => Ingreso.Idcliente" class="text-danger" />
+            </div>
+            <div class="mb-3">
+                <label for="idcxc" class="form-label">IDCXC:</label>
+                <InputSelect id="idcxc" @bind-Value="Ingreso.Idcxc" class="form-control" @oninput="OnCuentaPorCobrarChanged">
+                    <option value="">Seleccione una cuenta por cobrar</option>
+                    @foreach (var cuenta in cuentasPorCobrar)
+                    {
+                        <option value="@cuenta.IdcuentaxC">@cuenta.Descripcion</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="mb-3">
+                <label for="idfactura" class="form-label">IDFactura de Registro Abono:</label>
+                <InputSelect id="idfactura" @bind-Value="Ingreso.Idfactura" class="form-control" @onchange="OnFacturaChanged">
+                    <option value="">Seleccione una factura</option>
+                    @foreach (var factura in facturas)
+                    {
+                        <option value="@factura.Idfactura">@factura.CodigoFactura</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="mb-3">
+                <label for="concepto" class="form-label">Concepto:</label>
+                <InputText id="concepto" @bind-Value="Ingreso.Concepto" class="form-control" />
+                <ValidationMessage For="() => Ingreso.Concepto" class="text-danger" />
+            </div>
+            <div class="mb-3">
+                <label for="valor" class="form-label">Valor:</label>
+                <InputNumber id="valor" @bind-Value="Ingreso.Valor" class="form-control" />
+                <ValidationMessage For="() => Ingreso.Valor" class="text-danger" />
+            </div>
+            <button type="submit" class="btn btn-primary">Create</button>
+        </EditForm>
+    </div>
+</div>
+
+<div>
+    <a href="/ingresos">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private Ingreso Ingreso { get; set; } = new();
+    [SupplyParameterFromQuery]
+    public string IdFactura { get; set; } = "";
+    private MovimientoCaja movimientoCaja { get; set; } = new();
+    private List<Facturacion> facturas = new();
+    private List<CuentaPorCobrar> cuentasPorCobrar = new();
+
+    private List<Usuario> Usuarios { get; set; } = new();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Usuarios = await context.Usuarios.OrderBy(c => c.ApellidosNombres).ToListAsync();
+        facturas = await context.Facturacions.OrderBy(c => c.CodigoFactura).Include(c => c.IdpredioNavigation).ToListAsync();
+
+        cuentasPorCobrar = await context.CuentaPorCobrars
+            .Where(c => c.ValorDebe > 0)
+            .OrderBy(c => c.Descripcion)
+            .ToListAsync();
+
+        if (!string.IsNullOrEmpty(IdFactura))
+        {
+            // 1. Buscar la factura y asignar el CodigoFactura
+            var facturaSeleccionada = facturas.FirstOrDefault(f => f.Idfactura == IdFactura);
+            if (facturaSeleccionada != null)
+            {
+                Ingreso.Idfactura = facturaSeleccionada.Idfactura;
+
+                // 2. Buscar la cuenta por cobrar asociada a la factura seleccionada
+                var cxcSeleccionada = cuentasPorCobrar.FirstOrDefault(c => c.IdFactura == IdFactura);
+                if (cxcSeleccionada != null)
+                {
+                    Ingreso.Idcxc = cxcSeleccionada.IdcuentaxC;
+                    Ingreso.Idcliente = cxcSeleccionada.Identificacion;
+                    Ingreso.Valor = cxcSeleccionada.ValorDebe;
+                    Ingreso.Concepto = "PAGADA " + cxcSeleccionada.Descripcion + " " + cxcSeleccionada.ValorDebe;
+                }
+                else
+                {
+                    // Si no hay CxC, asigna el usuario desde la factura
+                    Ingreso.Idcliente = facturaSeleccionada.IdpredioNavigation?.IdentificacionFacturacion;
+                }
+            }
+        }
+
+        if (Ingreso.Numero == null || Ingreso.Numero == 0)
+        {
+            int siguienteNumero = 4414;
+            if (context.Ingresos.Any())
+            {
+                siguienteNumero = (context.Ingresos.Where(a => a.Numero > 0).Select(a => a.Numero).Max()) + 1;
+            }
+            Ingreso.Numero = siguienteNumero;
+        }
+    }
+
+    private async Task AddIngreso()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Ingreso.Idingreso = Guid.NewGuid().ToString();
+
+        if (!string.IsNullOrEmpty(Ingreso.Idcxc))
+        {
+            var selectedCuenta = cuentasPorCobrar.FirstOrDefault(c => c.IdcuentaxC == Ingreso.Idcxc);
+
+            if (selectedCuenta != null)
+            {
+                Ingreso.Idcliente = selectedCuenta.Identificacion;
+
+                if (selectedCuenta.CuotasTotales.HasValue && selectedCuenta.CuotasTotales.Value > 0)
+                {
+                    selectedCuenta.CuotasPagadas += 1;
+
+                    // si es la ultima cuota
+                    if (selectedCuenta.CuotasPagadas == selectedCuenta.CuotasTotales)
+                    {
+                        // Pago totalmente solo si el valor del ingreso es igual al valor de la cxc
+                        if (selectedCuenta.ValorDebe == Ingreso.Valor)
+                        {
+                            // Pago totaltmentar la cxc CANCELANDO la cxc
+                            Ingreso.Concepto = "CANCELO TOTALMENTE " + selectedCuenta.Descripcion;
+                        }
+                        else
+                        {
+                            if (selectedCuenta.ValorDebe < Ingreso.Valor)
+                            {
+                                // Pago TOTALMENTE LA DEUDA DE LA Cxc Y TIENE SALDO A FAVOR
+                                Ingreso.Concepto = "CANCELO TOTALMENTE Y TIENE SALDO A FAVOR " + selectedCuenta.Descripcion;
+
+                            } 
+                            else
+                            {
+                                // Pago una parte por lo que solo ABONO quedando aun debiendo saldo de la cxc
+                                Ingreso.Concepto = "ABONO PARCIAL " + selectedCuenta.Descripcion;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // si no es la ultima cuota debe haber un abono de una cuota,
+                        // partiendo el total en el n�mero de cuotas que faltan
+                        int cuotasRestantes = selectedCuenta.CuotasTotales.Value - selectedCuenta.CuotasPagadas.Value;
+                        double valorCuota = selectedCuenta.ValorDebe.Value / cuotasRestantes;
+                        Ingreso.Valor = valorCuota;
+                        Ingreso.Concepto = "ABONO DE CUOTA " + selectedCuenta.Descripcion;
+                    }
+                }
+
+                // Actualizar los valores de la cuenta por cobrar
+                selectedCuenta.ValorDebe -= Ingreso.Valor;
+                selectedCuenta.ValorPagado += Ingreso.Valor;
+                selectedCuenta.Identificacion = Ingreso.Idcliente;
+
+                context.CuentaPorCobrars.Update(selectedCuenta);
+                await context.SaveChangesAsync();
+
+                // se obtiene con Ingreso.idfactura el codigoFactura de la Factura del Cliente para hacer la actualizaci�n de la DeudaPasa y RecaudoPeriodoTotal
+                var selectedFactura = facturas.FirstOrDefault(f => f.Idfactura == Ingreso.Idfactura);
+
+                if (selectedFactura != null)
+                {
+                    selectedFactura.DeudaPasa -= Ingreso.Valor;
+                    selectedFactura.RecaudoPeriodoTotal += Ingreso.Valor;
+                    selectedFactura.NotasRecaudo += " - " + Ingreso.Concepto + " " + Ingreso.FechaHora;
+
+                    // // Actualizar las cuotas en la factura
+                    // selectedFactura.CuotasPagadas = selectedCuenta.CuotasPagadas;
+                    // selectedFactura.CuotasTotales = selectedCuenta.CuotasTotales;
+
+                    context.Facturacions.Update(selectedFactura);
+                    await context.SaveChangesAsync();
+                }
+            }
+        }
+        Ingreso.FechaHora = this.Ingreso.FechaHora;
+
+        context.Ingresos.Add(Ingreso);
+        await context.SaveChangesAsync();
+
+        // Se hace registro de movimiento de caja
+        movimientoCaja.FechaHora = Ingreso.FechaHora;
+        movimientoCaja.Entrada = Ingreso.Valor;
+        movimientoCaja.Iddocumento = "INGRESO#" + Ingreso.Numero.ToString();
+        movimientoCaja.Salida = 0;
+        movimientoCaja.Saldo = Ingreso. Valor;
+        context.MovimientoCajas.Add(movimientoCaja);
+        await context.SaveChangesAsync();
+        StateHasChanged();
+
+        NavigationManager.NavigateTo("/ingresos");
+        StateHasChanged();
+    }
+
+    private async Task OnFacturaChanged(ChangeEventArgs e)
+    {
+        var selectedCodigoFactura = e.Value?.ToString();
+        Ingreso.Idfactura = selectedCodigoFactura;
+
+        // Buscar la factura seleccionada
+        var facturaSeleccionada = facturas.FirstOrDefault(f => f.CodigoFactura == selectedCodigoFactura);
+
+        if (facturaSeleccionada != null)
+        {
+            // Asignar el usuario correspondiente a la factura
+            Ingreso.Idcliente = facturaSeleccionada.IdpredioNavigation?.IdentificacionFacturacion;
+
+            // Buscar la cuenta por cobrar asociada a la factura seleccionada
+            var cxcSeleccionada = cuentasPorCobrar.FirstOrDefault(c => c.IdFactura == facturaSeleccionada.Idfactura);
+            if (cxcSeleccionada != null)
+            {
+                Ingreso.Idcxc = cxcSeleccionada.IdcuentaxC;
+            }
+            else
+            {
+                Ingreso.Idcxc = null;
+            }
+        }
+        else
+        {
+            Ingreso.Idcliente = null;
+            Ingreso.Idcxc = null;
+        }
+
+        StateHasChanged();
+    }
+
+    // private void OnFacturaChanged(ChangeEventArgs e)
+    // {
+    //     var selectedCodigoFactura = e.Value?.ToString();
+    //     Console.WriteLine($"Factura seleccionada: {selectedCodigoFactura}"); // Verificar si se llama la funci�n
+    //     var selectedFactura = facturas.FirstOrDefault(f => f.CodigoFactura == selectedCodigoFactura);
+
+    //     if (selectedFactura != null)
+    //     {
+    //         Ingreso.Idcliente = selectedFactura.IdpredioNavigation?.IdentificacionFacturacion;
+    //         Ingreso.Valor = selectedFactura.ValorPeriodo;
+    //         Ingreso.Concepto = $"PAGO FACTURA #{selectedFactura.CodigoFactura}";
+    //         StateHasChanged(); // Forzar la actualizaci�n del estado del componente
+    //     }
+    // }
+
+    private void OnCuentaPorCobrarChanged(ChangeEventArgs e)
+    {
+        var selectedIdCuenta = e.Value?.ToString();
+        Console.WriteLine($"Cuenta por cobrar seleccionada: {selectedIdCuenta}"); // Verificar si se llama la funci�n
+        var selectedCuenta = cuentasPorCobrar.FirstOrDefault(c => c.IdcuentaxC == selectedIdCuenta);
+
+        if (selectedCuenta != null)
+        {
+            Ingreso.Idcliente = selectedCuenta.Identificacion;
+            Ingreso.Valor = selectedCuenta.ValorDebe;
+            Ingreso.Concepto = "PAGADA " + selectedCuenta.Descripcion + " " + selectedCuenta.ValorDebe;
+
+            // Buscar la factura correspondiente al cliente
+            var selectedFactura = facturas.FirstOrDefault(f =>
+                f.IdpredioNavigation.IdentificacionFacturacion == selectedCuenta.Identificacion);
+            if (selectedFactura != null)
+            {
+                Ingreso.Idfactura = selectedFactura.CodigoFactura;
+            }
+
+            StateHasChanged(); // Forzar la actualizaci�n del estado del componente
+        }
+    }
+
+    private string ExtractInvoiceNumber(string descripcion)
+    {
+        // Suponiendo que el n�mero de la factura est� al principio de la descripci�n y separado por un espacio
+        var parts = descripcion.Split(' ');
+        return parts.Length > 0 ? parts[0] : descripcion;
+    }
+
+    private int ObtenerPeriodo(DateTime fechaHora)
+    {
+        // Suponiendo que los periodos son bimestrales y empiezan en enero
+        int mes = fechaHora.Month;
+        int anio = fechaHora.Year;
+        if (mes == 12)
+        {
+            mes = 1;
+        }
+        int periodo = (mes + 1) / 2;
+        return periodo;
+    }
+
+    private async Task<string?> ObtenerCodigoFacturaPeriodoAnterior(string codigoFacturaActual)
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        // 1. Buscar la factura actual
+        var facturaActual = await context.Facturacions
+            .Include(f => f.IdplanillaNavigation)
+            .FirstOrDefaultAsync(f => f.CodigoFactura == codigoFacturaActual);
+
+        if (facturaActual == null || facturaActual.IdplanillaNavigation == null)
+            return null;
+
+        var idPredio = facturaActual.Idpredio;
+        var fechaActual = facturaActual.IdplanillaNavigation.FechaHoraRegistroConsumo;
+
+        // 2. Buscar la planilla anterior
+        var planillaAnterior = await context.Planillas
+            .Where(p => p.FechaHoraRegistroConsumo < fechaActual)
+            .OrderByDescending(p => p.FechaHoraRegistroConsumo)
+            .FirstOrDefaultAsync();
+
+        if (planillaAnterior == null)
+            return null;
+
+        // 3. Buscar la factura del mismo predio en la planilla anterior
+        var facturaAnterior = await context.Facturacions
+            .FirstOrDefaultAsync(f => f.Idplanilla == planillaAnterior.Idplanilla && f.Idpredio == idPredio);
+
+        return facturaAnterior?.CodigoFactura;
+    }
+
+    private async Task<string?> ObtenerIdCuentaPorCobrarPeriodoAnterior(string codigoFacturaActual)
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        // 1. Buscar la factura actual
+        var facturaActual = await context.Facturacions
+            .Include(f => f.IdplanillaNavigation)
+            .Include(f => f.IdpredioNavigation)
+            .FirstOrDefaultAsync(f => f.CodigoFactura == codigoFacturaActual);
+
+        if (facturaActual == null || facturaActual.IdplanillaNavigation == null || facturaActual.IdpredioNavigation == null)
+            return null;
+
+        var idPredio = facturaActual.Idpredio;
+        var identificacionCliente = facturaActual.IdpredioNavigation.IdentificacionFacturacion;
+        var fechaActual = facturaActual.IdplanillaNavigation.FechaHoraRegistroConsumo;
+
+        // 2. Buscar la planilla anterior
+        var planillaAnterior = await context.Planillas
+            .Where(p => p.FechaHoraRegistroConsumo < fechaActual)
+            .OrderByDescending(p => p.FechaHoraRegistroConsumo)
+            .FirstOrDefaultAsync();
+
+        if (planillaAnterior == null)
+            return null;
+
+        // 3. Buscar la factura del mismo predio en la planilla anterior
+        var facturaAnterior = await context.Facturacions
+            .FirstOrDefaultAsync(f => f.Idplanilla == planillaAnterior.Idplanilla && f.Idpredio == idPredio);
+
+        if (facturaAnterior == null)
+            return null;
+
+        // 4. Buscar la cuenta por cobrar del mismo cliente y factura anterior
+        var cuentaPorCobrar = await context.CuentaPorCobrars
+            .FirstOrDefaultAsync(c =>
+                c.Identificacion == identificacionCliente &&
+                c.IdFactura == facturaAnterior.Idfactura);
+
+        // Si no existe para el cliente, busca solo por factura anterior
+        if (cuentaPorCobrar == null)
+        {
+            cuentaPorCobrar = await context.CuentaPorCobrars
+                .FirstOrDefaultAsync(c => c.IdFactura == facturaAnterior.CodigoFactura);
+        }
+
+        return cuentaPorCobrar?.IdcuentaxC;
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

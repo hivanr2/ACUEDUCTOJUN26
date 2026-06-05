@@ -1,0 +1,201 @@
+@using ACUEDUCTO.Models
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<AcueductoContext> DbFactory
+@inject IJSRuntime JS
+
+@rendermode InteractiveServer
+
+<div class="container">
+    <div class="row mb-3 align-items-end">
+        <div class="col-md-6">
+            <label class="form-label">Seleccione una planilla</label>
+            <select class="form-select" @onchange="OnPlanillaChanged" value="@SelectedPlanillaId">
+                <option value="">-- Seleccione --</option>
+                @foreach (var p in _planillas)
+                {
+                    <option value="@p.Id" selected="@(p.Id == SelectedPlanillaId)">
+                        @p.Texto
+                    </option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <h3>Recaudo diario @(_tituloGrafico)</h3>
+    <canvas id="@_canvasId" width="800" height="300"></canvas>
+</div>
+
+@code {
+    [Parameter] public string? PlanillaId { get; set; }
+
+    private string _canvasId = "recaudoDiarioChart";
+    private string _tituloGrafico = "";
+    private string? SelectedPlanillaId;
+
+    private List<PlanillaOption> _planillas = new();
+    private bool _isRendered; // evita JS interop durante prerender
+
+    protected override async Task OnParametersSetAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        if (_planillas.Count == 0)
+        {
+            // Cargar listado de planillas (más recientes primero)
+            _planillas = await context.Planillas
+                .OrderBy(p => p.FechaHoraRegistroConsumo) // si hay nulls, quedarán al final
+                //.ThenByDescending(p => p.Idplanilla)
+                .Select(p => new PlanillaOption
+                {
+                    Id = p.Idplanilla,
+                    Texto = (p.Descripcion ?? p.Idplanilla) + (p.FechaHoraRegistroConsumo.HasValue ? $" - {p.FechaHoraRegistroConsumo.Value:yyyy-MM-dd}" : "")
+                })
+                .ToListAsync();
+        }
+
+        // Determinar selección inicial
+        if (string.IsNullOrWhiteSpace(SelectedPlanillaId))
+        {
+            if (!string.IsNullOrWhiteSpace(PlanillaId))
+            {
+                SelectedPlanillaId = PlanillaId;
+            }
+            else
+            {
+                var fechaActual = DateTime.Now;
+                var planillaActual = await context.Planillas
+                    .Where(p => p.FechaHoraRegistroConsumo.HasValue &&
+                                p.FechaHoraRegistroConsumo < fechaActual)
+                    .OrderByDescending(p => p.FechaHoraRegistroConsumo)
+                    .FirstOrDefaultAsync();
+
+                SelectedPlanillaId = planillaActual?.Idplanilla ?? _planillas.FirstOrDefault()?.Id;
+            }
+        }
+
+        // No llamar JS aquí: durante prerender no está disponible. Si ya se renderizó, actualiza el chart.
+        if (_isRendered)
+        {
+            await LoadChartAsync();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _isRendered = true;
+            await LoadChartAsync();
+        }
+    }
+
+    private async Task OnPlanillaChanged(ChangeEventArgs e)
+    {
+        SelectedPlanillaId = e?.Value?.ToString();
+        await LoadChartAsync();
+    }
+
+    private async Task LoadChartAsync()
+    {
+        // Evitar interop si aún no es interactivo
+        if (!_isRendered)
+        {
+            return;
+        }
+
+        using var context = DbFactory.CreateDbContext();
+
+        if (string.IsNullOrWhiteSpace(SelectedPlanillaId))
+        {
+            _tituloGrafico = "(sin planilla)";
+            await JS.InvokeVoidAsync("renderRecaudoDiarioChart",
+                _canvasId,
+                Array.Empty<string>(),
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                0d,
+                _tituloGrafico,
+                null,
+                null);
+            return;
+        }
+
+        // Obtener nombre/descripcion de la planilla seleccionada para mostrar en el título
+        var planillaInfo = await context.Planillas
+            .Where(p => p.Idplanilla == SelectedPlanillaId)
+            .Select(p => new
+            {
+                p.Descripcion,
+                p.FechaHoraRegistroConsumo
+            })
+            .FirstOrDefaultAsync();
+
+        _tituloGrafico = string.IsNullOrWhiteSpace(planillaInfo?.Descripcion)
+            ? SelectedPlanillaId!
+            : planillaInfo!.Descripcion!;
+
+        double totalAnterior = 0;
+        string? limiteAnteriorStr = null;
+        string? suspensionAnteriorStr = null;
+
+        if (planillaInfo?.FechaHoraRegistroConsumo != null)
+        {
+            var anterior = await context.Planillas
+                .Where(p => p.FechaHoraRegistroConsumo < planillaInfo.FechaHoraRegistroConsumo)
+                .OrderByDescending(p => p.FechaHoraRegistroConsumo)
+                .Select(p => new { p.Idplanilla, p.FechaLimitePago, p.FechaSuspension })
+                .FirstOrDefaultAsync();
+
+            if (anterior != null)
+            {
+                totalAnterior = await context.Facturacions
+                    .Where(f => f.Idplanilla == anterior.Idplanilla)
+                    .SumAsync(f => f.ValorPeriodo ?? 0);
+
+                limiteAnteriorStr = anterior.FechaLimitePago?.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd");
+                suspensionAnteriorStr = anterior.FechaSuspension?.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd");
+            }
+        }
+
+        // Agrupar ingresos (recaudos) por día para la planilla seleccionada
+        var diarios = await context.Ingresos
+            .Where(i => i.FechaHora.HasValue && i.Valor.HasValue)
+            .Join(context.Facturacions,
+                  i => i.Idfactura,
+                  f => f.Idfactura,
+                  (i, f) => new { i, f })
+            .Where(x => x.f.Idplanilla == SelectedPlanillaId)
+            .GroupBy(x => x.i.FechaHora!.Value.Date)
+            .Select(g => new { Fecha = g.Key, Total = g.Sum(x => x.i.Valor ?? 0) })
+            .OrderBy(x => x.Fecha)
+            .ToListAsync();
+
+        var labels = diarios.Select(d => d.Fecha.ToString("yyyy-MM-dd")).ToList();
+        var diario = diarios.Select(d => d.Total).ToList();
+
+        var acumulado = new List<double>(diario.Count);
+        double running = 0;
+        foreach (var v in diario)
+        {
+            running += v;
+            acumulado.Add(running);
+        }
+
+        await JS.InvokeVoidAsync(
+            "renderRecaudoDiarioChart",
+            _canvasId,
+            labels,
+            diario,
+            acumulado,
+            totalAnterior,
+            _tituloGrafico,
+            limiteAnteriorStr,
+            suspensionAnteriorStr);
+    }
+
+    private sealed class PlanillaOption
+    {
+        public string Id { get; set; } = "";
+        public string Texto { get; set; } = "";
+    }
+}

@@ -1,0 +1,67 @@
+﻿@page "/movimientocajas/create"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Crear Movimiento de Caja</PageTitle>
+
+<h1>Crear</h1>
+
+<h2>MovimientoCaja</h2>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <EditForm method="post" Model="MovimientoCaja" OnValidSubmit="AddMovimientoCaja" FormName="create" Enhance>
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert"/>
+            <div class="mb-3">
+                <label for="fechahora" class="form-label">FechaHora:</label> 
+                <InputDate id="fechahora" @bind-Value="MovimientoCaja.FechaHora" class="form-control" /> 
+                <ValidationMessage For="() => MovimientoCaja.FechaHora" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="iddocumento" class="form-label">Iddocumento:</label> 
+                <InputText id="iddocumento" @bind-Value="MovimientoCaja.Iddocumento" class="form-control" /> 
+                <ValidationMessage For="() => MovimientoCaja.Iddocumento" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="entrada" class="form-label">Entrada:</label> 
+                <InputNumber id="entrada" @bind-Value="MovimientoCaja.Entrada" class="form-control" /> 
+                <ValidationMessage For="() => MovimientoCaja.Entrada" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="salida" class="form-label">Salida:</label> 
+                <InputNumber id="salida" @bind-Value="MovimientoCaja.Salida" class="form-control" /> 
+                <ValidationMessage For="() => MovimientoCaja.Salida" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="saldo" class="form-label">Saldo:</label> 
+                <InputNumber id="saldo" @bind-Value="MovimientoCaja.Saldo" class="form-control" /> 
+                <ValidationMessage For="() => MovimientoCaja.Saldo" class="text-danger" /> 
+            </div>        
+            <div class="d-flex justify-content-end gap-2 mt-2">
+                <a class="btn btn-outline-secondary" href="/movimientocajas" onclick="return cerrarVentana('/movimientocajas');">Cerrar</a>
+                <button type="submit" class="btn btn-primary">Crear</button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+<div class="mt-3">
+    <a class="btn btn-link p-0" href="/movimientocajas" onclick="return cerrarVentana('/movimientocajas');">Cerrar</a>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private MovimientoCaja MovimientoCaja { get; set; } = new();
+
+    private async Task AddMovimientoCaja()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.MovimientoCajas.Add(MovimientoCaja);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/movimientocajas");
+    }
+}

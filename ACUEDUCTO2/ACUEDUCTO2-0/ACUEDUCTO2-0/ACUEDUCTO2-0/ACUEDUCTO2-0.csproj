@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>aspnet-ACUEDUCTO2-0-f8592b7e-430e-4ccc-a7a2-48af284995c5</UserSecretsId>
+    <RootNamespace>ACUEDUCTO2-0</RootNamespace>
+    <AssemblyName>$(AssemblyName.Replace(' ', '_'))</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\ACUEDUCTO2-0.Compartir\ACUEDUCTO2-0.Compartir\ACUEDUCTO2-0.Compartir.csproj" />
+    <ProjectReference Include="..\ACUEDUCTO2-0.Client\ACUEDUCTO2-0.Client.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="9.0.13" />
+    <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="9.0.13" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.13" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.13" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Components\Pages\UsuarioPages\" />
+  </ItemGroup>
+
+</Project>

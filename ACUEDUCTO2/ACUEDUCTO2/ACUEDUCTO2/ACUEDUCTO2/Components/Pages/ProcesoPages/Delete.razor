@@ -1,0 +1,88 @@
+@page "/procesos/delete/{id}"
+@using ACUEDUCTO2.Share.Models
+@using Microsoft.AspNetCore.Components
+@inject ACUEDUCTO2.Services.ProcesoServices.ProcesoService ProcesoService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<h3>Eliminar proceso</h3>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (isLoading)
+{
+    <p>Cargando...</p>
+}
+else if (proceso is null)
+{
+    <div class="alert alert-warning">No se encontró el proceso.</div>
+    <button class="btn btn-secondary" @onclick='() => Navigation.NavigateTo("/procesos")'>Volver</button>
+}
+else
+{
+    <div class="alert alert-warning">
+        <p>¿Desea eliminar el proceso <strong>@proceso.Nombre</strong>?</p>
+    </div>
+    <button class="btn btn-danger" @onclick="ConfirmDelete" disabled="@isDeleting">Eliminar</button>
+    <button class="btn btn-secondary ms-2" @onclick='() => Navigation.NavigateTo("/procesos")' disabled="@isDeleting">Cancelar</button>
+}
+
+@code {
+    [Parameter]
+    public string id { get; set; } = string.Empty;
+
+    private Proceso? proceso;
+    private bool isLoading = true;
+    private bool isDeleting;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        errorMessage = null;
+        isLoading = true;
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(id))
+                proceso = await ProcesoService.GetByIdAsync(id);
+            else
+                proceso = null;
+        }
+        catch
+        {
+            errorMessage = "Ocurrió un error al cargar el proceso.";
+            proceso = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (isDeleting)
+            return;
+
+        var targetId = proceso?.Id ?? id;
+        if (string.IsNullOrWhiteSpace(targetId))
+            return;
+
+        isDeleting = true;
+        errorMessage = null;
+
+        try
+        {
+            await ProcesoService.DeleteAsync(targetId);
+            Navigation.NavigateTo("/procesos", forceLoad: true);
+        }
+        catch
+        {
+            errorMessage = "No fue posible eliminar el proceso.";
+            isDeleting = false;
+        }
+    }
+}

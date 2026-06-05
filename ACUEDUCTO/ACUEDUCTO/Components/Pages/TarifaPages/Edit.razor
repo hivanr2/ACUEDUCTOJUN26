@@ -1,0 +1,100 @@
+﻿@page "/tarifas/edit"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit</PageTitle>
+
+<h1>Edit</h1>
+
+<h2>Tarifa</h2>
+<hr />
+@if (Tarifa is null)
+{
+    <p><em>Llamando...</em></p>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-4">
+            <EditForm method="post" Model="Tarifa" OnValidSubmit="UpdateTarifa" FormName="edit" Enhance>
+                <DataAnnotationsValidator />
+                <ValidationSummary role="alert"/>
+                <input type="hidden" name="Tarifa.Tipo" value="@Tarifa.Tipo" />
+                <div class="mb-3">
+                    <label for="desde" class="form-label">Desde:</label>
+                    <InputNumber id="desde" @bind-Value="Tarifa.Desde" class="form-control" />
+                    <ValidationMessage For="() => Tarifa.Desde" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="hasta" class="form-label">Hasta:</label>
+                    <InputNumber id="hasta" @bind-Value="Tarifa.Hasta" class="form-control" />
+                    <ValidationMessage For="() => Tarifa.Hasta" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="valorunidad" class="form-label">ValorUnidad:</label>
+                    <InputNumber id="valorunidad" @bind-Value="Tarifa.ValorUnidad" class="form-control" />
+                    <ValidationMessage For="() => Tarifa.ValorUnidad" class="text-danger" />
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<div>
+    <a class="btn btn-outline-secondary btn-sm" href="" onclick="return cerrarVentana('');">Cerrar</a>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string Tipo { get; set; }
+
+    [SupplyParameterFromForm]
+    private Tarifa? Tarifa { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Tarifa ??= await context.Tarifas.FirstOrDefaultAsync(m => m.Tipo == Tipo);
+
+        if (Tarifa is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    // To protect from overposting attacks, enable the specific properties you want to bind to.
+    // For more information, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task UpdateTarifa()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Attach(Tarifa!).State = EntityState.Modified;
+
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (!TarifaExists(Tarifa!.Tipo))
+            {
+                NavigationManager.NavigateTo("notfound");
+            }
+            else
+            {
+                throw;
+            }
+        }
+
+        NavigationManager.NavigateTo("/tarifas");
+    }
+
+    private bool TarifaExists(string tipo)
+    {
+        using var context = DbFactory.CreateDbContext();
+        return context.Tarifas.Any(e => e.Tipo == tipo);
+    }
+}

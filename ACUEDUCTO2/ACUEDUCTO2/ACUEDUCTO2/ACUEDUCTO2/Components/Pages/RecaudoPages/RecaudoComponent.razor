@@ -1,0 +1,1050 @@
+@page "/planillas/recaudocomponent"
+@layout SimpleLayout
+@using ACUEDUCTO2.Components.Layout
+@using ACUEDUCTO2.Share.Models
+@using Facturacion = ACUEDUCTO2.Share.Models.Factura
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@inject IJSRuntime JSRuntime
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager NavigationManager
+@inject IWebHostEnvironment Env
+@inject Microsoft.Extensions.Logging.ILogger<ACUEDUCTO2.Components.Pages.RecaudoPages.RecaudoComponent> Logger
+@rendermode InteractiveServer
+
+<div class="container-fluid py-2 py-md-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div class="d-flex align-items-center gap-2">
+            @if (facturacion != null && facturacion.Count == 1)
+            {
+                @if (@id_planilla_anterior != "No disponible")
+                {
+                    <a class="btn btn-outline-secondary btn-sm" href="/planillas/recaudocomponent?id=@id_planilla_anterior" target="_self" title="Anterior">
+                        <i class="bi bi-arrow-left"></i>
+                    </a>
+                }
+            }
+            <h3 class="h5 mb-0">RECAUDO :: @str_planilla</h3>
+            @if (facturacion != null && facturacion.Count == 1)
+            {
+                @if (@id_planilla_siguiente != "No disponible")
+                {
+                    <a class="btn btn-outline-secondary btn-sm" href="/planillas/recaudocomponent?id=@id_planilla_siguiente" target="_self" title="Siguiente">
+                        <i class="bi bi-arrow-right"></i>
+                    </a>
+                }
+            }
+        </div>
+        <div class="text-nowrap d-flex align-items-center gap-2">
+            <span class="badge bg-primary-subtle text-primary border">Periodo: <strong>@str_periodo_largo</strong></span>
+        </div>
+    </div>
+
+    @if (!editaPlanilla)
+    {
+        <div class="alert alert-warning py-2 mb-2 text-center">
+            La planilla está cerrada. La edición está deshabilitada.
+        </div>
+    }
+
+    <div class="card shadow-sm mb-2">
+        <div class="card-body py-2">
+            <div class="row g-3 align-items-center">
+                @if (mostrar)
+                {
+
+                    <div class="col-12 col-md-6">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="small text-muted">Índice de Recaudo</div>
+                            <span class="badge rounded-pill bg-primary">
+                                @indiceRecaudo%
+                            </span>
+                        </div>
+                        <div class="progress mt-1" role="progressbar" aria-valuenow="@indiceRecaudo" aria-valuemin="0" aria-valuemax="100" style="height: 8px;">
+                            <div class="progress-bar" style="width:@indiceRecaudo%"></div>
+                        </div>
+                    </div>
+                }
+                <div class="col-12 col-md-6">
+                    <div class="d-flex flex-wrap align-items-center gap-3 justify-content-md-end">
+                        <div class="form-check form-switch">
+                            <input id="verTodas" class="form-check-input" type="checkbox" @bind="verTodas" @bind:after="OnVerTodasChanged" />
+                            <label for="verTodas" class="form-check-label">Ver Todas</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input id="filtraNopago" class="form-check-input" type="checkbox" @bind="filtraNopago" @bind:after="OnFiltraNopagoChanged" />
+                            <label for="filtraNopago" class="form-check-label">No pago</label>
+                        </div>
+                        @if (facturacion?.Count == 1)
+                        {
+                            <div class="form-check form-switch">
+                                <input id="editarRecaudo" class="form-check-input" type="checkbox" @bind="editaRecaudo" disabled="@(!editaPlanilla)" />
+                                <label for="editarRecaudo" class="form-check-label">Edita Recaudo</label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input id="editarObservaciones" class="form-check-input" type="checkbox" @bind="editarObservaciones" disabled="@(!editaPlanilla)" />
+                                <label for="editarObservaciones" class="form-check-label">Editar Observaciones Predio</label>
+                            </div>
+                        }
+                        <div class="input-group input-group-sm" style="width: 180px;">
+                            <input id="filtroNombrePredio" class="form-control" placeholder="Filtrar predio" @bind="filtroNombrePredio" @bind:event="oninput" @bind:after="OnFiltroNombrePredioChanged" />
+                            <button class="btn btn-outline-secondary" type="button" @onclick="ClearFiltroNombrePredio" title="Limpiar filtro">×</button>
+                        </div>
+                        <div class="input-group input-group-sm" style="width: 140px;">
+                            <input id="filtroCodigoUsuario" class="form-control" placeholder="Filtrar código" @bind="filtroCodigoUsuario" @bind:event="oninput" @bind:after="OnFiltroCodigoUsuarioChanged" />
+                            <button class="btn btn-outline-secondary" type="button" @onclick="ClearFiltroCodigoUsuario" title="Limpiar filtro">×</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    @if (facturacion == null)
+    {
+        <div>Cargando...</div>
+    }
+    else
+    {
+        if (facturacion.Count > 0)
+        {
+            if (!string.IsNullOrWhiteSpace(facturacion.FirstOrDefault()?.CodigoFactura))
+            {
+                HayFacturas = true;
+            }
+
+            <div class="table-container table-responsive">
+                <table class="table table-sm table-hover table-striped align-middle fixed-header">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col" class="text-center" style="min-width:120px;">It</th>
+                            <th scope="col" style="min-width:280px;">Predio</th>
+                            <th scope="col">Código</th>
+                            @if (editaPlanilla && editaValores)
+                            {
+                                @foreach (var header in new[] { "Consumo M3", "Valor Consumo", "Cargo Fijo", "% Sobretasa", "Valor Sobretasa", "% Mora", "Valor Mora", "% Subsidio", "Valor Subsididio" })
+                                {
+                                    <th scope="col">@header</th>
+                                }
+                            }
+                            <th scope="col">Otros Valores</th>
+                            <th scope="col">Valor Periodo</th>
+                            <th scope="col" class="border-blue">Deuda Anterior</th>
+                            <th scope="col" class="border-blue">Recaudo Bimestre</th>
+                            <th scope="col">Deuda Pasa</th>
+                            @if (editarObservaciones)
+                            {
+                                <th scope="col">Observaciones Predio</th>
+                            }
+                            <th scope="col">Notas Factura</th>
+                            <th scope="col">Notas Recaudo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < facturacion.Count; i++)
+                        {
+                            var factura = facturacion[i];
+                            <tr>
+                                <td class="text-center">
+                                    <div>@(i + 1)</div>
+                                    <div class="btn-group btn-group-sm mt-1" role="group">
+                                        <a class="btn btn-outline-secondary" href="/facturacion/edit?id=@factura.Idfactura" target="_blank" title="Editar factura"><i class="bi bi-pencil"></i></a>
+                                        @if (HayFacturas && hasFacturaPdf.TryGetValue(factura.Idfactura, out var hasPdf) && hasPdf)
+                                        {
+                                            @if (editaRecaudo)
+                                            {
+                                                <button class="btn btn-outline-primary" title="Imprimir / Ver (modo edición)" @onclick="() => OpenFacturaImprimir(factura.Idfactura)">
+                                                    <i class="bi bi-file-earmark"></i> Ver Factura
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-outline-primary" title="Ver Factura" @onclick="() => VerFactura(factura)"><i class="bi bi-file-earmark"></i> Ver Factura</button>
+                                            }
+                                        }
+                                        @if (Math.Abs(factura.RecaudoPeriodoTotal ?? 0) > 0)
+                                        {
+                                            if ((i == 1 || facturacion.Count == 1) && editaRecaudo)
+                                            {
+                                                <button class="btn btn-outline-secondary" title="Ver Recibo" @onclick="() => VerReciboSmart(factura)">
+                                                    <i class="bi bi-file-earmark-text"></i>
+                                                    Crear Recibo
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-outline-secondary" title="Ver Recibo" @onclick="() => VerReciboSmart(factura)">
+                                                    <i class="bi bi-file-earmark-text"></i>
+                                                    Ver Recibo
+                                                </button>
+
+                                            }
+                                        }
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold">@factura.IdpredioNavigation.ApellidosNombresUsuario</div>
+                                    <div><a class="small" href="/predios/details?idpredio=@factura.Idpredio" target="_blank">Ver predio</a></div>
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-link p-0 text-decoration-underline" title="Filtrar por código" @onclick="() => FiltrarPorCodigo(factura.CodigoUsuario ?? string.Empty)">@factura.CodigoUsuario</button>
+                                </td>
+                                @if (editaPlanilla && editaValores)
+                                {
+                                    <td>@factura.ConsumoM3</td>
+                                    <td>@FormatCurrency(factura.ValorConsumo)</td>
+                                    <td>
+                                        @factura.CargoFijo
+                                        <input type="number" class="form-control form-control-sm mt-1" value="@factura.CargoFijo" @onchange="async (e) => await OnCargoFijoChanged(factura, e)" />
+                                    </td>
+                                    <td>
+                                        @factura.PorcentajeSobreTasa
+                                        <input type="number" class="form-control form-control-sm mt-1" value="@factura.PorcentajeSobreTasa" @onchange="async (e) => await OnPorcentajeSobreTasaChanged(factura, e)" />
+                                    </td>
+                                    <td>
+                                        @FormatCurrency(factura.ValorSobreTasa)
+                                        <input type="number" class="form-control form-control-sm mt-1" value="@factura.ValorSobreTasa" @onchange="async (e) => await OnValorSobreTasaChanged(factura, e)" />
+                                    </td>
+                                    <td>
+                                        @factura.PorcentajeMora
+                                        <input type="number" class="form-control form-control-sm mt-1" value="@factura.PorcentajeMora" @onchange="async (e) => await OnPorcentajeMoraChanged(factura, e)" />
+                                    </td>
+                                    <td>
+                                        @FormatCurrency(factura.ValorMora)
+                                        <input type="number" class="form-control form-control-sm mt-1" value="@factura.ValorMora" @onchange="async (e) => await OnValorMoraChanged(factura, e)" />
+                                    </td>
+                                    <td>
+                                        @factura.PorcentajeSubsidio
+                                        <input type="number" class="form-control form-control-sm mt-1" value="@factura.PorcentajeSubsidio" @onchange="async (e) => await OnPorcentajeSubsidioChanged(factura, e)" />
+                                    </td>
+                                    <td>
+                                        @FormatCurrency(factura.ValorSubsidio)
+                                        <input type="number" class="form-control form-control-sm mt-1" value="@factura.ValorSubsidio" @onchange="async (e) => await OnValorSubsidioChanged(factura, e)" />
+                                    </td>
+                                }
+                                <td>
+                                    <div class="h6 mb-1">@FormatCurrency(factura.OtrosValores)</div>
+                                    @if (editaPlanilla && editaRecaudo)
+                                    {
+                                        <input type="number" class="form-control form-control-sm" @bind="factura.OtrosValores" @bind:after="async () => await OnOtrosValoresChanged(factura)" tabindex="@((i * 1000) + 2)" />
+                                    }
+                                </td>
+                                <td>@FormatCurrency(factura.ValorPeriodo)</td>
+                                <td class="border-blue">
+                                    <div class="h6 mb-1">@FormatCurrency(factura.DeudaAnterior)</div>
+                                </td>
+                                <td class="border-blue">
+                                    <div class="h6 mb-1">@FormatCurrency(factura.RecaudoPeriodoTotal)</div>
+                                    @if (editaPlanilla && editaRecaudo)
+                                    {
+                                        <input type="number" class="form-control form-control-sm" @bind="factura.RecaudoPeriodoTotal" @bind:after="async () => await OnRecaudoPeriodoTotalChanged(factura)" />
+                                    }
+                                </td>
+                                <td>@FormatCurrency(factura.DeudaPasa)</td>
+                                @if (editarObservaciones)
+                                {
+                                    <td>
+                                        <div class="small text-muted">@factura.IdpredioNavigation.Observaciones</div>
+                                        <textarea class="form-control form-control-sm mt-1" value="@factura.IdpredioNavigation.Observaciones" @onchange="async (e) => await OnObservacionesPredioChanged(factura, e)" tabindex="@((i * 1000) + 4)"></textarea>
+                                    </td>
+                                }
+                                <td>
+                                    <div class="small">@((string.IsNullOrWhiteSpace(factura.NotasFactura) && (factura.RecaudoPeriodoTotal ?? 0) == 0) ? $"SIN RECAUDO EN EL BIMESTRE {str_periodo_corto}" : factura.NotasFactura)</div>
+                                    @if (editaPlanilla && editaRecaudo)
+                                    {
+                                        <textarea class="form-control form-control-sm mt-1" value="@factura.NotasFactura" @onchange="async (e) => await OnNotasFacturaChanged(factura, e)" tabindex="@((i * 1000) + 4)"></textarea>
+                                    }
+                                </td>
+
+                                <td>
+                                    <div class="small">@((string.IsNullOrWhiteSpace(factura.NotasRecaudo) && (factura.RecaudoPeriodoTotal ?? 0) == 0) ? $"SIN RECAUDO EN EL BIMESTRE {str_periodo_corto}" : factura.NotasRecaudo)</div>
+                                    @if (editaPlanilla && editaRecaudo)
+                                    {
+                                        <textarea class="form-control form-control-sm mt-1" value="@factura.NotasRecaudo" @onchange="async (e) => await OnNotasRecaudoChanged(factura, e)" tabindex="@((i * 1000) + 5)"></textarea>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        <tr class="table-secondary fw-semibold">
+                            @if (editaRecaudo && editaValores)
+                            {
+                                <td colspan="9"></td>
+                            }
+                            <td colspan="3" class="text-end">Totales</td>
+                            <td class="text-center">@FormatCurrency(facturacion.Sum(f => f.OtrosValores ?? 0))</td>
+                            <td class="text-center">@FormatCurrency(facturacion.Sum(f => f.ValorPeriodo ?? 0))</td>
+                            <td class="text-center border-blue">@FormatCurrency(facturacion.Sum(f => f.DeudaAnterior ?? 0))</td>
+                            <td class="text-center border-blue">@FormatCurrency(facturacion.Sum(f => f.RecaudoPeriodoTotal ?? 0))</td>
+                            <td class="text-center">@FormatCurrency(facturacion.Sum(f => f.DeudaPasa ?? 0))</td>
+                            <td colspan="2"></td>
+                        </tr>
+
+                    </tbody>
+                </table>
+            </div>
+
+            <style>
+                .table-container {
+                    max-height: 70vh;
+                    overflow: auto;
+                }
+
+                .fixed-header thead th, .fixed-header thead td {
+                    position: sticky;
+                    top: 0;
+                    background-color: var(--bs-light);
+                    z-index: 5;
+                }
+
+                .border-blue {
+                    border: 1px solid #007bff;
+                    border-radius: 4px;
+                }
+            </style>
+
+        }
+        else
+        {
+            <div class="alert alert-info">Poner letras de ApellidosNombres o el codigo</div>
+        }
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-2">@errorMessage</div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string id { get; set; }
+    [SupplyParameterFromQuery]
+    private string codigo { get; set; }
+    [SupplyParameterFromQuery]
+    private string usuario { get; set; }
+    private bool abrirEnModoEdicionPorCodigo = false;
+    private IList<Facturacion> facturacion;
+    private bool HayFacturas { get; set; } = false;
+    private Dictionary<string, bool> hasFacturaPdf = new();
+    private string str_planilla;
+    private string id_planilla_siguiente;
+    private string id_planilla_anterior;
+    private string str_periodo_corto;
+    private string str_periodo_largo;
+    private string errorMessage;
+    private double indiceRecaudo = 0;
+    private bool editarObservaciones = false;
+    private bool editaRecaudo = false;
+    private bool editaValores = false;
+    private bool editaPlanilla = false;
+    private bool filtraNopago = false;
+    private string filtroNombrePredio = string.Empty;
+    private string filtroCodigoUsuario = string.Empty;
+    private System.Threading.CancellationTokenSource? _filtroCts;
+    private DateTime? FechaTomaConsumoPlanilla;
+    private DateTime? FechaUltimoPagoPlanilla;
+    private DateTime? FechaSuspensionPlanilla;
+    private bool mostrar = true;
+    private IList<Tarifa> tarifas;
+    private bool showFullTemporary = false;
+    private bool lastHasAnyFilter = false;
+    private bool verTodas = false;
+
+    private Dictionary<string, int> _reciboNumeroPorFactura = new();
+
+    private double totalValorPeriodoAnterior;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+    protected override async Task OnParametersSetAsync()
+    {
+        // If a 'codigo' query parameter is provided, apply it to the codigo filter so the page shows filtered results.
+        if (!string.IsNullOrWhiteSpace(codigo))
+        {
+            // Existing behavior: open in edit mode and prefill recaudo faltante
+            filtroCodigoUsuario = codigo;
+            abrirEnModoEdicionPorCodigo = true;
+        }
+        else if (!string.IsNullOrWhiteSpace(usuario))
+        {
+            // New behavior: open filtered by usuario in read-only mode
+            filtroCodigoUsuario = usuario;
+            abrirEnModoEdicionPorCodigo = false;
+            // ensure editing is disabled when arriving via 'usuario'
+            editaRecaudo = false;
+        }
+        else
+        {
+            abrirEnModoEdicionPorCodigo = false;
+        }
+        await LoadData();
+    }
+
+    private async Task VerReciboSmart(Facturacion factura)
+    {
+        if (factura == null) { errorMessage = "Factura no encontrada"; return; }
+
+        // Update notes if there is recaudo (positive or negative for anticipos)
+        if (Math.Abs(factura.RecaudoPeriodoTotal ?? 0) > 0)
+        {
+            try
+            {
+                using var ctx = DbFactory.CreateDbContext();
+                var f = await ctx.Facturacions.FirstOrDefaultAsync(x => x.Idfactura == factura.Idfactura);
+                if (f != null)
+                {
+                    var recaudoVal = f.RecaudoPeriodoTotal ?? (factura.RecaudoPeriodoTotal ?? 0);
+                    var deudaPrev = f.DeudaAnterior ?? 0;
+                    var nowText = DateTime.Now.ToString("g", new CultureInfo("es-CO"));
+
+                    var noteFacturaReplacement = "GRACIAS POR SU PAGO";
+                    var noteRecaudoReplacement = BuildNotaRecaudo(recaudoVal, deudaPrev, nowText);
+
+                    if (string.IsNullOrWhiteSpace(f.NotasFactura))
+                    {
+                        f.NotasFactura = noteFacturaReplacement;
+                    }
+                    else
+                    {
+                        var updatedFacturaNotes = ReplacePlaceholderSegment(f.NotasFactura, "SIN RECAUDO EN EL BIMESTRE", noteFacturaReplacement);
+                        updatedFacturaNotes = ReplacePlaceholderSegment(updatedFacturaNotes, "SIN RECAUDO EN BIMESTRE", noteFacturaReplacement);
+                        f.NotasFactura = updatedFacturaNotes;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(f.NotasRecaudo))
+                    {
+                        f.NotasRecaudo = noteRecaudoReplacement;
+                    }
+                    else
+                    {
+                        f.NotasRecaudo = ReplacePlaceholderSegment(f.NotasRecaudo, "SIN RECAUDO EN EL BIMESTRE", noteRecaudoReplacement);
+                    }
+
+                    ctx.Facturacions.Update(f);
+                    await ctx.SaveChangesAsync();
+
+                    // Update local model to reflect changes
+                    factura.NotasFactura = f.NotasFactura;
+                    factura.NotasRecaudo = f.NotasRecaudo;
+                }
+            }
+            catch
+            {
+                // Ignore DB errors to not block opening recibo
+            }
+        }
+
+        // Open recibo in new window
+        try
+        {
+            var noteRecaudo = string.Empty;
+            var noteFactura = string.Empty;
+            try { noteRecaudo = Uri.EscapeDataString(factura.NotasRecaudo ?? string.Empty); } catch { }
+            try { noteFactura = Uri.EscapeDataString(factura.NotasFactura ?? string.Empty); } catch { }
+            var ts = DateTime.UtcNow.Ticks;
+            var url = $"/recibos/details?idfactura={factura.Idfactura}&from=recaudo&noteRecaudo={noteRecaudo}&noteFactura={noteFactura}&ts={ts}";
+            await JSRuntime.InvokeVoidAsync("window.open", url, "_blank");
+        }
+        catch
+        {
+            var url = $"/recibos/details?idfactura={factura.Idfactura}&from=recaudo";
+            await JSRuntime.InvokeVoidAsync("window.open", url, "_blank");
+        }
+    }
+
+    // Replace only the placeholder text portion, preserving any text before or after it.
+    private string ReplacePlaceholderSegment(string original, string placeholderStart, string replacement)
+    {
+        if (string.IsNullOrEmpty(original)) return original;
+
+        int idx = original.IndexOf(placeholderStart, StringComparison.OrdinalIgnoreCase);
+        if (idx < 0) return original;
+
+        int start = idx;
+        int end = FindPlaceholderEnd(original, idx);
+        if (end <= start) return original;
+
+        var before = original.Substring(0, start);
+        var after = end < original.Length ? original.Substring(end) : string.Empty;
+        return before + replacement + after;
+    }
+
+    private int FindPlaceholderEnd(string original, int startIdx)
+    {
+        // Consume until a separator that is part of the surrounding note, not the placeholder.
+        // We stop at: " - ", new line, or end of string.
+        int end = original.Length;
+        int sep1 = original.IndexOf(" - ", startIdx, StringComparison.Ordinal);
+        if (sep1 > startIdx) end = Math.Min(end, sep1);
+        int nl = original.IndexOf('\n', startIdx);
+        if (nl > startIdx) end = Math.Min(end, nl);
+        int cr = original.IndexOf('\r', startIdx);
+        if (cr > startIdx) end = Math.Min(end, cr);
+
+        // Also include trailing " (....)" if it is immediately attached to the placeholder text.
+        int i = startIdx;
+        while (i < end)
+        {
+            if (original[i] == '(')
+            {
+                int close = original.IndexOf(')', i + 1);
+                if (close > i)
+                {
+                    end = Math.Min(end, close + 1);
+                }
+                break;
+            }
+            i++;
+        }
+
+        // Trim trailing spaces from the placeholder segment only.
+        while (end > startIdx && char.IsWhiteSpace(original[end - 1])) end--;
+        return end;
+    }
+
+    private string BuildNotaRecaudo(double recaudoVal, double deudaPrev, string fechaHora)
+    {
+        var recaudoAbs = Math.Abs(recaudoVal);
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"Recaudo ({fechaHora}) {FormatCurrency(recaudoVal)}");
+
+        if (recaudoAbs < Math.Abs(deudaPrev))
+        {
+            var faltante = Math.Abs(deudaPrev) - recaudoAbs;
+            sb.Append($" {FormatCurrency(faltante)} FALTANTE");
+        }
+        else if (recaudoAbs > Math.Abs(deudaPrev))
+        {
+            var anticipo = recaudoAbs - Math.Abs(deudaPrev);
+            sb.Append($" {FormatCurrency(anticipo)} ANTICIPO");
+        }
+        else
+        {
+            sb.Append(" SALDADO");
+        }
+
+        sb.Append('.');
+        return sb.ToString();
+    }
+
+    private async Task LoadData()
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        // Load planilla early so header and edit flags are available even when no filters are applied.
+        var planillaActual = await context.Periodos.Where(p => p.Guid == id).AsNoTracking().FirstOrDefaultAsync();
+        editaPlanilla = planillaActual?.Abierta ?? false;
+        FechaTomaConsumoPlanilla = planillaActual?.FechaHoraIniciaPeriodo;
+        FechaUltimoPagoPlanilla = planillaActual?.FechaLimitePago;
+        FechaSuspensionPlanilla = planillaActual?.FechaSuspension;
+        if (planillaActual != null)
+        {
+            str_planilla = planillaActual.Descripcion ?? "No hay planilla";
+            str_periodo_corto = planillaActual.NombreCortoPeriodo ?? "N/A";
+            str_periodo_largo = planillaActual.NombreLargoPeriodo ?? "N/A";
+        }
+
+        // Determine whether any filter is active
+        var hasAnyFilter = verTodas || filtraNopago || !string.IsNullOrWhiteSpace(filtroNombrePredio) || !string.IsNullOrWhiteSpace(filtroCodigoUsuario);
+        lastHasAnyFilter = hasAnyFilter;
+
+        if (!hasAnyFilter)
+        {
+            // If we haven't shown the full list temporarily yet, allow one load so the user
+            // can see the recaudation index for a few seconds. Subsequent loads without filters
+            // will return an empty list.
+            if (!showFullTemporary)
+            {
+                showFullTemporary = true;
+                // proceed to load the full list this time
+            }
+            else
+            {
+                // We've already shown the full list temporarily; now hide
+                facturacion = new List<Facturacion>();
+                hasFacturaPdf.Clear();
+                _reciboNumeroPorFactura.Clear();
+                HayFacturas = false;
+                editaRecaudo = false;
+                editaValores = false;
+                editarObservaciones = false;
+                await PonerEnlacesAntesDespues();
+                return;
+            }
+        }
+        else
+        {
+            // A real filter is active — cancel the temporary full-list mode
+            showFullTemporary = false;
+        }
+
+        var baseQuery = context.Facturacions.Where(f => f.Guid == id);
+        if (filtraNopago) baseQuery = baseQuery.Where(f => (f.RecaudoPeriodoTotal ?? 0) == 0);
+        if (!string.IsNullOrWhiteSpace(filtroNombrePredio))
+        {
+            var pattern = $"%{filtroNombrePredio}%";
+            baseQuery = baseQuery.Where(f => context.Predios.Any(p => p.Idpredio == f.Idpredio && p.ApellidosNombresUsuario != null && EF.Functions.Like(p.ApellidosNombresUsuario, pattern)));
+        }
+        if (!string.IsNullOrWhiteSpace(filtroCodigoUsuario))
+        {
+            var patternCode = $"%{filtroCodigoUsuario}%";
+            baseQuery = baseQuery.Where(f => f.CodigoUsuario != null && EF.Functions.Like(f.CodigoUsuario, patternCode));
+        }
+        var facturasDb = await baseQuery.AsNoTracking().ToListAsync();
+        var predioIds = facturasDb.Select(f => f.Idpredio).Distinct().ToList();
+        var predios = await context.Predios.Where(p => predioIds.Contains(p.Idpredio)).AsNoTracking().ToDictionaryAsync(p => p.Idpredio, p => p);
+
+        // Preload tarifas
+        var tarifasList = await context.Tarifas.AsNoTracking().ToListAsync();
+        this.tarifas = tarifasList;
+
+        foreach (var f in facturasDb)
+        {
+            predios.TryGetValue(f.Idpredio, out var p);
+            f.IdpredioNavigation = p;
+            // Use in-memory recalculation to prepare display values only.
+            // DO NOT call RecalcularValores here because it may persist changes and propagate deuda across planillas.
+            await RecalcularValoresEnMemoria(f, tarifasList);
+        }
+        facturacion = facturasDb.OrderBy(f => f.IdpredioNavigation?.ApellidosNombresUsuario).ToList();
+
+        // If the page was opened with a 'codigo' query parameter, prefill the recaudo
+        // input with the amount needed to pay the previous debt and enable edit mode.
+        if (!string.IsNullOrWhiteSpace(codigo) && facturacion.Any())
+        {
+            editaRecaudo = true;
+            foreach (var f in facturacion)
+            {
+                var deudaPrev = f.DeudaAnterior ?? 0;
+                var existente = f.RecaudoPeriodoTotal ?? 0;
+                var faltante = Math.Max(0, deudaPrev - existente);
+                if (faltante > 0)
+                {
+                    f.RecaudoPeriodoTotal = faltante;
+                }
+            }
+        }
+
+        // Do NOT modify factura notes or balances during listing. Placeholder text will be shown
+        // in the UI without mutating the model. Actual persistence must happen only when records
+        // are created or the user explicitly saves changes.
+
+        // Check PDF existence for each factura
+        hasFacturaPdf.Clear();
+        foreach (var f in facturacion)
+        {
+            try
+            {
+                var codigoUsuarioSafe = Sanitize(f.CodigoUsuario ?? "usuario");
+                var codigoFacturaSafe = Sanitize(f.CodigoFactura ?? "factura");
+                var pdfPath = System.IO.Path.Combine(Env.WebRootPath ?? string.Empty, "imagenes", codigoUsuarioSafe, $"{codigoFacturaSafe}.pdf");
+                hasFacturaPdf[f.Idfactura] = System.IO.File.Exists(pdfPath);
+            }
+            catch
+            {
+                hasFacturaPdf[f.Idfactura] = false;
+            }
+        }
+
+        // Cargar números de recibo existentes por factura
+        _reciboNumeroPorFactura.Clear();
+        var facturaIds = facturasDb.Select(f => f.Idfactura).ToList();
+        var ingresos = await context.Ingresos.Where(i => facturaIds.Contains(i.Idfactura)).Select(i => new { i.Idfactura, i.Numero }).AsNoTracking().ToListAsync();
+        foreach (var ing in ingresos)
+        {
+            if (ing.Numero > 0 && !_reciboNumeroPorFactura.ContainsKey(ing.Idfactura))
+                _reciboNumeroPorFactura[ing.Idfactura] = ing.Numero;
+        }
+
+        if (facturacion == null || facturacion.Count != 1) { editaRecaudo = false; editaValores = false; editarObservaciones = false; }
+        if (planillaActual != null)
+        {
+            str_planilla = planillaActual.Descripcion ?? "No hay planilla";
+            str_periodo_corto = planillaActual.NombreCortoPeriodo ?? "N/A";
+            str_periodo_largo = planillaActual.NombreLargoPeriodo ?? "N/A";
+            var planillaAnterior = await context.Periodos.Where(p => p.FechaHoraIniciaPeriodo < planillaActual.FechaHoraIniciaPeriodo).OrderByDescending(p => p.FechaHoraIniciaPeriodo).AsNoTracking().FirstOrDefaultAsync();
+            if (planillaAnterior != null)
+            {
+                // Calculate totals in one query
+                var totalsAnterior = await context.Facturacions.Where(f => f.Idplanilla == planillaAnterior.Idplanilla).AsNoTracking()
+                    .GroupBy(f => 1)
+                    .Select(g => new { TotalValorPeriodo = g.Sum(f => f.ValorPeriodo ?? 0) })
+                    .FirstOrDefaultAsync();
+                var totalRecaudoActual = facturacion.Sum(f => f.RecaudoPeriodoTotal ?? 0);
+                indiceRecaudo = totalsAnterior != null && totalsAnterior.TotalValorPeriodo > 0 ? Math.Round((totalRecaudoActual / totalsAnterior.TotalValorPeriodo) * 100, 0) : 0;
+                this.totalValorPeriodoAnterior = totalsAnterior?.TotalValorPeriodo ?? 0;
+            }
+            await PonerEnlacesAntesDespues();
+        }
+    }
+
+    // Handlers y helpers añadidos
+    private async Task OnFiltraNopagoChanged()
+    {
+        await LoadData();
+        StateHasChanged();
+    }
+
+    private async Task OnVerTodasChanged()
+    {
+        // When user toggles 'Ver Todas'
+        if (!verTodas)
+        {
+            // If no other filters are active, immediately clear the list and do not show records
+            var hasOtherFilters = filtraNopago || !string.IsNullOrWhiteSpace(filtroNombrePredio) || !string.IsNullOrWhiteSpace(filtroCodigoUsuario);
+            if (!hasOtherFilters)
+            {
+                facturacion = new List<Facturacion>();
+                hasFacturaPdf.Clear();
+                _reciboNumeroPorFactura.Clear();
+                HayFacturas = false;
+                editaRecaudo = false;
+                editaValores = false;
+                editarObservaciones = false;
+                showFullTemporary = false;
+                lastHasAnyFilter = false;
+                await PonerEnlacesAntesDespues();
+                StateHasChanged();
+                return;
+            }
+        }
+
+        // Otherwise reload data (verTodas true or other filters present)
+        await LoadData();
+        StateHasChanged();
+    }
+
+    private Task OnEditaValoresChanged()
+    {
+        if (!editaValores) editaRecaudo = false;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task OnFiltroNombrePredioChanged()
+    {
+        _filtroCts?.Cancel();
+        var cts = new System.Threading.CancellationTokenSource();
+        _filtroCts = cts;
+        try { await Task.Delay(250, cts.Token); await LoadData(); StateHasChanged(); } catch (TaskCanceledException) { }
+    }
+
+    private async Task OnFiltroCodigoUsuarioChanged()
+    {
+        _filtroCts?.Cancel();
+        var cts = new System.Threading.CancellationTokenSource();
+        _filtroCts = cts;
+        try { await Task.Delay(250, cts.Token); await LoadData(); StateHasChanged(); } catch (TaskCanceledException) { }
+    }
+
+    private async Task ClearFiltroNombrePredio()
+    {
+        filtroNombrePredio = string.Empty;
+        await LoadData();
+        StateHasChanged();
+    }
+
+    private async Task ClearFiltroCodigoUsuario()
+    {
+        filtroCodigoUsuario = string.Empty;
+        await LoadData();
+        StateHasChanged();
+    }
+
+    private async Task FiltrarPorCodigo(string codigo)
+    {
+        filtroCodigoUsuario = codigo ?? string.Empty;
+        await LoadData();
+        StateHasChanged();
+    }
+
+    private string FormatCurrency(double? value)
+    {
+        return value.HasValue ? value.Value.ToString("C0", new CultureInfo("es-CO")) : "$0";
+    }
+
+    private async Task PonerEnlacesAntesDespues()
+    {
+        try
+        {
+            using var context = DbFactory.CreateDbContext();
+            var actual = await context.Periodos.FirstOrDefaultAsync(p => p.Guid == id);
+            if (actual == null) { id_planilla_anterior = "No disponible"; id_planilla_siguiente = "No disponible"; return; }
+            var anterior = await context.Periodos.Where(p => p.FechaHoraIniciaPeriodo < actual.FechaHoraIniciaPeriodo)
+                .OrderByDescending(p => p.FechaHoraIniciaPeriodo).FirstOrDefaultAsync();
+            var siguiente = await context.Periodos.Where(p => p.FechaHoraIniciaPeriodo > actual.FechaHoraIniciaPeriodo)
+                .OrderBy(p => p.FechaHoraIniciaPeriodo).FirstOrDefaultAsync();
+            id_planilla_anterior = anterior?.Idplanilla ?? "No disponible";
+            id_planilla_siguiente = siguiente?.Idplanilla ?? "No disponible";
+        }
+        catch
+        {
+            id_planilla_anterior = "No disponible";
+            id_planilla_siguiente = "No disponible";
+        }
+    }
+
+    private async Task OnValorSobreTasaChanged(Facturacion factura, ChangeEventArgs e)
+    {
+        if (!editaPlanilla) return;
+        if (double.TryParse(e.Value?.ToString(), out double v))
+        {
+            factura.ValorSobreTasa = v;
+            await RecalcularValores(factura, this.tarifas);
+            await UpdateFactura(factura);
+            await UpdatePlanilla();
+            StateHasChanged();
+        }
+    }
+
+    private async Task VerReciboPdf(Facturacion factura)
+    {
+        if (factura is null) { errorMessage = "Factura no encontrada"; return; }
+        if (_reciboNumeroPorFactura.TryGetValue(factura.Idfactura, out var numero) && numero > 0)
+        {
+            var codigoUsuario = Sanitize(factura.CodigoUsuario ?? "usuario");
+            var url = $"/imagenes/{codigoUsuario}/REC-{numero:0000}.pdf";
+            await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+        }
+        else
+        {
+            errorMessage = "Recibo no disponible para esta factura";
+            StateHasChanged();
+        }
+    }
+
+    private async Task VerFactura(Facturacion factura)
+    {
+        if (factura is null) { errorMessage = "Factura no encontrada"; return; }
+        var codigoUsuario = Sanitize(factura.CodigoUsuario ?? "usuario");
+        var codigoFactura = Sanitize(factura.CodigoFactura ?? "factura");
+        var url = $"/imagenes/{codigoUsuario}/{codigoFactura}.pdf";
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+    }
+
+    private async Task OpenFacturaImprimir(string idFactura)
+    {
+        if (string.IsNullOrWhiteSpace(idFactura)) { errorMessage = "Factura no encontrada"; return; }
+        var url = $"/factura/imprimir?IdFactura={idFactura}";
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+    }
+
+    private async Task HacerRecibo(Facturacion factura)
+    {
+        if (factura == null) { errorMessage = "Factura no encontrada"; return; }
+        string urlRecibo = $"/ingresos/createrecaudo?IdFactura={factura.Idfactura}";
+        await JSRuntime.InvokeVoidAsync("window.open", urlRecibo, "_blank");
+    }
+
+    private async Task VerRecibo(Facturacion factura)
+    {
+        if (factura == null) { errorMessage = "Factura no encontrada"; return; }
+        string urlRecibo = $"/recibos/details?idfactura={factura.Idfactura}";
+        await JSRuntime.InvokeVoidAsync("window.open", urlRecibo, "_blank");
+    }
+
+    private async Task UpdateFactura(Facturacion factura)
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Update(factura); await context.SaveChangesAsync();
+    }
+    private async Task UpdatePlanilla()
+    {
+        using var context = DbFactory.CreateDbContext();
+        var planilla = await context.Periodos.FindAsync(id);
+        if (planilla != null)
+        {
+            if (FechaTomaConsumoPlanilla.HasValue)
+            {
+                planilla.FechaHoraIniciaPeriodo = FechaTomaConsumoPlanilla.Value;
+            }
+            planilla.FechaLimitePago = FechaUltimoPagoPlanilla;
+            planilla.FechaSuspension = FechaSuspensionPlanilla;
+            context.Periodos.Update(planilla);
+            await context.SaveChangesAsync();
+        }
+    }
+
+    private double RedondearValor(double valor)
+    {
+        int centenas = (int)(valor / 100); int decenas = (int)((valor % 100) / 10); return decenas <= 5 ? centenas * 100 : (centenas + 1) * 100;
+    }
+
+    private async Task RecalcularValores(Facturacion factura, IList<Tarifa> tarifas)
+    {
+        if (!editaPlanilla) return;
+        await CalcularConsumo(factura, tarifas); 
+        CalcularValorSobreTasa(factura); 
+        await CalcularValorPeriodo(factura);
+        var deudaAnterior = factura.DeudaAnterior ?? 0; 
+        var valorPeriodo = factura.ValorPeriodo ?? 0; 
+        var recaudo = factura.RecaudoPeriodoTotal ?? 0; 
+        factura.DeudaPasa = RedondearValor(deudaAnterior + valorPeriodo - recaudo);
+        await PropagarDeudaPasa(factura);
+    }
+
+    // In-memory recalculation for display only. DOES NOT persist changes or propagate deuda to other planillas.
+    private async Task RecalcularValoresEnMemoria(Facturacion factura, IList<Tarifa> tarifas)
+    {
+        // Compute consumption and value fields for UI display. Do not modify balances or persist.
+        await CalcularConsumo(factura, tarifas);
+        CalcularValorSobreTasa(factura);
+        // Use direct period calculation to avoid side-effects
+        CalcularValorPeriodoDirecto(factura);
+        // IMPORTANT: do NOT modify DeudaAnterior, RecaudoPeriodoTotal, DeudaPasa here.
+        await Task.CompletedTask;
+    }
+
+    private async Task CalcularConsumo(Facturacion factura, IList<Tarifa> tarifas)
+    {
+        if (factura.MedicionActual >= factura.MedicionAnterior) factura.ConsumoM3 = (factura.MedicionActual ?? 0) - (factura.MedicionAnterior ?? 0); else factura.ConsumoM3 = 0;
+        await CalcularValorConsumo(factura, tarifas); CalcularValorSobreTasa(factura); CalcularValorPeriodoDirecto(factura);
+    }
+
+    private async Task CalcularValorConsumo(Facturacion factura, IList<Tarifa> tarifas)
+    {
+        double valorConsumo = 0;
+        double consumoRestante = factura.ConsumoM3 ?? 0;
+        foreach (var tarifa in tarifas.OrderBy(t => t.Desde))
+        {
+            if (tarifa.ValorUnidad.HasValue)
+            { double rangoConsumo = Math.Min(consumoRestante, tarifa.Hasta - tarifa.Desde + 1); valorConsumo += rangoConsumo * tarifa.ValorUnidad.Value; consumoRestante -= rangoConsumo; if (consumoRestante <= 0) break; }
+        }
+        factura.ValorConsumo = valorConsumo;
+        await Task.CompletedTask; // Keep async for compatibility
+    }
+
+    private void CalcularValorSobreTasa(Facturacion factura)
+    { 
+        if (factura.CargoFijo.HasValue && factura.PorcentajeSobreTasa.HasValue) { 
+            double valorSobreTasa = (double)(factura.CargoFijo.Value + factura.ValorConsumo) * (factura.PorcentajeSobreTasa.Value / 100); factura.ValorSobreTasa = RedondearValor(valorSobreTasa); } 
+    }
+
+    private async Task CalcularValorPeriodo(Facturacion factura)
+    { double valorPeriodo = (double)((factura.CargoFijo ?? 0) + (factura.ValorConsumo ?? 0) + (factura.ValorSobreTasa ?? 0) + (factura.ValorMora ?? 0) + (factura.ValorSubsidio ?? 0) + (factura.OtrosValores ?? 0)); factura.ValorPeriodo = RedondearValor(valorPeriodo); await Task.CompletedTask; }
+    private void CalcularValorPeriodoDirecto(Facturacion factura)
+    { double valorPeriodo = (double)((factura.CargoFijo ?? 0) + (factura.ValorConsumo ?? 0) + (factura.ValorSobreTasa ?? 0) + (factura.ValorMora ?? 0) + (factura.ValorSubsidio ?? 0) + (factura.OtrosValores ?? 0)); factura.ValorPeriodo = RedondearValor(valorPeriodo); }
+
+    private async Task OnPorcentajeSubsidioChanged(Facturacion factura, ChangeEventArgs e)
+    { if (double.TryParse(e.Value?.ToString(), out double v)) { factura.PorcentajeSubsidio = v; if (factura.CargoFijo.HasValue && factura.PorcentajeSubsidio.HasValue) { double valorSubsidio = (factura.CargoFijo.Value + (factura.ValorConsumo ?? 0)) * (factura.PorcentajeSubsidio.Value / 100); factura.ValorSubsidio = RedondearValor(valorSubsidio); } await RecalcularValores(factura, this.tarifas); await UpdateFactura(factura); await UpdatePlanilla(); StateHasChanged(); } }
+    private async Task OnPorcentajeMoraChanged(Facturacion factura, ChangeEventArgs e)
+    { if (!editaPlanilla) return; if (double.TryParse(e.Value?.ToString(), out double v)) { factura.PorcentajeMora = v; if (factura.CargoFijo.HasValue && factura.PorcentajeMora.HasValue) { double valorMora = (factura.CargoFijo.Value + (factura.ValorConsumo ?? 0)) * (factura.PorcentajeMora.Value / 100); factura.ValorMora = RedondearValor(valorMora); } await RecalcularValores(factura, this.tarifas); await UpdateFactura(factura); await UpdatePlanilla(); StateHasChanged(); } }
+    private async Task OnPorcentajeSobreTasaChanged(Facturacion factura, ChangeEventArgs e)
+    { if (!editaPlanilla) return; if (double.TryParse(e.Value?.ToString(), out double v)) { factura.PorcentajeSobreTasa = v; if (factura.CargoFijo.HasValue && factura.PorcentajeSobreTasa.HasValue) { double valorSobreTasa = (factura.CargoFijo.Value + (factura.ValorConsumo ?? 0)) * (factura.PorcentajeSobreTasa.Value / 100); factura.ValorSobreTasa = RedondearValor(valorSobreTasa); } await RecalcularValores(factura, this.tarifas); await UpdateFactura(factura); await UpdatePlanilla(); StateHasChanged(); } }
+    private async Task OnValorMoraChanged(Facturacion factura, ChangeEventArgs e)
+    { if (!editaPlanilla) return; if (double.TryParse(e.Value?.ToString(), out double v)) { factura.ValorMora = v; await RecalcularValores(factura, this.tarifas); await UpdateFactura(factura); await UpdatePlanilla(); StateHasChanged(); } }
+    private async Task OnValorSubsidioChanged(Facturacion factura, ChangeEventArgs e)
+    { if (!editaPlanilla) return; if (double.TryParse(e.Value?.ToString(), out double v)) { factura.ValorSubsidio = v; await RecalcularValores(factura, this.tarifas); await UpdateFactura(factura); await UpdatePlanilla(); StateHasChanged(); } }
+    private async Task OnOtrosValoresChanged(Facturacion factura)
+    {
+        if (!editaPlanilla) return;
+        await RecalcularValores(factura, this.tarifas);
+        await UpdateFactura(factura);
+        await UpdatePlanilla();
+        StateHasChanged();
+    }
+    private async Task OnObservacionesPredioChanged(Facturacion factura, ChangeEventArgs e)
+    { if (!editaPlanilla) return; factura.IdpredioNavigation.Observaciones = e.Value.ToString(); await UpdateFactura(factura); }
+    private async Task OnDeudaAnteriorChanged(Facturacion factura, ChangeEventArgs e)
+    { if (!editaPlanilla) return; if (double.TryParse(e.Value.ToString(), out double v)) { factura.DeudaAnterior = v; await RecalcularValores(factura, this.tarifas); await UpdateFactura(factura); await UpdatePlanilla(); StateHasChanged(); } }
+    private async Task OnRecaudoPeriodoTotalChanged(Facturacion factura)
+    {
+        if (!editaPlanilla) return;
+        await RecalcularValores(factura, this.tarifas);
+        await UpdateFactura(factura);
+        await UpdatePlanilla();
+        var totalRecaudoActual = facturacion.Sum(f => f.RecaudoPeriodoTotal ?? 0);
+        indiceRecaudo = totalValorPeriodoAnterior > 0 ? Math.Round((totalRecaudoActual / totalValorPeriodoAnterior) * 100, 0) : 0;
+        StateHasChanged();
+    }
+    private async Task OnMedicionAnteriorChanged(Facturacion factura, ChangeEventArgs e)
+    { if (!editaPlanilla) return; if (double.TryParse(e.Value.ToString(), out double v)) { factura.MedicionAnterior = v; await CalcularConsumo(factura, this.tarifas); await RecalcularValores(factura, this.tarifas); await UpdateFactura(factura); await UpdatePlanilla(); StateHasChanged(); } }
+    private async Task OnMedicionActualChanged(Facturacion factura, ChangeEventArgs e)
+    { if (!editaPlanilla) return; if (double.TryParse(e.Value?.ToString(), out double v)) { factura.MedicionActual = v; await CalcularConsumo(factura, this.tarifas); await RecalcularValores(factura, this.tarifas); await UpdateFactura(factura); await UpdatePlanilla(); StateHasChanged(); } }
+    private async Task OnCargoFijoChanged(Facturacion factura, ChangeEventArgs e)
+    { if (!editaPlanilla) return; if (double.TryParse(e.Value?.ToString(), out double v)) { factura.CargoFijo = v; await RecalcularValores(factura, this.tarifas); await UpdateFactura(factura); await UpdatePlanilla(); StateHasChanged(); } }
+    private async Task OnNotasFacturaChanged(Facturacion factura, ChangeEventArgs e)
+    { if (!editaPlanilla) return; factura.NotasFactura = e.Value.ToString(); await UpdateFactura(factura); StateHasChanged(); }
+    private async Task OnNotasRecaudoChanged(Facturacion factura, ChangeEventArgs e)
+    { if (!editaPlanilla) return; factura.NotasRecaudo = e.Value.ToString(); await UpdateFactura(factura); StateHasChanged(); }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(5000);
+                // hide the temporary index UI
+                mostrar = false;
+
+                // if we showed the full list only temporarily and there are still no filters, clear the list
+                if (showFullTemporary && !lastHasAnyFilter)
+                {
+                    facturacion = new List<Facturacion>();
+                    hasFacturaPdf.Clear();
+                    _reciboNumeroPorFactura.Clear();
+                    HayFacturas = false;
+                    editaRecaudo = false;
+                    editaValores = false;
+                    editarObservaciones = false;
+                    showFullTemporary = false;
+                }
+
+                await InvokeAsync(StateHasChanged);
+            });
+        }
+        await JSRuntime.InvokeVoidAsync("setPageTitle", "REC:" + str_periodo_corto);
+    }
+
+    private static string Sanitize(string input)
+    { if (string.IsNullOrWhiteSpace(input)) return string.Empty; var invalid = System.IO.Path.GetInvalidFileNameChars(); var safe = string.Join("_", input.Split(invalid, StringSplitOptions.RemoveEmptyEntries)); return safe.Trim(); }
+
+    private async Task PropagarDeudaPasa(Facturacion facturaActual)
+    {
+        if (facturaActual == null) return;
+
+        try
+        {
+            using var context = DbFactory.CreateDbContext();
+
+            // Get ordered subsequent planillas starting after the current planilla
+            var currentPlanilla = await context.Periodos.FirstOrDefaultAsync(p => p.Guid == id);
+            if (currentPlanilla == null) return;
+
+            var subsequentPlanillas = await context.Periodos
+                .Where(p => p.FechaHoraIniciaPeriodo > currentPlanilla.FechaHoraIniciaPeriodo)
+                .OrderBy(p => p.FechaHoraIniciaPeriodo)
+                .ToListAsync();
+
+            // Start with the deudaPasa from the facturaActual
+            double deudaPasaAnterior = facturaActual.DeudaPasa ?? 0;
+
+            // Iterate through each subsequent planilla and update the factura for the same predio
+            foreach (var planilla in subsequentPlanillas)
+            {
+                var facturaSiguiente = await context.Facturacions.FirstOrDefaultAsync(f => f.Idplanilla == planilla.Idplanilla && f.Idpredio == facturaActual.Idpredio);
+                if (facturaSiguiente == null) break; // stop propagation when no factura exists for this predio
+
+                // recompute recaudo total from ingresos for that factura
+                var ingresos = await context.Ingresos.Where(i => i.Idfactura == facturaSiguiente.Idfactura).ToListAsync();
+                facturaSiguiente.RecaudoPeriodoTotal = ingresos.Sum(i => i.Valor ?? 0);
+
+                // set DeudaAnterior and recalculate DeudaPasa
+                facturaSiguiente.DeudaAnterior = deudaPasaAnterior;
+                var valorPeriodo = facturaSiguiente.ValorPeriodo ?? 0;
+                facturaSiguiente.DeudaPasa = RedondearValor((facturaSiguiente.DeudaAnterior ?? 0) + valorPeriodo - (facturaSiguiente.RecaudoPeriodoTotal ?? 0));
+
+                context.Facturacions.Update(facturaSiguiente);
+                await context.SaveChangesAsync();
+
+                // prepare deudaPasa for next iteration
+                deudaPasaAnterior = facturaSiguiente.DeudaPasa ?? 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Error propagando deuda en cadena para factura {FacturaId}", facturaActual.Idfactura);
+        }
+    }
+}

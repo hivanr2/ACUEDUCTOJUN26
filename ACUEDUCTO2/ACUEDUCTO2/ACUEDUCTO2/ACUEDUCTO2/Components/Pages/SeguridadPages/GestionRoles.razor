@@ -1,0 +1,207 @@
+@page "/proceso/Gestión de Roles"
+@page "/proceso/Nuevo Acceso"
+@page "/proceso/Actualizar Acceso"
+@page "/proceso/Eliminar Acceso"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using ACUEDUCTO2.Data
+@attribute [Authorize(Roles = "Administradores")]
+
+@inject ACUEDUCTO2.Data.SeguridadService SeguridadService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h3>Gestión de Roles</h3>
+<p class="text-muted">Crear y administrar los roles del sistema. El rol <strong>Administradores</strong> tiene acceso a todos los procesos.</p>
+
+@if (!string.IsNullOrEmpty(mensaje))
+{
+    <div class="alert @(esError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+        @mensaje
+        <button type="button" class="btn-close" @onclick="() => mensaje = null"></button>
+    </div>
+}
+
+<div class="card mb-4">
+    <div class="card-header"><strong>Crear Nuevo Rol</strong></div>
+    <div class="card-body">
+        <div class="input-group">
+            <input type="text" class="form-control" placeholder="Nombre del rol..." @bind="nuevoRol" @bind:event="oninput" />
+            <button class="btn btn-primary" @onclick="CrearRol" disabled="@string.IsNullOrWhiteSpace(nuevoRol)">
+                Crear Rol
+            </button>
+        </div>
+    </div>
+</div>
+
+@if (roles == null)
+{
+    <p><em>Cargando roles...</em></p>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>Rol</th>
+                <th>Procesos Asignados</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var role in roles)
+            {
+                var roleName = role.Name!;
+                var esAdmin = roleName == "Administradores";
+                var cantidadProcesos = conteoProcesosPorRol.ContainsKey(roleName) ? conteoProcesosPorRol[roleName] : 0;
+
+                <tr>
+                    <td>
+                        @if (!esAdmin && rolEditando == roleName)
+                        {
+                            <div class="input-group input-group-sm">
+                                <input type="text" class="form-control" @bind="nuevoNombreRol" @bind:event="oninput" />
+                                <button class="btn btn-sm btn-success" @onclick="GuardarEdicion" disabled="@string.IsNullOrWhiteSpace(nuevoNombreRol)">Guardar</button>
+                                <button class="btn btn-sm btn-secondary" @onclick="CancelarEdicion">Cancelar</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <strong>@roleName</strong>
+                            @if (esAdmin)
+                            {
+                                <span class="badge bg-warning text-dark ms-2">Acceso Total</span>
+                            }
+                        }
+                    </td>
+                    <td>
+                        @if (esAdmin)
+                        {
+                            <span class="text-success">Todos los procesos (@totalProcesos)</span>
+                        }
+                        else
+                        {
+                            <span>@cantidadProcesos de @totalProcesos</span>
+                        }
+                    </td>
+                    <td>
+                        @if (!esAdmin)
+                        {
+                            <a class="btn btn-sm btn-outline-primary me-1" href="proceso/Listado%20de%20Accesos?rol=@Uri.EscapeDataString(roleName)">
+                                Configurar Accesos
+                            </a>
+                            <button class="btn btn-sm btn-outline-warning me-1" @onclick="() => IniciarEdicion(roleName)" disabled="@(rolEditando != null)">
+                                Editar
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarRol(roleName)" disabled="@(rolEditando != null)">
+                                Eliminar
+                            </button>
+                        }
+                        else
+                        {
+                            <span class="text-muted">No editable</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<ApplicationRole>? roles;
+    private Dictionary<string, int> conteoProcesosPorRol = new();
+    private int totalProcesos;
+    private string? nuevoRol;
+    private string? mensaje;
+    private bool esError;
+    private string? rolEditando;
+    private string? nuevoNombreRol;
+
+    protected override async Task OnInitializedAsync()
+    {
+        totalProcesos = ProcesosCatalogo.Todos.Count;
+        await CargarRoles();
+    }
+
+    private async Task CargarRoles()
+    {
+        roles = await SeguridadService.ObtenerRolesAsync();
+        conteoProcesosPorRol.Clear();
+        foreach (var role in roles)
+        {
+            if (role.Name != "Administradores")
+            {
+                var procesos = await SeguridadService.ObtenerNombresProcesosDeRolAsync(role.Name!);
+                conteoProcesosPorRol[role.Name!] = procesos.Count;
+            }
+        }
+    }
+
+    private async Task CrearRol()
+    {
+        if (string.IsNullOrWhiteSpace(nuevoRol)) return;
+
+        var result = await SeguridadService.CrearRolAsync(nuevoRol.Trim());
+        if (result.Succeeded)
+        {
+            mensaje = $"Rol '{nuevoRol.Trim()}' creado exitosamente.";
+            esError = false;
+            nuevoRol = null;
+            await CargarRoles();
+        }
+        else
+        {
+            mensaje = string.Join(" ", result.Errors.Select(e => e.Description));
+            esError = true;
+        }
+    }
+
+    private void IniciarEdicion(string roleName)
+    {
+        rolEditando = roleName;
+        nuevoNombreRol = roleName;
+    }
+
+    private void CancelarEdicion()
+    {
+        rolEditando = null;
+        nuevoNombreRol = null;
+    }
+
+    private async Task GuardarEdicion()
+    {
+        if (string.IsNullOrWhiteSpace(rolEditando) || string.IsNullOrWhiteSpace(nuevoNombreRol)) return;
+
+        var result = await SeguridadService.EditarRolAsync(rolEditando, nuevoNombreRol.Trim());
+        if (result.Succeeded)
+        {
+            mensaje = $"Rol '{rolEditando}' renombrado a '{nuevoNombreRol.Trim()}'.";
+            esError = false;
+            rolEditando = null;
+            nuevoNombreRol = null;
+            await CargarRoles();
+        }
+        else
+        {
+            mensaje = string.Join(" ", result.Errors.Select(e => e.Description));
+            esError = true;
+        }
+    }
+
+    private async Task EliminarRol(string roleName)
+    {
+        var result = await SeguridadService.EliminarRolAsync(roleName);
+        if (result.Succeeded)
+        {
+            mensaje = $"Rol '{roleName}' eliminado.";
+            esError = false;
+            await CargarRoles();
+        }
+        else
+        {
+            mensaje = string.Join(" ", result.Errors.Select(e => e.Description));
+            esError = true;
+        }
+    }
+}

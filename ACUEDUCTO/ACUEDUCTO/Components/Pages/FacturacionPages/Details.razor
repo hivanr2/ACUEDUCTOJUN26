@@ -1,0 +1,217 @@
+﻿@page "/facturacion/details"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Detalles de Facturación</PageTitle>
+
+@if (facturacion is null)
+{
+    <p><em>Llamando...</em></p>
+}
+else
+{
+    <div class="container-fluid">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h1 class="card-title">Detalles de Facturación</h1>
+            </div>
+            <div class="card-body">
+                <!-- Información Básica -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5>Información Básica</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">IdFactura:</label>
+                                <p class="form-control-plaintext">@facturacion.Idfactura</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Planilla:</label>
+                                <p class="form-control-plaintext">@facturacion.IdplanillaNavigation?.Descripcion</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Predio:</label>
+                                <p class="form-control-plaintext">@facturacion.IdpredioNavigation?.ApellidosNombresUsuario</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Periodo:</label>
+                                <p class="form-control-plaintext">@facturacion.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionLarga</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">CodigoFactura:</label>
+                                <p class="form-control-plaintext">@facturacion.CodigoFactura</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">CodigoUsuario:</label>
+                                <p class="form-control-plaintext">@facturacion.CodigoUsuario</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">FechaHoraRegistro:</label>
+                                <p class="form-control-plaintext">@facturacion.FechaHoraRegistro</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mediciones -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5>Mediciones</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">MedicionAnterior:</label>
+                                <p class="form-control-plaintext">@facturacion.MedicionAnterior</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">MedicionActual:</label>
+                                <p class="form-control-plaintext">@facturacion.MedicionActual</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">ConsumoM3:</label>
+                                <p class="form-control-plaintext">@facturacion.ConsumoM3</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cargos y Tasas -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5>Cargos y Tasas</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">CargoFijo:</label>
+                                <p class="form-control-plaintext">@facturacion.CargoFijo</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">ValorConsumo:</label>
+                                <p class="form-control-plaintext">@facturacion.ValorConsumo</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">PorcentajeSobreTasa:</label>
+                                <p class="form-control-plaintext">@facturacion.PorcentajeSobreTasa</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">ValorSobreTasa:</label>
+                                <p class="form-control-plaintext">@facturacion.ValorSobreTasa</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">PorcentajeMora:</label>
+                                <p class="form-control-plaintext">@facturacion.PorcentajeMora</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">ValorMora:</label>
+                                <p class="form-control-plaintext">@facturacion.ValorMora</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">PorcentajeSubsidio:</label>
+                                <p class="form-control-plaintext">@facturacion.PorcentajeSubsidio</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">ValorSubsidio:</label>
+                                <p class="form-control-plaintext">@facturacion.ValorSubsidio</p>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">OtrosValores:</label>
+                            <p class="form-control-plaintext">@facturacion.OtrosValores</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Totales -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5>Totales</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">ValorPeriodo:</label>
+                                <p class="form-control-plaintext">@facturacion.ValorPeriodo</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">DeudaAnterior:</label>
+                                <p class="form-control-plaintext">@facturacion.DeudaAnterior</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">RecaudoPeriodoTotal:</label>
+                                <p class="form-control-plaintext">@facturacion.RecaudoPeriodoTotal</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">DeudaPasa:</label>
+                                <p class="form-control-plaintext">@facturacion.DeudaPasa</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notas -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5>Notas</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">NotasFactura:</label>
+                            <p class="form-control-plaintext">@facturacion.NotasFactura</p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">NotasRecaudo:</label>
+                            <p class="form-control-plaintext">@facturacion.NotasRecaudo</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <a href="@($"/facturacion/edit?idplanilla={facturacion.Idplanilla}")" class="btn btn-primary">Editar</a>
+                    <a href="@($"/facturacion")" class="btn btn-secondary ms-2">Volver a la Lista</a>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Facturacion? facturacion;
+
+    [SupplyParameterFromQuery]
+    private string Idplanilla { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        facturacion = await context.Facturacions
+            .Include(f => f.IdplanillaNavigation)
+                .ThenInclude(p => p.IdperiodoNavigation)
+            .Include(f => f.IdpredioNavigation)
+            .FirstOrDefaultAsync(m => m.Idplanilla == Idplanilla);
+
+        if (facturacion is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+}

@@ -1,0 +1,104 @@
+﻿@page "/cuentaporpagars/create"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create</PageTitle>
+
+<h1>Create</h1>
+
+<h2>CuentaPorPagar</h2>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <EditForm method="post" Model="CuentaPorPagar" OnValidSubmit="AddCuentaPorPagar" FormName="create" Enhance>
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert"/>
+            <div class="mb-3">
+                <label for="numero" class="form-label">Numero:</label> 
+                <InputNumber id="numero" @bind-Value="CuentaPorPagar.Numero" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorPagar.Numero" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="identificacion" class="form-label">Identificacion:</label> 
+                <InputText id="identificacion" @bind-Value="CuentaPorPagar.Identificacion" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorPagar.Identificacion" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="descripción" class="form-label">Descripcion:</label> 
+                <InputText id="descripción" @bind-Value="CuentaPorPagar.Descripcion" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorPagar.Descripcion" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="fechahora" class="form-label">FechaHora:</label> 
+                <InputDate id="fechahora" @bind-Value="CuentaPorPagar.FechaHora" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorPagar.FechaHora" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="vencimiento" class="form-label">Vencimiento:</label> 
+                <InputDate id="vencimiento" @bind-Value="CuentaPorPagar.Vencimiento" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorPagar.Vencimiento" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="valordebe" class="form-label">ValorDebe:</label> 
+                <InputNumber id="valordebe" @bind-Value="CuentaPorPagar.ValorDebe" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorPagar.ValorDebe" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="valorpagado" class="form-label">ValorPagado:</label> 
+                <InputNumber id="valorpagado" @bind-Value="CuentaPorPagar.ValorPagado" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorPagar.ValorPagado" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="cuotastotales" class="form-label">CuotasTotales:</label> 
+                <InputNumber id="cuotastotales" @bind-Value="CuentaPorPagar.CuotasTotales" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorPagar.CuotasTotales" class="text-danger" /> 
+            </div>        
+            <div class="mb-3">
+                <label for="cuotaspagadas" class="form-label">CuotasPagadas:</label> 
+                <InputNumber id="cuotaspagadas" @bind-Value="CuentaPorPagar.CuotasPagadas" class="form-control" /> 
+                <ValidationMessage For="() => CuentaPorPagar.CuotasPagadas" class="text-danger" /> 
+            </div>        
+            <button type="submit" class="btn btn-primary">Create</button>
+        </EditForm>
+    </div>
+</div>
+
+<div>
+    <a href="/cuentaporpagars">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private CuentaPorPagar CuentaPorPagar { get; set; } = new();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        // facturas = await context.Facturacions.Include(c => c.IdpredioNavigation).ToListAsync();
+        if (CuentaPorPagar.Numero == null || CuentaPorPagar.Numero == 0)
+        {
+            // Ingreso.FechaHora = DateTime.Now;
+            int siguienteNumero = 1; // Valor por defecto en caso de que no haya registros
+
+            if (context.CuentaPorPagars.Any() && context.CuentaPorPagars != null)
+            {
+                siguienteNumero = (context.CuentaPorPagars.Where(a => a.Numero > 0).Select(a => a.Numero).Max().Value) + 1;
+            }
+            CuentaPorPagar.Numero = siguienteNumero;
+        }
+    }
+
+
+    private async Task AddCuentaPorPagar()
+    {
+        using var context = DbFactory.CreateDbContext();
+        CuentaPorPagar.IdcuentaxP = Guid.NewGuid().ToString();
+
+        context.CuentaPorPagars.Add(CuentaPorPagar);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/cuentaporpagars");
+    }
+}

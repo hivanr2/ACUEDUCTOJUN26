@@ -1,0 +1,21 @@
+﻿@page "/predio/historicoconsumos"
+@using Microsoft.AspNetCore.Components
+@layout SimpleLayout
+@* Accept idpredio from query string and forward to the component *@
+
+<h3>Histórico de Facturas</h3>
+
+@if (string.IsNullOrWhiteSpace(Idpredio))
+{
+    <div class="alert alert-info">Seleccione un predio para ver su histórico de facturas.</div>
+}
+else
+{
+    <FacturasPredioComponent Idpredio="@Idpredio" />
+}
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "idpredio")]
+    public string? Idpredio { get; set; }
+}

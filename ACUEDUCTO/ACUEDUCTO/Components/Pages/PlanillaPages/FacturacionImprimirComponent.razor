@@ -1,0 +1,256 @@
+﻿@layout ACUEDUCTO.Components.Layout.PrintLayout
+@page "/planilla/facturacionimprimircomponent/"
+@using ACUEDUCTO.Models
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@inject IDbContextFactory<AcueductoContext> DbFactory
+@inject IJSRuntime JSRuntime
+
+@rendermode InteractiveServer
+
+<h3>FACTURACIÓN :: @str_planilla.</h3>
+<h2>@str_periodo_largo</h2>
+
+@if (mostrar)
+{
+    <div class="fecha-destacada">
+        Fecha Toma de Consumos :
+        <b>@(FechaTomaConsumoPlanilla.HasValue ? FechaTomaConsumoPlanilla.Value.ToString("D", new CultureInfo("es-CO")) : "")</b>
+        - Ultimo día de Pago:
+        <b>@(FechaUltimoPagoPlanilla.HasValue ? FechaUltimoPagoPlanilla.Value.ToString("D", new CultureInfo("es-CO")) : "")</b>
+        - Fecha de Suspensión :
+        <b>@(FechaSuspensionPlanilla.HasValue ? FechaSuspensionPlanilla.Value.ToString("D", new CultureInfo("es-CO")) : "")</b> 
+    </div>
+
+}
+
+@if (facturacion == null)
+{
+    <div>Cargando...</div>
+}
+else
+{
+    if (facturacion.Count > 0)
+    {
+        if (facturacion.FirstOrDefault().CodigoFactura.Trim().Count() > 0)
+        {
+            HayFacturas = true;
+        }
+        <div>
+            <table class="table table-striped table-bordered table-responsive fixed-header">
+                <thead>
+                    <tr>
+                        <th scope="col">It</th>
+                        <th scope="col">Factura</th>
+                        @foreach (var header in new[] { "Predio", "Dirección", "Ruta", "Codigo Usuario", "Celular", "Medidor","Marca Medidor","Estado Medidor", "Medición Anterior", "Medición Actual",
+                    "ConsumoM3", "Valor Consumo", "Cargo Fijo", "Porcentaje SobreTasa",
+                "Valor SobreTasa", "Porcentaje Mora", "Valor Mora",
+                "Porcentaje Subsidio", "Valor Subsidio", "Otros Valores",
+                                "Valor Periodo","|", "Deuda Anterior", "Recaudo Bimestre",
+                "Deuda Pasa"})
+                        {
+                            <th scope="col">@header</th>
+                        }
+                        <th scope="col" style="width: 300px; ">::::Observaciones_Predio::::</th>
+                        <th scope="col" style="width: 300px; ">::::::Notas_Factura:::::</th>
+                        <th scope="col" style="width: 300px; ">::::::Notas_Recaudo:::::</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < facturacion.Count; i++)
+                    {
+
+                        var factura = facturacion[i];
+                        <tr>
+                            <th scope="col">@(i + 1)</th>
+                            <th scope="row">
+                                @factura.CodigoFactura <br />
+                            </th>
+                            <td>
+                                @factura.IdpredioNavigation.ApellidosNombresUsuario <br />
+                            </td>
+                            <td>
+                                @factura.IdpredioNavigation.Direccion <br />
+                            </td>
+                            <td>
+                                @factura.IdpredioNavigation.Ruta <br />
+                            </td>
+                            <td>@factura.CodigoUsuario</td>
+                            <td>@factura.IdpredioNavigation.IdentificacionFacturacionNavigation.Celular</td>
+                            <td>@factura.IdpredioNavigation.NumeroMedidor</td>
+                            <td>@factura.IdpredioNavigation.MarcaMedidor</td>
+                            <td>@factura.IdpredioNavigation.EstadoMedidor</td>
+                            <td>@factura.MedicionAnterior</td>
+                            <td>@factura.MedicionActual</td>
+                            <td class="text-center">@factura.ConsumoM3</td>
+                            <td class="text-center">@FormatCurrency(factura.ValorConsumo)</td>
+                            <td class="text-center">@FormatCurrency(factura.CargoFijo)</td>
+                            <td class="text-center">@factura.PorcentajeSobreTasa</td>
+                            <td class="text-center">@FormatCurrency(factura.ValorSobreTasa)</td>
+                            <td class="text-center">@factura.PorcentajeMora</td>
+                            <td class="text-center">@FormatCurrency(factura.ValorMora)</td>
+                            <td class="text-center">@factura.PorcentajeSubsidio</td>
+                            <td class="text-center">@FormatCurrency(factura.ValorSubsidio)</td>
+                            <td>
+                                @FormatCurrency(factura.OtrosValores)<br />
+                            </td>
+                            <td class="text-center">@FormatCurrency(factura.ValorPeriodo)</td>
+                            <td>|</td>
+                            <td class="text-center">@FormatCurrency(factura.DeudaAnterior)</td>
+                            <td>
+                                @FormatCurrency(factura.RecaudoPeriodoTotal)<br />
+                            </td>
+                            <td class="text-center">@FormatCurrency(factura.DeudaPasa)</td>
+                            <td style="max-width: 100px; width: 100px; word-break: break-word; white-space: normal;">
+                                @factura.IdpredioNavigation.Observaciones
+                            </td>
+                            <td>
+                                @(string.IsNullOrWhiteSpace(factura.NotasFactura) ? "(sin nota)" : factura.NotasFactura)
+                            </td>
+                            <td>
+                                @(string.IsNullOrWhiteSpace(factura.NotasRecaudo) ? "(sin nota)" : factura.NotasRecaudo)
+                            </td>
+                        </tr>
+                    }
+                    <tr>
+                        <td colspan="15"><strong>Totales</strong></td>
+                        <td class="text-center"><strong>@totalOtrosValores.ToString("C0")</strong></td>
+                        <td class="text-center"><strong>@totalValorPeriodo.ToString("C0")</strong></td>
+                        <td class="text-center"><strong>@totalDeudaAnterior.ToString("C0")</strong></td>
+                        <td class="text-center"><strong>@totalRecaudoPeriodoTotal.ToString("C0")</strong></td>
+                        <td class="text-center"><strong>@totalDeudaPasa.ToString("C0")</strong></td>
+                        <td colspan="4"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <style>
+
+            .fixed-header thead th {
+                position: sticky;
+                top: 0;
+                background-color: white; /* Ajusta el color de fondo según tus necesidades */
+                z-index: 1;
+            }
+        </style>
+
+    }
+    else
+    {
+        <div>Se DEBE CREAR facturación según Planilla por cada Predio Existente</div>
+    }
+}
+
+
+
+@code {
+
+    [SupplyParameterFromQuery]
+    private string id { get; set; }
+    private bool HayFacturas { get; set; } = false;
+    private IList<Facturacion> facturacion = new List<Facturacion>();
+    private string str_planilla;
+    private string str_periodo_corto;
+    private string str_periodo_largo;
+    private string errorMessage;
+    private bool isProcessing = false;
+    private bool facturasElaboradas = false;
+    private bool showModal = false;
+    private Facturacion selectedFactura;
+    private Planilla planilla;
+    private bool mostrar = false;
+    private DateTime? FechaTomaConsumoPlanilla;
+    private DateOnly? FechaUltimoPagoPlanilla;
+    private DateOnly? FechaSuspensionPlanilla;
+
+    private double totalOtrosValores;
+    private double totalValorPeriodo;
+    private double totalDeudaAnterior;
+    private double totalRecaudoPeriodoTotal;
+    private double totalDeudaPasa;
+
+    private Dictionary<string, string> notasRecaudoDict = new();
+
+
+    private string FormatCurrency(double? value)
+    {
+        if (value.HasValue)
+        {
+            return $"${value.Value:N0}";
+        }
+        return "$0";
+    }
+
+
+
+    private async Task LoadData()
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        // Asigna directamente a la propiedad de la clase
+        facturacion = await context.Facturacions
+            .Where(p => p.Idplanilla == id)
+            .Include(f => f.IdpredioNavigation)
+                .ThenInclude(c => c.TipoConsumoNavigation)
+            .Include(f => f.IdpredioNavigation)   
+                .ThenInclude(c => c.IdentificacionFacturacionNavigation)
+            .OrderBy(c => c.IdpredioNavigation.ApellidosNombresUsuario)
+            .ToListAsync();
+
+        foreach (var factura in facturacion)
+        {
+            await context.Entry(factura)
+                .Reference(f => f.IdpredioNavigation)
+                .LoadAsync();
+            // Cargar notas de recaudos (ingresos) relacionados a la factura para asegurarnos de mostrar todas las anotaciones
+            try
+            {
+                var ingresos = await context.Ingresos
+                    .Where(i => i.Idfactura == factura.Idfactura)
+                    .ToListAsync();
+
+                if (ingresos != null && ingresos.Count > 0)
+                {
+                    notasRecaudoDict[factura.Idfactura] = string.Join(" - ", ingresos.Select(i => (i.Concepto ?? string.Empty) + " " + (i.FechaHora.ToString()))) ;
+                }
+                else
+                {
+                    notasRecaudoDict[factura.Idfactura] = factura.NotasRecaudo ?? "";
+                }
+            }
+            catch
+            {
+                // Si no existe la tabla Ingresos o hay error, fallback a la nota en la factura
+                notasRecaudoDict[factura.Idfactura] = factura.NotasRecaudo ?? string.Empty;
+            }
+        }
+
+        var planilla1 = await context.Planillas
+            .Where(p => p.Idplanilla == id)
+            .Include(c => c.IdperiodoNavigation)
+            .ToListAsync();
+        FechaTomaConsumoPlanilla = planilla1.Where(c => c.Idplanilla == id).Select(c => c.FechaHoraRegistroConsumo).FirstOrDefault();
+        FechaUltimoPagoPlanilla = planilla1.Where(c => c.Idplanilla == id).Select(c => c.FechaLimitePago).FirstOrDefault();
+        FechaSuspensionPlanilla = planilla1.Where(c => c.Idplanilla == id).Select(c => c.FechaSuspension).FirstOrDefault();
+        mostrar = true;
+        if (planilla1 == null)
+        {
+            str_planilla = "No hay planilla";
+        }
+        else
+        {
+            str_planilla = planilla1.FirstOrDefault()?.Descripcion ?? "No hay planilla";
+            str_periodo_corto = planilla1.FirstOrDefault()?.IdperiodoNavigation?.DescripcionCorta ?? "N/A";
+            str_periodo_largo = planilla1.FirstOrDefault()?.IdperiodoNavigation?.DescripcionLarga ?? "N/A";
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var culture = new System.Globalization.CultureInfo("es-CO");
+
+        await LoadData();
+
+    }
+}

@@ -1,0 +1,100 @@
+﻿@page "/estratos/edit"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit</PageTitle>
+
+<h1>Edit</h1>
+
+<h2>Estrato</h2>
+<hr />
+@if (Estrato is null)
+{
+    <p><em>Llamando...</em></p>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-4">
+            <EditForm method="post" Model="Estrato" OnValidSubmit="UpdateEstrato" FormName="edit" Enhance>
+                <DataAnnotationsValidator />
+                <ValidationSummary role="alert"/>
+                <input type="hidden" name="Estrato.Idestrato" value="@Estrato.Idestrato" />
+                <div class="mb-3">
+                    <label for="descripcion" class="form-label">Descripcion:</label>
+                    <InputText id="descripcion" @bind-Value="Estrato.Descripcion" class="form-control" />
+                    <ValidationMessage For="() => Estrato.Descripcion" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="sobretasa" class="form-label">SobreTasa:</label>
+                    <InputNumber id="sobretasa" @bind-Value="Estrato.SobreTasa" class="form-control" />
+                    <ValidationMessage For="() => Estrato.SobreTasa" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="cargofijo" class="form-label">CargoFijo:</label>
+                    <InputNumber id="cargofijo" @bind-Value="Estrato.CargoFijo" class="form-control" />
+                    <ValidationMessage For="() => Estrato.CargoFijo" class="text-danger" />
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<div>
+    <a class="btn btn-outline-secondary btn-sm" href="" onclick="return cerrarVentana('');">Cerrar</a>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private int Idestrato { get; set; }
+
+    [SupplyParameterFromForm]
+    private Estrato? Estrato { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Estrato ??= await context.Estratos.FirstOrDefaultAsync(m => m.Idestrato == Idestrato);
+
+        if (Estrato is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    // To protect from overposting attacks, enable the specific properties you want to bind to.
+    // For more information, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task UpdateEstrato()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Attach(Estrato!).State = EntityState.Modified;
+
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (!EstratoExists(Estrato!.Idestrato))
+            {
+                NavigationManager.NavigateTo("notfound");
+            }
+            else
+            {
+                throw;
+            }
+        }
+
+        NavigationManager.NavigateTo("/estratos");
+    }
+
+    private bool EstratoExists(int idestrato)
+    {
+        using var context = DbFactory.CreateDbContext();
+        return context.Estratos.Any(e => e.Idestrato == idestrato);
+    }
+}

@@ -1,0 +1,237 @@
+@page "/usuarios/details"
+@page "/proceso/Total a Pagar Bimestre"
+@page "/proceso/Total a Pagar Deuda"
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO2.Data
+@using ACUEDUCTO2.Share.Models
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>@(usuario?.ApellidosNombres ?? "Detalles Usuario")</PageTitle>
+
+@if (usuario is null)
+{
+    <div class="container py-5 text-center text-muted">Cargando...</div>
+}
+else
+{
+    <div class="container py-3">
+        <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+            <div>
+                <h1 class="h4 mb-2">@usuario.ApellidosNombres</h1>
+                <div class="d-flex flex-wrap gap-2">
+                    @if (!string.IsNullOrWhiteSpace(usuario.Identificacion))
+                    {
+                        <span class="badge bg-primary">ID: @usuario.Identificacion</span>
+                    }
+                    <span class="badge @(usuario.EmailConfirmed ? "bg-success" : "bg-warning text-dark")">
+                        @(usuario.EmailConfirmed ? "Correo Confirmado" : "Correo Sin Confirmar")
+                    </span>
+                </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-secondary" href="/usuarios">Volver</a>
+                <a class="btn btn-primary" href="@($"/usuarios/edit?id={usuario.Id}")">Editar</a>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light"><strong>Información del Usuario</strong></div>
+                    <div class="card-body">
+                        <div class="row g-2">
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Identificación</div>
+                                <div class="fw-semibold">@(usuario.Identificacion ?? "N/A")</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Apellidos y Nombres</div>
+                                <div class="fw-semibold">@(usuario.ApellidosNombres ?? "N/A")</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Teléfono</div>
+                                <div class="fw-semibold">@(usuario.PhoneNumber ?? "N/A")</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Correo Electrónico</div>
+                                <div class="fw-semibold">@(usuario.Email ?? "N/A")</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Usuario (Login)</div>
+                                <div class="fw-semibold">@(usuario.UserName ?? "N/A")</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light"><strong>Predios Asociados</strong></div>
+                    <div class="card-body p-0">
+                        @if (predios != null && predios.Any())
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Predio</th>
+                                            <th>Dirección</th>
+                                            <th>Ruta</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var p in predios)
+                                        {
+                                            <tr>
+                                                <td>@p.ApellidosNombresUsuario</td>
+                                                <td>@p.Direccion</td>
+                                                <td>@p.Ruta</td>
+                                                <td class="text-end">
+                                                    <a class="btn btn-outline-primary btn-sm" href="@($"/predios/details?idpredio={p.IdPredio}")" target="_blank">Ver</a>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="p-3 text-muted">No hay predios asociados a esta identificación.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @if (prediosAutorizados is not null && prediosAutorizados.Count > 0)
+            {
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light d-flex justify-content-between">
+                            <strong>Predios Autorizados por Otros Usuarios</strong>
+                            <span class="badge bg-success">@prediosAutorizados.Count</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                <table class="table table-sm table-hover align-middle mb-0">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th>Autorizado por</th>
+                                            <th>Predio</th>
+                                            <th>Dirección</th>
+                                            <th>Ruta</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in prediosAutorizados)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <div>@item.QuienAutoriza</div>
+                                                    @if (!string.IsNullOrWhiteSpace(item.NombreQuienAutoriza))
+                                                    {
+                                                        <small class="text-muted">@item.NombreQuienAutoriza</small>
+                                                    }
+                                                </td>
+                                                <td>@item.Predio.ApellidosNombresUsuario</td>
+                                                <td>@(item.Predio.Direccion ?? "—")</td>
+                                                <td>@item.Predio.Ruta</td>
+                                                <td class="text-end">
+                                                    <a class="btn btn-outline-primary btn-sm" href="@($"/predios/details?idpredio={item.Predio.IdPredio}")" target="_blank">Ver</a>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    private string? Id { get; set; }
+
+    private ApplicationUser? usuario;
+    private List<Predio>? predios;
+    private List<PredioAutorizadoView>? prediosAutorizados;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(Id))
+        {
+            NavigationManager.NavigateTo("/usuarios");
+            return;
+        }
+
+        await using var context = await DbFactory.CreateDbContextAsync();
+        usuario = await context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == Id);
+
+        if (usuario is null)
+        {
+            NavigationManager.NavigateTo("/usuarios");
+            return;
+        }
+
+        predios = await context.Predio
+            .AsNoTracking()
+            .Where(p => p.IdentificacionFacturacion == usuario.Identificacion)
+            .OrderBy(p => p.ApellidosNombresUsuario)
+            .ToListAsync();
+
+        // Autorizaciones recibidas: otros usuarios que autorizaron a este usuario
+        var autorizaciones = await context.Set<Autorizado>()
+            .AsNoTracking()
+            .Where(a => a.AQueAutoriza == usuario.Identificacion)
+            .ToListAsync();
+
+        if (autorizaciones.Count > 0)
+        {
+            var identificacionesAutorizantes = autorizaciones
+                .Select(a => a.QuienAutoriza)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var prediosDeAutorizantes = await context.Predio
+                .AsNoTracking()
+                .Where(p => identificacionesAutorizantes.Contains(p.IdentificacionFacturacion))
+                .OrderBy(p => p.IdentificacionFacturacion)
+                .ThenBy(p => p.ApellidosNombresUsuario)
+                .ToListAsync();
+
+            // Resolver nombres de quienes autorizan
+            var nombresCache = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var id in identificacionesAutorizantes)
+            {
+                var user = await context.Users
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.Identificacion == id);
+                nombresCache[id!] = user?.ApellidosNombres;
+            }
+
+            prediosAutorizados = prediosDeAutorizantes.Select(p => new PredioAutorizadoView
+            {
+                Predio = p,
+                QuienAutoriza = p.IdentificacionFacturacion ?? "",
+                NombreQuienAutoriza = nombresCache.GetValueOrDefault(p.IdentificacionFacturacion ?? "")
+            }).ToList();
+        }
+    }
+
+    private sealed class PredioAutorizadoView
+    {
+        public required Predio Predio { get; init; }
+        public required string QuienAutoriza { get; init; }
+        public string? NombreQuienAutoriza { get; init; }
+    }
+}

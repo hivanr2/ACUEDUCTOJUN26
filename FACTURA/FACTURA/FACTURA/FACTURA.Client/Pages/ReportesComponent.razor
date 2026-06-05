@@ -1,0 +1,135 @@
+﻿@page "/reportes"
+@using FACTURA.Client.Models
+@using FACTURA.Client.Services
+@inject IReportesService Reportes
+@inject IClientesService Clientes
+@inject IJSRuntime JS
+
+<h3>Reportes</h3>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Desde</label>
+                <InputDate class="form-control" @bind-Value="filtro.Desde" @onchange="_ => BuscarAsync()" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Hasta</label>
+                <InputDate class="form-control" @bind-Value="filtro.Hasta" @onchange="_ => BuscarAsync()" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Cliente</label>
+                <select class="form-select" @onchange="OnClienteChanged">
+                    <option value="">Todos</option>
+                    @foreach (var c in clientes)
+                    {
+                        <option value="@c.Id" selected="@(filtro.ClienteId == c.Id)">@c.Nombre</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Estado</label>
+                <InputSelect class="form-select" @bind-Value="filtro.Estado" @onchange="_ => BuscarAsync()">
+                    <option>Todos</option>
+                    <option>Borrador</option>
+                    <option>Emitida</option>
+                    <option>Anulada</option>
+                </InputSelect>
+            </div>
+            <div class="col-md-1 d-grid">
+                <button class="btn btn-primary" @onclick="BuscarAsync" title="Buscar"><i class="fas fa-search"></i></button>
+            </div>
+        </div>
+        <div class="mt-2">
+            <button class="btn btn-link p-0" type="button" @onclick="ResetFiltros">Limpiar filtros</button>
+        </div>
+    </div>
+</div>
+
+@if (loading)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>Estado</th>
+                    <th class="text-end">Subtotal</th>
+                    <th class="text-end">Impuestos</th>
+                    <th class="text-end">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var f in facturas)
+                {
+                    <tr>
+                        <td>@f.Fecha.ToShortDateString()</td>
+                        <td>@f.ClienteNombre</td>
+                        <td>@f.Estado</td>
+                        <td class="text-end">@f.Subtotal.ToString("N2")</td>
+                        <td class="text-end">@f.Impuestos.ToString("N2")</td>
+                        <td class="text-end">@f.Total.ToString("N2")</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="3" class="text-end">Totales:</th>
+                    <th class="text-end">@facturas.Sum(x => x.Subtotal).ToString("N2")</th>
+                    <th class="text-end">@facturas.Sum(x => x.Impuestos).ToString("N2")</th>
+                    <th class="text-end">@facturas.Sum(x => x.Total).ToString("N2")</th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <button class="btn btn-outline-secondary" @onclick="ExportarCsvAsync"><i class="fas fa-file-csv me-1"></i> Exportar CSV</button>
+}
+
+@code {
+    private bool loading;
+    private ReportFilter filtro = new() { Estado = "Todos" };
+    private List<Factura> facturas = [];
+    private List<Cliente> clientes = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        clientes = (await Clientes.GetAsync()).ToList();
+        await BuscarAsync();
+    }
+
+    private async Task BuscarAsync()
+    {
+        loading = true;
+        try { facturas = (await Reportes.GetFacturasAsync(filtro)).ToList(); }
+        finally { loading = false; }
+    }
+
+    private async Task ExportarCsvAsync()
+    {
+        var bytes = await Reportes.ExportarFacturasCsvAsync(filtro);
+        var base64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("downloadFile", $"facturas_{DateTime.Now:yyyyMMddHHmmss}.csv", "text/csv", base64);
+    }
+
+    private async void OnClienteChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id))
+            filtro.ClienteId = id;
+        else
+            filtro.ClienteId = null;
+        await BuscarAsync();
+    }
+
+    private async Task ResetFiltros()
+    {
+        filtro = new ReportFilter { Estado = "Todos" };
+        await BuscarAsync();
+    }
+}

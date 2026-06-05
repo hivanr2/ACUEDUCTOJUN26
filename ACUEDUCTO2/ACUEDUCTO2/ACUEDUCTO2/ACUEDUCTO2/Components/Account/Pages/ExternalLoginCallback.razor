@@ -1,0 +1,43 @@
+@page "/Account/ExternalLoginCallback"
+
+@using Microsoft.AspNetCore.Components
+
+@inject NavigationManager NavigationManager
+
+<h3>Procesando inicio de sesión externo...</h3>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? Action { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? provider { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? RemoteError { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // Build target URI to reuse the existing ExternalLogin component which handles
+        // the login callback logic. Use a full page load so the server authentication
+        // middleware can process the external provider response (cookies, tokens).
+        var target = "Account/ExternalLogin";
+
+        var query = new Dictionary<string, object?>();
+        if (!string.IsNullOrEmpty(ReturnUrl)) query["ReturnUrl"] = ReturnUrl;
+        if (!string.IsNullOrEmpty(provider)) query["provider"] = provider;
+        if (!string.IsNullOrEmpty(RemoteError)) query["RemoteError"] = RemoteError;
+
+        // Mark this as the login callback action for the ExternalLogin component
+        query["Action"] = "LoginCallback";
+
+        var uri = NavigationManager.GetUriWithQueryParameters(target, query);
+
+        // forceLoad = true triggers a full browser navigation so server-side
+        // authentication handlers can complete the external login flow.
+        NavigationManager.NavigateTo(uri, forceLoad: true);
+    }
+}

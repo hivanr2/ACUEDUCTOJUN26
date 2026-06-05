@@ -1,0 +1,208 @@
+﻿@page "/movimientocajas"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Models
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+<PageTitle>CAJA</PageTitle>
+<div class="text-center">
+<table style="height: 100px;" class="text-center">
+    <tbody class="text-center">
+        <tr>
+                <td class="col-4 text-center"><a href="./ingresos/create" target="_blank"><img src="./entrada.jpg" /></a> :: <a href="ingresos" target="_blank">INGRESO: @FormatCurrency(ValorIngreso)</a>
+                </td>
+                <td class="col-4 text-center"><a href="./egresos/create" target="_blank"><img src="./salida.jpg" /></a> :: <a href="egresos" target="_blank">EGRESO : @FormatCurrency(ValorEgreso)</a></td>
+            <!--Se alinea verticalmentente-->
+            <td class="col-4 text-center align-middle">SALDO : @FormatCurrency(ValorSaldo)</td>
+        </tr>
+        <tr>
+                <td class="col-4 text-center"><a href="./cuentaporcobrars/create"><img src="./cxc.jpg" hight="120px" width="120px" /></a> :: <a href="./cuentaporcobrars">CXC : @FormatCurrency(ValorCXC)</a></td>
+                <td class="col-4 text-center"><a href="./cuentaporpagars/create"><img src="./cxp.jpg" hight="120px" width="120px" /></a> :: <a href="./cuentaporpagars">CXP : @FormatCurrency(ValorCXP)</a></td>
+            <td class="col-4 text-center align-middle">SALDO : @FormatCurrency(ValorSaldoCXCCXP)</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+<h1 class="text-center">:: Movimiento de Caja ::</h1>
+<div class="text-center">INICIO:DIA:
+    <select @bind="dia1">
+        @for (var i = 1; i <= 31; i++)
+        {
+            @if(dia1 == i)
+            {
+                <option selected>@i</option>
+            }
+            else
+            {
+                <option>@i</option>
+            }
+        }
+    </select>
+    MES:
+    <select @bind="mes1">
+        @for (var i = 1; i <= 12; i++)
+        {
+            @if (mes1 == i)
+            {
+                <option selected>@i</option>
+            }
+            else
+            {
+                <option>@i</option>
+            }
+        }
+    </select>
+
+    AÑO:
+    <select @bind="ano1">
+        @for (var i = 2022; i <= 2040; i++)
+        {
+            @if (ano1 == i)
+            {
+                <option selected>@i</option>
+            }
+            else
+            {
+                <option>@i</option>
+            }
+        }
+    </select>
+
+    FIN: DIA:
+    <select @bind="dia2">
+        @for (var i = 1; i <= 31; i++)
+        {
+            @if (dia2 == i)
+            {
+                <option selected>@i</option>
+            }
+            else
+            {
+                <option>@i</option>
+            }
+        }
+    </select>
+    MES:
+    <select @bind="mes2">
+        @for (var i = 1; i <= 12; i++)
+        {
+            @if (mes2 == i)
+            {
+                <option selected>@i</option>
+            }
+            else
+            {
+                <option>@i</option>
+            }
+        }
+    </select>
+
+    AÑO:
+    <select @bind="ano2">
+        @for (var i = 2022; i <= 2040; i++)
+        {
+            @if (ano2 == i)
+            {
+                <option selected>@i</option>
+            }
+            else
+            {
+                <option>@i</option>
+            }
+        }
+    </select>
+    <button type="submit" @onclick="BuscarRegistrosCaja">Buscar</button>
+</div>
+
+<QuickGrid Class="table" Items="filterMovimientos" Pagination="@pagination">
+    <PropertyColumn Property="movimientocaja => movimientocaja.Idmov" Sortable="true" />
+    <PropertyColumn Property="movimientocaja => movimientocaja.FechaHora" Sortable="true" />
+    <PropertyColumn Property="movimientocaja => movimientocaja.Iddocumento" Sortable="true" />
+    <PropertyColumn Property="movimientocaja => movimientocaja.Entrada" />
+    <PropertyColumn Property="movimientocaja => movimientocaja.Salida" />
+    <PropertyColumn Property="movimientocaja => movimientocaja.Saldo" />
+
+    <TemplateColumn Context="movimientocaja">
+        <a href="@($"movimientocajas/edit?idmov={movimientocaja.Idmov}")" target="_blank">Edit</a> |
+        <a href="@($"movimientocajas/details?idmov={movimientocaja.Idmov}")" target="_blank">Details</a> |
+    </TemplateColumn>
+</QuickGrid>
+<Paginator State="@pagination" />
+
+@code {
+    private AcueductoContext context = default!;
+
+    private float ValorIngreso = 0;
+    private float ValorEgreso = 0;
+    private float ValorSaldo = 0;
+    private float ValorCXC = 0;
+    private float ValorCXP = 0;
+    private float ValorSaldoCXCCXP = 0;
+
+    private int dia1;
+    private int mes1;
+    private int ano1;
+    private int dia2;
+    private int mes2;
+    private int ano2;
+
+    private DateTime fecha1;
+    private DateTime fecha2;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+        dia1 = 1;// DateTime.Now.Day;
+        mes1 = 1;// DateTime.Now.Month;
+        ano1 = DateTime.Now.Year;
+        dia2 = DateTime.Now.Day;
+        mes2 = DateTime.Now.Month;
+        ano2 = DateTime.Now.Year;
+        fecha1 = new DateTime(ano1, mes1, dia1);
+        fecha2 = new DateTime(ano2, mes2, dia2);
+        fecha2 = fecha2.AddDays(1);
+        ValorCXC = (float)context.CuentaPorCobrars.Sum(c => c.ValorDebe).Value;
+        ValorCXP = (float)context.CuentaPorPagars.Sum(c => c.ValorDebe).Value;
+        ValorSaldoCXCCXP = ValorCXC - ValorCXP;
+        ValorIngreso = (float)context.Ingresos.Where(c => c.FechaHora >= fecha1 && c.FechaHora <= fecha2).Sum(c => c.Valor).Value;
+        ValorEgreso = (float)context.Egresos.Where(c => c.FechaHora >= fecha1 && c.FechaHora <= fecha2).Sum(c => c.Valor).Value;
+        ValorSaldo = ValorIngreso - ValorEgreso;
+    }
+    PaginationState pagination = new PaginationState { ItemsPerPage = 10 };
+
+
+    private string FormatCurrency(double? value)
+    {
+        if (value.HasValue)
+        {
+            return $"${value.Value:N0}";
+        }
+        return "";
+    }
+    private void BuscarRegistrosCaja()
+    {
+        fecha1 = new DateTime(ano1, mes1, dia1);
+        fecha2 = new DateTime(ano2, mes2, dia2);
+        fecha2 = fecha2.AddDays(1);
+        ValorIngreso = (float)filterMovimientos.Sum(c => c.Entrada);
+        ValorEgreso = (float)filterMovimientos.Sum(c => c.Salida);
+        ValorSaldo = ValorIngreso - ValorEgreso;
+        ValorCXC = (float)context.CuentaPorCobrars.Where(x => x.FechaHora >= fecha1 && x.FechaHora <= fecha2.AddDays(-1)).OrderBy(u => u.FechaHora).Sum(c => c.ValorDebe);
+        ValorCXP = (float)context.CuentaPorPagars.Where(x => x.FechaHora >= fecha1 && x.FechaHora <= fecha2.AddDays(-1)).OrderBy(u => u.FechaHora).Sum(c => c.ValorDebe);
+        ValorSaldoCXCCXP = ValorCXC - ValorCXP;
+    }
+    IQueryable<MovimientoCaja> filterMovimientos => context.MovimientoCajas.Where(x => x.FechaHora >= fecha1 && x.FechaHora <= fecha2).OrderByDescending(u => u.FechaHora);
+    //foreach(var registro in filterMovimientos){
+
+    //}
+    // public void buscar()
+    // {
+    //     filterMovimientos = (IQueryable<MovimientoCaja>)filterMovimientos.Where(x => x.FechaHora >= fecha1 && x.FechaHora <= fecha2).OrderBy(u => u.FechaHora).AsQueryable();
+    // }
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+
+
+}

@@ -1,0 +1,83 @@
+﻿@page "/Account/ConfirmEmail"
+
+@using System.Text
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using ACUEDUCTO2.Data
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Confirmar correo electrónico</PageTitle>
+
+<div class="container-xxl py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6 text-center">
+            <div style="padding:40px 24px;background:rgba(255,255,255,0.92);border-radius:12px;box-shadow:0 10px 30px rgba(2,6,23,0.08);">
+                @if (confirmed)
+                {
+                    <div style="font-size:3rem;margin-bottom:16px;">✅</div>
+                    <h1 style="color:#0f172a;font-size:1.5rem;margin-bottom:12px;">¡Cuenta confirmada!</h1>
+                    <p style="color:#475569;font-size:0.95rem;line-height:1.6;margin-bottom:24px;">
+                        Tu correo electrónico ha sido verificado correctamente. Ya puedes iniciar sesión y comenzar a usar <strong>ACUEDUCTO</strong>.
+                    </p>
+                    <a href="Account/Login" class="btn btn-lg btn-primary" style="min-width:220px;">
+                        Iniciar Sesión
+                    </a>
+                }
+                else
+                {
+                    <div style="font-size:3rem;margin-bottom:16px;">⚠️</div>
+                    <h1 style="color:#0f172a;font-size:1.5rem;margin-bottom:12px;">Error al confirmar</h1>
+                    <p style="color:#dc2626;font-size:0.95rem;line-height:1.6;margin-bottom:24px;">
+                        @statusMessage
+                    </p>
+                    <a href="Account/ResendEmailConfirmation" class="btn btn-lg btn-primary" style="min-width:220px;">
+                        Reenviar confirmación
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string? statusMessage;
+    private bool confirmed;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? UserId { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? Code { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (UserId is null || Code is null)
+        {
+            RedirectManager.RedirectTo("");
+        }
+
+        var user = await UserManager.FindByIdAsync(UserId);
+        if (user is null)
+        {
+            HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+            statusMessage = $"No se encontró el usuario solicitado.";
+            return;
+        }
+
+        var code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(Code));
+        var result = await UserManager.ConfirmEmailAsync(user, code);
+        if (result.Succeeded)
+        {
+            confirmed = true;
+        }
+        else
+        {
+            statusMessage = "El enlace de confirmación no es válido o ha expirado. Solicita uno nuevo.";
+        }
+    }
+}

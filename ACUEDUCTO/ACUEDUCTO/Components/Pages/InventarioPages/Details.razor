@@ -1,0 +1,253 @@
+﻿@page "/inventarios/details"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+@inject IWebHostEnvironment Env
+@inject IJSRuntime JS
+
+@rendermode InteractiveServer
+
+<PageTitle>Detalles inventario</PageTitle>
+
+<div class="container py-2">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Detalles de inventario</h1>
+            <small class="text-muted">Información del producto</small>
+        </div>
+        <div>
+            <a class="btn btn-secondary" href="/inventarios">Volver</a>
+        </div>
+    </div>
+
+    @if (inventario is not null)
+    {
+        <!-- print CSS removed to avoid Razor parsing issues; JS will prepare the DOM for printing -->
+
+        <div class="card shadow-sm mb-3">
+            <div class="card-body d-flex align-items-center flex-wrap gap-3">
+                <div>
+                    <img src="@(qrUrl ?? string.Empty)" alt="QR Inventario" style="width:150px;height:150px;object-fit:contain;border-radius:.25rem;" />
+                </div>
+                <div class="flex-grow-1">
+                    <h6 class="mb-1">QR - Enlace al detalle</h6>
+                    <p class="mb-1 small text-muted">Imprime este código y pégalo en el inventario físico para acceder a su ficha.</p>
+                    <a href="@(detailUrl ?? string.Empty)" target="_blank">@(detailUrl ?? string.Empty)</a>
+
+                    <div class="mt-2 d-flex align-items-center gap-2">
+                        <label class="mb-0 small">Copias:</label>
+                        <input id="qrCopies" type="number" min="1" max="200" class="form-control form-control-sm" style="width:120px;" @bind="printCopies" />
+                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="PrintQrAsync">Imprimir QR</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Printing delegated to app-level JS (ImprimirFactura.js etc.) to keep behavior consistent -->
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            @if (inventario is null)
+            {
+                <p><em>Llamando...</em></p>
+            }
+            else
+            {
+                <dl class="row mb-0">
+                    <dt class="col-sm-3 col-md-2">Código</dt>
+                    <dd class="col-sm-9 col-md-10">@inventario.Codigo</dd>
+                    <dt class="col-sm-3 col-md-2">Descripción corta</dt>
+                    <dd class="col-sm-9 col-md-10">@inventario.DescripcionCorta</dd>
+                    <dt class="col-sm-3 col-md-2">Descripción larga</dt>
+                    <dd class="col-sm-9 col-md-10">@inventario.DescripcionLarga</dd>
+                    <dt class="col-sm-3 col-md-2">Unidad</dt>
+                    <dd class="col-sm-9 col-md-10">@inventario.Unidad</dd>
+                    <dt class="col-sm-3 col-md-2">Medida</dt>
+                    <dd class="col-sm-9 col-md-10">@inventario.Medida</dd>
+                    <dt class="col-sm-3 col-md-2">Cantidad</dt>
+                    <dd class="col-sm-9 col-md-10">@inventario.Cantidad</dd>
+                    <dt class="col-sm-3 col-md-2">Valor unitario</dt>
+                    <dd class="col-sm-9 col-md-10">@inventario.ValorUnitario</dd>
+                    <dt class="col-sm-3 col-md-2">Valor total</dt>
+                    <dd class="col-sm-9 col-md-10">@inventario.ValorTotal</dd>
+                    <dt class="col-sm-3 col-md-2">Observaciones:</dt>
+                    <dd class="col-sm-9 col-md-10">@inventario.Observaciones</dd>
+                    <dt class="col-sm-3 col-md-2">Fecha registro</dt>
+                    <dd class="col-sm-9 col-md-10">@inventario.FechaHoraRegistro</dd>
+                </dl>
+
+                @if ((imageUrls?.Count ?? 0) > 0 || (videoUrls?.Count ?? 0) > 0 || (docUrls?.Count ?? 0) > 0)
+                {
+                    <div class="card shadow-sm mt-3">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <strong>Multimedia y archivos</strong>
+                            <a class="btn btn-sm btn-outline-primary" href="@($"/archivosgaleria?CodigoInventario={inventario.Codigo}")" target="_blank">Abrir galería</a>
+                        </div>
+                        <div class="card-body">
+                            @if ((imageUrls?.Count ?? 0) > 0)
+                            {
+                                <div id="inventarioCarousel" class="carousel slide" data-bs-ride="carousel">
+                                    <div class="carousel-indicators">
+                                        @for (var i = 0; i < imageUrls.Count; i++)
+                                        {
+                                            <button type="button" data-bs-target="#inventarioCarousel" data-bs-slide-to="@i" class="@(i==0?"active":"")" aria-current="@(i==0?"true":null)" aria-label="Slide @(i+1)"></button>
+                                        }
+                                    </div>
+                                    <div class="carousel-inner rounded">
+                                        @for (var i = 0; i < imageUrls.Count; i++)
+                                        {
+                                            var url = imageUrls[i];
+                                            <div class="carousel-item @(i==0?"active":null)">
+                                                <a href="@($"/archivosgaleria?CodigoInventario={inventario.Codigo}")" target="_blank" class="d-block w-100" title="Abrir galería completa">
+                                                    <img src="@url" class="d-block w-100" alt="Imagen @i" loading="lazy" style="max-height:420px;object-fit:cover;border-radius:.5rem;" />
+                                                </a>
+                                            </div>
+                                        }
+                                    </div>
+                                    <button class="carousel-control-prev" type="button" data-bs-target="#inventarioCarousel" data-bs-slide="prev">
+                                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                        <span class="visually-hidden">Anterior</span>
+                                    </button>
+                                    <button class="carousel-control-next" type="button" data-bs-target="#inventarioCarousel" data-bs-slide="next">
+                                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                        <span class="visually-hidden">Siguiente</span>
+                                    </button>
+                                </div>
+
+                                <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 g-2 mt-2">
+                                    @for (var i = 0; i < imageUrls.Count; i++)
+                                    {
+                                        var url = imageUrls[i];
+                                        <div class="col">
+                                            <a href="@($"/archivosgaleria?CodigoInventario={inventario.Codigo}")" target="_blank" class="d-block" title="Abrir galería completa">
+                                                <img src="@url" class="img-fluid rounded" alt="thumb @i" loading="lazy" style="height:80px;object-fit:cover;width:100%;" />
+                                            </a>
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            @if ((videoUrls?.Count ?? 0) > 0)
+                            {
+                                <hr />
+                                <h6 class="mb-2">Videos</h6>
+                                <div class="row row-cols-1 row-cols-md-2 g-3">
+                                    @foreach (var v in videoUrls)
+                                    {
+                                        <div class="col">
+                                            <video src="@v" class="w-100 rounded" controls preload="metadata" style="max-height:360px; object-fit:contain;"></video>
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            @if ((docUrls?.Count ?? 0) > 0)
+                            {
+                                <hr />
+                                <h6 class="mb-2">Archivos</h6>
+                                <ul class="list-group">
+                                    @foreach (var d in docUrls)
+                                    {
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <a href="@d.Url" target="_blank">@d.Name</a>
+                                            <a class="btn btn-sm btn-outline-secondary" href="@d.Url" target="_blank">Abrir</a>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                    <a class="btn btn-primary" href="@($"/inventarios/edit?idinventario={inventario.Idinventario}")">Editar</a>
+                    <a class="btn btn-light" href="/inventarios" onclick="return cerrarVentana('/inventarios');">Cerrar</a>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private Inventario? inventario;
+    private List<string> imageUrls = new();
+    private List<string> videoUrls = new();
+    private List<(string Url, string Name)> docUrls = new();
+    private string? detailUrl;
+    private string? qrUrl;
+    private int printCopies = 1;
+
+    [SupplyParameterFromQuery]
+    private string Idinventario { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        inventario = await context.Inventarios.FirstOrDefaultAsync(m => m.Idinventario == Idinventario);
+
+        if (inventario is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+            return;
+        }
+
+        // prepare media and QR links
+        LoadInventarioMedia();
+        detailUrl = $"{NavigationManager.BaseUri.TrimEnd('/')}/inventarios/details?idinventario={Uri.EscapeDataString(inventario.Idinventario)}";
+        qrUrl = $"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={Uri.EscapeDataString(detailUrl)}";
+    }
+
+    private void LoadInventarioMedia()
+    {
+        imageUrls.Clear();
+        videoUrls.Clear();
+        docUrls.Clear();
+        try
+        {
+            var code = inventario?.Codigo?.Trim();
+            if (string.IsNullOrWhiteSpace(code)) return;
+            var folder = System.IO.Path.Combine(Env.WebRootPath, "imagenes", code);
+            if (!System.IO.Directory.Exists(folder)) return;
+
+            var images = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+            var videos = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".mp4", ".webm", ".ogg" };
+            var docs = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".ppt", ".pptx", ".odt", ".ods", ".odp", ".txt", ".zip" };
+
+            foreach (var file in System.IO.Directory.EnumerateFiles(folder).OrderBy(f => f))
+            {
+                var ext = System.IO.Path.GetExtension(file);
+                var name = System.IO.Path.GetFileName(file);
+                var url = $"/imagenes/{Uri.EscapeDataString(code)}/{Uri.EscapeDataString(name)}";
+                if (images.Contains(ext)) imageUrls.Add(url);
+                else if (videos.Contains(ext)) videoUrls.Add(url);
+                else if (docs.Contains(ext)) docUrls.Add((url, name));
+            }
+        }
+        catch { }
+    }
+
+    private async Task PrintQrAsync()
+    {
+        try
+        {
+            var url = qrUrl ?? string.Empty;
+            var copies = Math.Max(1, printCopies);
+            var desc = inventario?.DescripcionCorta ?? string.Empty;
+            try
+            {
+                await JS.InvokeVoidAsync("imprimirQrTiras", url, 1, copies, desc);
+            }
+            catch (Microsoft.JSInterop.JSException)
+            {
+                await JS.InvokeVoidAsync("showToast", "Función de impresión no disponible.", 3000);
+            }
+        }
+        catch (Microsoft.JSInterop.JSException)
+        {
+            await JS.InvokeVoidAsync("alert", "Función de impresión no disponible.");
+        }
+    }
+}

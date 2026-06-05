@@ -1,0 +1,124 @@
+﻿@page "/egresos/edit"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit</PageTitle>
+
+<h1>Edit</h1>
+
+<h2>Egreso</h2>
+<hr />
+@if (Egreso is null)
+{
+    <p><em>Llamando...</em></p>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-4">
+            <EditForm method="post" Model="Egreso" OnValidSubmit="UpdateEgreso" FormName="edit" Enhance>
+                <DataAnnotationsValidator />
+                <ValidationSummary role="alert"/>
+                <input type="hidden" name="Egreso.Idegreso" value="@Egreso.Idegreso" />
+                <div class="mb-3">
+                    <label for="numero" class="form-label">Numero:</label>
+                    <InputNumber id="numero" @bind-Value="Egreso.Numero" class="form-control" />
+                    <ValidationMessage For="() => Egreso.Numero" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="fechahora" class="form-label">FechaHora:</label>
+                    <InputDate id="fechahora" @bind-Value="Egreso.FechaHora" class="form-control" />
+                    <ValidationMessage For="() => Egreso.FechaHora" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="idproveedor" class="form-label">Idproveedor:</label>
+                    <InputText id="idproveedor" @bind-Value="Egreso.Idproveedor" class="form-control" />
+                    <ValidationMessage For="() => Egreso.Idproveedor" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="idfactura" class="form-label">Idfactura:</label>
+                    <InputText id="idfactura" @bind-Value="Egreso.Idfactura" class="form-control" />
+                    <ValidationMessage For="() => Egreso.Idfactura" class="text-danger" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="idcxp" class="form-label">Idcxp:</label>
+                    <InputText id="idcxp" @bind-Value="Egreso.Idcxp" class="form-control" />
+                    <ValidationMessage For="() => Egreso.Idcxp" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="concepto" class="form-label">Concepto:</label>
+                    <InputText id="concepto" @bind-Value="Egreso.Concepto" class="form-control" />
+                    <ValidationMessage For="() => Egreso.Concepto" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="valor" class="form-label">Valor:</label>
+                    <InputNumber id="valor" @bind-Value="Egreso.Valor" class="form-control" />
+                    <ValidationMessage For="() => Egreso.Valor" class="text-danger" />
+                </div>
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                    <a class="btn btn-outline-secondary" href="/egresos" onclick="return cerrarVentana('/egresos');">Cerrar</a>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<div>
+    <a href="/egresos" onclick="return cerrarVentana('/egresos');">Cerrar</a>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string Idegreso { get; set; }
+
+    [SupplyParameterFromForm]
+    private Egreso? Egreso { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Egreso ??= await context.Egresos.FirstOrDefaultAsync(m => m.Idegreso == Idegreso);
+
+        if (Egreso is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    // To protect from overposting attacks, enable the specific properties you want to bind to.
+    // For more information, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task UpdateEgreso()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Attach(Egreso!).State = EntityState.Modified;
+
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (!EgresoExists(Egreso!.Idegreso))
+            {
+                NavigationManager.NavigateTo("notfound");
+            }
+            else
+            {
+                throw;
+            }
+        }
+
+        NavigationManager.NavigateTo("/egresos");
+    }
+
+    private bool EgresoExists(string idegreso)
+    {
+        using var context = DbFactory.CreateDbContext();
+        return context.Egresos.Any(e => e.Idegreso == idegreso);
+    }
+}

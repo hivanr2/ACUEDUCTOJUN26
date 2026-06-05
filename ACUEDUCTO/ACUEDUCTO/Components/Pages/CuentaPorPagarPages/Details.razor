@@ -1,0 +1,62 @@
+﻿@page "/cuentaporpagars/details"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Details</PageTitle>
+
+<h1>Details</h1>
+
+<div>
+    <h2>CuentaPorPagar</h2>
+    <hr />
+    @if (cuentaporpagar is null)
+    {
+        <p><em>Llamando...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Numero</dt>
+            <dd class="col-sm-10">@cuentaporpagar.Numero</dd>
+            <dt class="col-sm-2">Identificacion</dt>
+            <dd class="col-sm-10">@cuentaporpagar.Identificacion</dd>
+            <dt class="col-sm-2">Descripcion</dt>
+            <dd class="col-sm-10">@cuentaporpagar.Descripcion</dd>
+            <dt class="col-sm-2">FechaHora</dt>
+            <dd class="col-sm-10">@cuentaporpagar.FechaHora</dd>
+            <dt class="col-sm-2">Vencimiento</dt>
+            <dd class="col-sm-10">@cuentaporpagar.Vencimiento</dd>
+            <dt class="col-sm-2">ValorDebe</dt>
+            <dd class="col-sm-10">@cuentaporpagar.ValorDebe</dd>
+            <dt class="col-sm-2">ValorPagado</dt>
+            <dd class="col-sm-10">@cuentaporpagar.ValorPagado</dd>
+            <dt class="col-sm-2">CuotasTotales</dt>
+            <dd class="col-sm-10">@cuentaporpagar.CuotasTotales</dd>
+            <dt class="col-sm-2">CuotasPagadas</dt>
+            <dd class="col-sm-10">@cuentaporpagar.CuotasPagadas</dd>
+        </dl>
+        <div>
+            <a href="@($"/cuentaporpagars/edit?idcuentaxp={cuentaporpagar.IdcuentaxP}")">Edit</a> |
+            <a href="@($"/cuentaporpagars")">Back to List</a>
+        </div>
+    }
+</div>
+
+@code {
+    private CuentaPorPagar? cuentaporpagar;
+
+    [SupplyParameterFromQuery]
+    private string IdcuentaxP { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        cuentaporpagar = await context.CuentaPorPagars.FirstOrDefaultAsync(m => m.IdcuentaxP == IdcuentaxP);
+
+        if (cuentaporpagar is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+}

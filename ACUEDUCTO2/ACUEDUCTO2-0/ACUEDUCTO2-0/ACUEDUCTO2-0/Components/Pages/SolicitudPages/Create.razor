@@ -1,0 +1,179 @@
+@page "/solicitud/crear"
+@page "/proceso/Nueva Solicitud"
+
+@using ACUEDUCTO2-0_0.Data
+@using ACUEDUCTO2-0_0.Compartir.MODELS
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Nueva Solicitud</PageTitle>
+
+<h3>Nueva Solicitud</h3>
+
+<EditForm Model="solicitud" OnValidSubmit="GuardarSolicitud" OnInvalidSubmit="HandleInvalidSubmit">
+    <ValidationSummary />
+    @if (!string.IsNullOrEmpty(FormError))
+    {
+        <div class="alert alert-danger">@FormError</div>
+    }
+    <div class="mb-3">
+        <label>Tipo</label>
+        <InputSelect class="form-select" @bind-Value="solicitud.IdTipo">
+            <option value="">Seleccione un tipo</option>
+            @foreach (var t in Tipos)
+            {
+                <option value="@t.Guid">@t.NombreTipoSolicitud</option>
+            }
+        </InputSelect>
+    </div>
+    <div class="mb-3">
+        <label>Estado</label>
+        @if (!EstadoEditable)
+        {
+            <InputSelect class="form-select" disabled @bind-Value="solicitud.IdEstado">
+                <option value="">(se asignará 'Abierta')</option>
+                @foreach (var e in Estados)
+                {
+                    <option value="@e.Guid">@e.NombreEstadoSolicitud</option>
+                }
+            </InputSelect>
+        }
+        else
+        {
+            <InputSelect class="form-select" @bind-Value="solicitud.IdEstado">
+                <option value="">Seleccione un estado</option>
+                @foreach (var e in Estados)
+                {
+                    <option value="@e.Guid">@e.NombreEstadoSolicitud</option>
+                }
+            </InputSelect>
+        }
+    </div>
+    <div class="mb-3">
+        <label>Descripción</label>
+        <InputTextArea class="form-control" @bind-Value="solicitud.DescripcionSolicitud" />
+        <ValidationMessage For="() => solicitud.DescripcionSolicitud" />
+    </div>
+    <div class="mb-3">
+        <label>Usuario que registra</label>
+        <input type="text" class="form-control" value="@CurrentUserName" disabled />
+        <input type="hidden" name="solicitud.UsuarioSistemaCreaRegistro" value="@solicitud.UsuarioSistemaCreaRegistro" />
+        <small class="text-muted">No puede cambiarse; será el usuario autenticado.</small>
+        <ValidationMessage For="() => solicitud.UsuarioSistemaCreaRegistro" />
+    </div>
+    <button type="submit" class="btn btn-success">Guardar</button>
+    <button type="button" class="btn btn-secondary ms-2" @onclick="Cancelar">Cancelar</button>
+</EditForm>
+
+@code {
+    private Solicitud solicitud = new();
+    private List<TipoSolicitud> Tipos = new();
+    private List<EstadoSolicitud> Estados = new();
+    private List<Usuario> Usuarios = new();
+    private List<Autorizado> Autorizados = new();
+
+    private string PersonSearch { get; set; } = string.Empty;
+
+    private record PersonItem(string Guid, string Name, string Source);
+    private string SelectedPersonSource { get; set; } = string.Empty;
+    private IEnumerable<PersonItem> FilteredPeople => string.IsNullOrWhiteSpace(PersonSearch)
+        ? People
+        : People.Where(p => p.Name?.Contains(PersonSearch, StringComparison.OrdinalIgnoreCase) == true);
+    private List<PersonItem> People = new();
+    private string CurrentUserId { get; set; } = string.Empty;
+    private string CurrentUserName { get; set; } = string.Empty;
+
+    private async Task GuardarSolicitud()
+    {
+        // Manual validation to avoid creating empty solicitud
+        FormError = null;
+        if (string.IsNullOrWhiteSpace(solicitud.DescripcionSolicitud))
+        {
+            FormError = "La descripción es obligatoria.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(solicitud.UsuarioSistemaCreaRegistro))
+        {
+            FormError = "Debe seleccionar un usuario o autorizado.";
+            return;
+        }
+
+        // Assign CodigoSolicitud at creation time: max existing CodigoSolicitud + 1
+        using var db = DbFactory.CreateDbContext();
+        var maxCodigo = await db.Solicitud.MaxAsync(s => (int?)s.CodigoSolicitud) ?? 0;
+        solicitud.CodigoSolicitud = maxCodigo + 1;
+
+        solicitud.Guid = Guid.NewGuid().ToString();
+        solicitud.FechaHoraCreacionRegistro = DateTime.Now;
+        db.Add(solicitud);
+        await db.SaveChangesAsync();
+        Navigation.NavigateTo("/solicitud");
+    }
+
+    private string FormError { get; set; }
+
+    private Task HandleInvalidSubmit(EditContext ctx)
+    {
+        // Fallback: Basic manual check
+        if (string.IsNullOrWhiteSpace(solicitud.DescripcionSolicitud))
+            FormError = "La descripción es obligatoria.";
+        return Task.CompletedTask;
+    }
+
+    void Cancelar() => Navigation.NavigateTo("/solicitud");
+
+    private void SelectPerson(PersonItem p)
+    {
+        if (p is null) return;
+        solicitud.UsuarioSistemaCreaRegistro = p.Guid;
+        solicitud.ApellidosNombresRegistraSolicitud = p.Name;
+        PersonSearch = p.Name;
+        SelectedPersonSource = p.Source;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = DbFactory.CreateDbContext();
+        Tipos = await db.TipoSolicitud.AsNoTracking().ToListAsync();
+        Estados = await db.EstadoSolicitud.AsNoTracking().ToListAsync();
+        Usuarios = await db.Set<Usuario>().AsNoTracking().OrderBy(u => u.ApellidosNombres).ToListAsync();
+        Autorizados = await db.Set<Autorizado>().AsNoTracking().OrderBy(a => a.QuienAutoriza).ToListAsync();
+
+        // Include Identity users (AspNetUsers) by UserName so they can be selected here as well
+        var appUsers = await db.Users.AsNoTracking().OrderBy(u => u.UserName).ToListAsync();
+
+        People = Usuarios.Select(u => new PersonItem(u.Guid, u.ApellidosNombres, "Usuario")).ToList();
+        People.AddRange(Autorizados.Select(a => new PersonItem(a.Guid, a.QuienAutoriza, "Autorizado")));
+        People.AddRange(appUsers.Select(u => new PersonItem(u.Id, u.UserName ?? u.Email ?? "(sin nombre)", "AspNetUser")));
+        // Determine current authenticated user and set as registrant
+        try
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = auth.User;
+            if (user?.Identity?.IsAuthenticated == true)
+            {
+                CurrentUserId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+                CurrentUserName = user.Identity?.Name ?? user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? CurrentUserId;
+                solicitud.UsuarioSistemaCreaRegistro = CurrentUserId;
+                solicitud.ApellidosNombresRegistraSolicitud ??= CurrentUserName;
+            }
+        }
+        catch
+        {
+            // ignore: if auth not available, keep default behavior
+        }
+
+        // Ensure new solicitudes are created with Estado 'Abierta' and not editable
+        var abierta = Estados.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.NombreEstadoSolicitud) && x.NombreEstadoSolicitud.ToLowerInvariant().Contains("abier"));
+        if (abierta != null)
+        {
+            solicitud.IdEstado = abierta.Guid;
+        }
+        EstadoEditable = false;
+    }
+
+    private bool EstadoEditable { get; set; } = false;
+}

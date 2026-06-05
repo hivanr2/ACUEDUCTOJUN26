@@ -1,0 +1,69 @@
+﻿@page "/indicadors/details"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Detalles indicador</PageTitle>
+
+<div class="container py-2">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h5 mb-0">Detalles del indicador</h1>
+            <small class="text-muted">Información básica</small>
+        </div>
+        <div>
+            <a class="btn btn-secondary" href="/indicadors">Volver</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            @if (indicador is null)
+            {
+                <p><em>Loading...</em></p>
+            }
+            else
+            {
+                <dl class="row mb-0">
+                    <dt class="col-sm-3 col-md-2">Categoría</dt>
+                    <dd class="col-sm-9 col-md-10">@indicador.Categoría</dd>
+                    <dt class="col-sm-3 col-md-2">Responsable</dt>
+                    <dd class="col-sm-9 col-md-10">@indicador.Responsable</dd>
+                    <dt class="col-sm-3 col-md-2">Descripcion</dt>
+                    <dd class="col-sm-9 col-md-10">@indicador.Descripcion</dd>
+                    <dt class="col-sm-3 col-md-2">Fórmula/Unidad</dt>
+                    <dd class="col-sm-9 col-md-10">@indicador.FórmulaUnidad</dd>
+                    <dt class="col-sm-3 col-md-2">Frecuencia</dt>
+                    <dd class="col-sm-9 col-md-10">@indicador.Frecuencia</dd>
+                    <dt class="col-sm-3 col-md-2">Meta/Umbral</dt>
+                    <dd class="col-sm-9 col-md-10">@indicador.MetaUmbral</dd>
+                    <dt class="col-sm-3 col-md-2">Semáforo de gestión</dt>
+                    <dd class="col-sm-9 col-md-10">@indicador.SemáforoGestión</dd>
+                </dl>
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                    <a class="btn btn-primary" href="@($"/indicadors/edit?idindicador={indicador.Idindicador}")">Editar</a>
+                    <a class="btn btn-light" href="/indicadors">Volver</a>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private Indicador? indicador;
+
+    [SupplyParameterFromQuery]
+    private int Idindicador { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        indicador = await context.Indicadores.FirstOrDefaultAsync(m => m.Idindicador == Idindicador);
+
+        if (indicador is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+}

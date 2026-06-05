@@ -1,0 +1,177 @@
+﻿@page "/usuarios/details"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>@(usuario?.ApellidosNombres ?? "Detalles Usuario")</PageTitle>
+
+@if (usuario is null)
+{
+    <div class="container py-5 text-center text-muted">Cargando...</div>
+}
+else
+{
+    <div class="container-fluid py-2 py-md-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div>
+                <h1 class="h5 mb-1">@usuario.ApellidosNombres</h1>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="badge bg-primary">Identificación: @usuario.Identificacion</span>
+                    @if (!string.IsNullOrWhiteSpace(usuario.Celular))
+                    {
+                        <span class="badge bg-info text-dark">Cel: @usuario.Celular</span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(usuario.CorreoElectronico))
+                    {
+                        <span class="badge bg-secondary">@usuario.CorreoElectronico</span>
+                    }
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <a class="btn btn-outline-secondary btn-sm" href="/usuarios" onclick="return cerrarVentana('/usuarios');">Cerrar</a>
+                <a class="btn btn-primary btn-sm" href="@($"/usuarios/edit?identificacion={usuario.Identificacion}")">Editar</a>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-light"><strong>Información</strong></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Identificación</div>
+                                <div class="fw-semibold">@usuario.Identificacion</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="small text-muted">Nivel Educativo</div>
+                                <div class="fw-semibold">@usuario.NivelEducativo</div>
+                            </div>
+                            <div class="col-12">
+                                <div class="small text-muted">Observaciones</div>
+                                <div class="fw-semibold">@usuario.Observaciones</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-light"><strong>Predios</strong></div>
+                    <div class="card-body p-0">
+                        @if (usuario.Predios != null && usuario.Predios.Any())
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Predio</th>
+                                            <th>Dirección</th>
+                                            <th>Medidor</th>
+                                            <th>Últ. Medición</th>
+                                            <th>Prom. M³</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var p in usuario.Predios)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    @p.ApellidosNombresUsuario
+                                                    <div>
+                                                        <a class="small" href="@($"/predios/details?idpredio={p.Idpredio}")" target="_blank">Ver</a>
+                                                    </div>
+                                                </td>
+                                                <td>@p.Direccion</td>
+                                                <td>@p.NumeroMedidor</td>
+                                                <td>@p.UltimaMedicion</td>
+                                                <td>@p.ConsumoM3promedio</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="p-3 text-muted">No hay predios asociados.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="row g-3 mt-1">
+            <div class="col-12">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-light"><strong>Solicitudes SGS</strong></div>
+                    <div class="card-body p-0">
+                        @if (usuario.Solicitudes != null && usuario.Solicitudes.Any())
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Código</th>
+                                            <th>Tipo</th>
+                                            <th>Estado</th>
+                                            <th>Fecha recepción</th>
+                                            <th>Descripción</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var s in usuario.Solicitudes.OrderByDescending(s => s.FechaHoraRecepcion))
+                                        {
+                                            <tr>
+                                                <td>@s.Codigo</td>
+                                                <td>@s.TipoNavigation?.Nombre</td>
+                                                <td>@s.EstadoNavigation?.Nombre</td>
+                                                <td>@(s.FechaHoraRecepcion?.ToString("dd/MM/yyyy"))</td>
+                                                <td class="text-truncate" style="max-width: 300px">@s.Descripción</td>
+                                                <td class="text-end">
+                                                    <a class="btn btn-outline-primary btn-sm" href="@($"/solicitudes/details?id={s.Id}")" target="_blank">Ver</a>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="p-3 text-muted">No hay solicitudes SGS asociadas.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Usuario? usuario;
+
+    [SupplyParameterFromQuery]
+    private string Identificacion { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        usuario = await context.Usuarios
+            .Include(u => u.Predios)
+            .Include(u => u.Solicitudes) // incluir solicitudes
+                .ThenInclude(s => s.TipoNavigation)
+            .Include(u => u.Solicitudes)
+                .ThenInclude(s => s.EstadoNavigation)
+            .FirstOrDefaultAsync(m => m.Identificacion == Identificacion);
+
+        if (usuario is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+}

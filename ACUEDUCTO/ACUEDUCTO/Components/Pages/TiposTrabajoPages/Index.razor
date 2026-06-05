@@ -1,0 +1,37 @@
+﻿@page "/tipostrabajos"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Models
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+<PageTitle>Tipos Trabajos</PageTitle>
+
+<h1>Tipos Trabajos</h1>
+
+<p>
+    <a href="tipostrabajos/create">Crear Nuevo Tipos Trabajos</a>
+</p>
+
+<QuickGrid Class="table" Items="context.TiposTrabajos">
+    <PropertyColumn Property="tipostrabajo => tipostrabajo.Nombre" />
+    <PropertyColumn Property="tipostrabajo => tipostrabajo.Descripcion" />
+
+    <TemplateColumn Context="tipostrabajo">
+        <a href="@($"tipostrabajos/edit?idtipotrabajo={tipostrabajo.IdTipoTrabajo}")">Edit</a> |
+        <a href="@($"tipostrabajos/details?idtipotrabajo={tipostrabajo.IdTipoTrabajo}")">Details</a> |
+        <a href="@($"tipostrabajos/delete?idtipotrabajo={tipostrabajo.IdTipoTrabajo}")">Delete</a>
+    </TemplateColumn>
+</QuickGrid>
+
+@code {
+    private AcueductoContext context = default!;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}

@@ -1,0 +1,115 @@
+@page "/usuarios/edit"
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.JSInterop
+@using ACUEDUCTO2.Data
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Editar Usuario</PageTitle>
+
+@if (usuario is null)
+{
+    <div class="container py-5 text-center text-muted">Cargando...</div>
+}
+else
+{
+    <div class="container-fluid py-2 py-md-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div>
+                <h1 class="h5 mb-0">Editar Usuario</h1>
+                <small class="text-muted">@usuario.ApellidosNombres</small>
+            </div>
+            <a class="btn btn-outline-secondary btn-sm" href="/usuarios">Volver</a>
+        </div>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <EditForm Model="usuario" OnValidSubmit="UpdateUsuario" FormName="editUsuario">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger" role="alert" />
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <label for="identificacion" class="form-label">Identificación</label>
+                            <InputText id="identificacion" @bind-Value="usuario.Identificacion" class="form-control" />
+                        </div>
+                        <div class="col-12 col-md-8">
+                            <label for="apellidosnombres" class="form-label">Apellidos y Nombres</label>
+                            <InputText id="apellidosnombres" @bind-Value="usuario.ApellidosNombres" class="form-control" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="telefono" class="form-label">Teléfono</label>
+                            <InputText id="telefono" @bind-Value="usuario.PhoneNumber" class="form-control" />
+                        </div>
+                        <div class="col-12 col-md-8">
+                            <label for="correo" class="form-label">Correo Electrónico</label>
+                            <InputText id="correo" @bind-Value="usuario.Email" class="form-control" readonly />
+                            <small class="text-muted">El correo se cambia desde la gestión de cuenta.</small>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <a class="btn btn-outline-secondary" href="/usuarios">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    private string? Id { get; set; }
+
+    private ApplicationUser? usuario;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(Id))
+        {
+            NavigationManager.NavigateTo("/usuarios");
+            return;
+        }
+
+        using var context = DbFactory.CreateDbContext();
+        usuario = await context.Users.FirstOrDefaultAsync(u => u.Id == Id);
+
+        if (usuario is null)
+        {
+            NavigationManager.NavigateTo("/usuarios");
+        }
+    }
+
+    private async Task UpdateUsuario()
+    {
+        if (usuario is null) return;
+
+        try
+        {
+            using var context = DbFactory.CreateDbContext();
+            var entity = await context.Users.FirstOrDefaultAsync(u => u.Id == usuario.Id);
+            if (entity is null) return;
+
+            entity.Identificacion = usuario.Identificacion;
+            entity.ApellidosNombres = usuario.ApellidosNombres;
+            entity.PhoneNumber = usuario.PhoneNumber;
+
+            await context.SaveChangesAsync();
+            await JSRuntime.InvokeVoidAsync("alert", "Usuario guardado correctamente.");
+            NavigationManager.NavigateTo("/usuarios");
+        }
+        catch (DbUpdateException ex)
+        {
+            errorMessage = $"Error al guardar: {ex.InnerException?.Message ?? ex.Message}";
+        }
+    }
+}

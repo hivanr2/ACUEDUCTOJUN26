@@ -1,0 +1,296 @@
+﻿@page "/planillas/edit"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+
+
+<PageTitle>Editar Planilla</PageTitle>
+
+<div class="container py-3">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+            <h1 class="h3 mb-1">Editar Planilla</h1>
+            @if (Planilla is not null)
+            {
+                <div class="small text-muted">
+                    <span class="me-2">Id: <strong>@Planilla.Idplanilla</strong></span>
+                    @if (Planilla.Abierta)
+                    {
+                        <span class="badge bg-success">Abierta</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">Cerrada</span>
+                    }
+                </div>
+            }
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary" href="/planillas" onclick="return cerrarVentana('/planillas');">Cerrar</a>
+            <button class="btn btn-primary" form="edit-form" type="submit">
+                <i class="bi bi-save"></i> Guardar
+            </button>
+        </div>
+    </div>
+
+    @if (Planilla is null)
+    {
+        <div class="text-center text-muted py-5"><em>Cargando...</em></div>
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(_status))
+        {
+            <div class="alert alert-success" role="alert">@_status</div>
+        }
+
+        <EditForm id="edit-form" method="post" Model="Planilla" OnValidSubmit="UpdatePlanilla" FormName="edit" Enhance>
+            <DataAnnotationsValidator />
+            <ValidationSummary role="alert" />
+            <input type="hidden" name="Planilla.Idplanilla" value="@Planilla.Idplanilla" />
+
+            <div class="row g-3">
+                <div class="col-12 col-xxl-8">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header bg-light"><strong>General</strong></div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-12 col-md-8">
+                                    <label for="descripcion" class="form-label">Descripción</label>
+                                    <InputText id="descripcion" @bind-Value="Planilla.Descripcion" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.Descripcion" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <label for="idperiodo" class="form-label">Periodo</label>
+                                    <InputSelect id="idperiodo" @bind-Value="Planilla.Idperiodo" class="form-select">
+                                        <option value="">Seleccione un periodo</option>
+                                        @foreach (var periodo in Periodos)
+                                        {
+                                            <option value="@periodo.Idperiodo">@periodo.DescripcionCorta</option>
+                                        }
+                                    </InputSelect>
+                                    <ValidationMessage For="() => Planilla.Idperiodo" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="encargadoregistroconsumos" class="form-label">Encargado Registro Consumos</label>
+                                    <InputText id="encargadoregistroconsumos" @bind-Value="Planilla.EncargadoRegistroConsumos" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.EncargadoRegistroConsumos" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="encargadofacturacion" class="form-label">Encargado Facturación</label>
+                                    <InputText id="encargadofacturacion" @bind-Value="Planilla.EncargadoFacturacion" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.EncargadoFacturacion" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="porcentajemora" class="form-label">% Mora</label>
+                                    <InputNumber id="porcentajemora" @bind-Value="Planilla.PorcentajeMora" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.PorcentajeMora" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="porcentajesubsidio" class="form-label">% Subsidio</label>
+                                    <InputNumber id="porcentajesubsidio" @bind-Value="Planilla.PorcentajeSubsidio" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.PorcentajeSubsidio" class="text-danger" />
+                                </div>
+                                <div class="col-12">
+                                    <div class="form-check form-switch">
+                                        <InputCheckbox id="abierta" @bind-Value="Planilla.Abierta" class="form-check-input" />
+                                        <label for="abierta" class="form-check-label">Planilla abierta</label>
+                                        <ValidationMessage For="() => Planilla.Abierta" class="text-danger" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header bg-light"><strong>Fechas</strong></div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-12 col-md-6">
+                                    <label for="fechahoraregistroconsumo" class="form-label">Fecha Registro Consumo</label>
+                                    <InputDate id="fechahoraregistroconsumo" @bind-Value="Planilla.FechaHoraRegistroConsumo" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.FechaHoraRegistroConsumo" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="fechahoraregistroconsumos" class="form-label">Fecha Registro Consumos</label>
+                                    <InputDate id="fechahoraregistroconsumos" @bind-Value="Planilla.FechaHoraRegistroConsumos" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.FechaHoraRegistroConsumos" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="fechahorafacturacion" class="form-label">Fecha Facturación</label>
+                                    <InputDate id="fechahorafacturacion" @bind-Value="Planilla.FechaHoraFacturacion" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.FechaHoraFacturacion" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="fechalimitepago" class="form-label">Fecha Límite Pago</label>
+                                    <InputDate id="fechalimitepago" @bind-Value="Planilla.FechaLimitePago" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.FechaLimitePago" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="fechasuspension" class="form-label">Fecha Suspensión</label>
+                                    <InputDate id="fechasuspension" @bind-Value="Planilla.FechaSuspension" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.FechaSuspension" class="text-danger" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header bg-light"><strong>Totales y acumulados</strong></div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-6 col-md-4">
+                                    <label for="totalpredios" class="form-label">Total Predios</label>
+                                    <InputNumber id="totalpredios" @bind-Value="Planilla.TotalPredios" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.TotalPredios" class="text-danger" />
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label for="cantidadconsumom3total" class="form-label">Consumo M3 total</label>
+                                    <InputNumber id="cantidadconsumom3total" @bind-Value="Planilla.CantidadConsumoM3total" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.CantidadConsumoM3total" class="text-danger" />
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <label for="ultimafacturaregistrada" class="form-label">Última Factura Registrada</label>
+                                    <InputText id="ultimafacturaregistrada" @bind-Value="Planilla.UltimaFacturaRegistrada" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.UltimaFacturaRegistrada" class="text-danger" />
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label for="valortotalconsumobasico" class="form-label">Total Consumo Básico</label>
+                                    <InputNumber id="valortotalconsumobasico" @bind-Value="Planilla.ValorTotalConsumoBasico" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.ValorTotalConsumoBasico" class="text-danger" />
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label for="valortotalconsumoadicional" class="form-label">Total Consumo Adicional</label>
+                                    <InputNumber id="valortotalconsumoadicional" @bind-Value="Planilla.ValorTotalConsumoAdicional" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.ValorTotalConsumoAdicional" class="text-danger" />
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label for="valortotalconsumom3" class="form-label">Total Consumo M3</label>
+                                    <InputNumber id="valortotalconsumom3" @bind-Value="Planilla.ValorTotalConsumoM3" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.ValorTotalConsumoM3" class="text-danger" />
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label for="valortotalmora" class="form-label">Total Mora</label>
+                                    <InputNumber id="valortotalmora" @bind-Value="Planilla.ValorTotalMora" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.ValorTotalMora" class="text-danger" />
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label for="valortotalsobretasa" class="form-label">Total Sobretasa</label>
+                                    <InputNumber id="valortotalsobretasa" @bind-Value="Planilla.ValorTotalSobreTasa" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.ValorTotalSobreTasa" class="text-danger" />
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label for="valortotalsubsidio" class="form-label">Total Subsidio</label>
+                                    <InputNumber id="valortotalsubsidio" @bind-Value="Planilla.ValorTotalSubsidio" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.ValorTotalSubsidio" class="text-danger" />
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label for="valortotalotros" class="form-label">Total Otros</label>
+                                    <InputNumber id="valortotalotros" @bind-Value="Planilla.ValorTotalOtros" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.ValorTotalOtros" class="text-danger" />
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label for="valortotalplanilla" class="form-label">Total Planilla</label>
+                                    <InputNumber id="valortotalplanilla" @bind-Value="Planilla.ValorTotalPlanilla" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.ValorTotalPlanilla" class="text-danger" />
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label for="valortotalrecaudo" class="form-label">Total Recaudo</label>
+                                    <InputNumber id="valortotalrecaudo" @bind-Value="Planilla.ValorTotalRecaudo" class="form-control" />
+                                    <ValidationMessage For="() => Planilla.ValorTotalRecaudo" class="text-danger" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header bg-light"><strong>Observaciones</strong></div>
+                        <div class="card-body">
+                            <label for="observaciones" class="form-label">Observaciones</label>
+                            <InputTextArea id="observaciones" @bind-Value="Planilla.Observaciones" class="form-control" rows="3" />
+                            <ValidationMessage For="() => Planilla.Observaciones" class="text-danger" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Guardar cambios
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </EditForm>
+
+        <div class="mt-3">
+            <a class="link-secondary" href="/planillas">Volver a la lista</a>
+        </div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string Idplanilla { get; set; }
+
+    [SupplyParameterFromForm]
+    private Planilla? Planilla { get; set; }
+
+    private List<Periodo> Periodos { get; set; } = new();
+    private string? _status;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Planilla ??= await context.Planillas.FirstOrDefaultAsync(m => m.Idplanilla == Idplanilla);
+
+        if (Planilla is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+        //periodos
+        Periodos = await context.Periodos.ToListAsync();
+
+    }
+
+    private async Task UpdatePlanilla()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Attach(Planilla!).State = EntityState.Modified;
+
+        var fecha = Planilla!.FechaHoraFacturacion;
+        int rowsAffected = 0;
+
+        if (fecha.HasValue)
+        {
+            rowsAffected = await context.Facturacions
+                .Where(f => f.Idplanilla == Planilla.Idplanilla)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(f => f.FechaHoraRegistro, fecha));
+        }
+
+        try
+        {
+            await context.SaveChangesAsync();
+            _status = $"Planilla guardada. Facturas actualizadas: {rowsAffected}.";
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (!PlanillaExists(Planilla!.Idplanilla))
+            {
+                NavigationManager.NavigateTo("notfound");
+                return;
+            }
+            throw;
+        }
+
+        NavigationManager.NavigateTo("/planillas");
+    }
+
+    private bool PlanillaExists(string idplanilla)
+    {
+        using var context = DbFactory.CreateDbContext();
+        return context.Planillas.Any(e => e.Idplanilla == idplanilla);
+    }
+}

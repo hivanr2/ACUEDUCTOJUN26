@@ -1,0 +1,167 @@
+@page "/trabajos/mantenimientocomponent"
+@layout SimpleLayout
+@using ACUEDUCTO2.Share.Models
+@using ACUEDUCTO2.Data
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IJSRuntime JSRuntime
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@rendermode InteractiveServer
+
+<div class="container-fluid py-2 py-md-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <h2 class="h5 mb-0">MANTENIMIENTOS ACUEDUCTO COMUNITARIO</h2>
+        <div class="d-flex align-items-center gap-2">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text"><i class="bi bi-funnel"></i> Tipo</span>
+                <select class="form-select" id="Tipo" name="Tipo" @onchange="CambiaTipo">
+                    <option>Selecciona...</option>
+                    <option value="PREDIO">PREDIO</option>
+                    <option value="TODOS">TODOS</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    @if (currentView == "TODOS")
+    {
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <h3 class="h6 mb-0">TODOS LOS TRABAJOS</h3>
+        </div>
+
+        @if (trabajos != null && trabajos.Count > 0)
+        {
+            <div class="row">
+                @foreach (var trabajo in trabajos)
+                {
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="card-title mb-0">@trabajo.Descripcion</h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-text">
+                                    <strong>Fecha Inicio:</strong> @(trabajo.FechaInicio.ToString("d", new CultureInfo("es-CO")))<br>
+                                    <strong>Fecha Fin:</strong> @(trabajo.FechaFinalizacion.ToString("d", new CultureInfo("es-CO")))<br>
+                                    <strong>Tipo:</strong> @(trabajo.TipoTrabajoNavigation?.Nombre ?? trabajo.TipoTrabajo.ToString())<br>
+                                    <strong>Estado:</strong> @trabajo.Estado<br>
+                                    <strong>Asignado a:</strong> @(trabajo.IdPredio != null ? predioNames.GetValueOrDefault(trabajo.IdPredio, trabajo.IdPredio) : "Ninguno")<br>
+                                    <strong>Personal:</strong> @trabajo.Personal
+                                </p>
+                            </div>
+                            <div class="card-footer">
+                                <a href="/trabajos/details?idtrabajo=@trabajo.IdTrabajo" class="btn btn-primary btn-sm" target="_blank">Ver Detalle</a>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-info">No hay trabajos registrados.</div>
+        }
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger mt-2">@errorMessage</div>
+        }
+    }
+    else if (currentView == "PREDIO")
+    {
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <h3 class="h6 mb-0">TRABAJOS EN PREDIOS</h3>
+            <div class="d-flex align-items-center gap-2">
+                <a class="btn btn-outline-dark btn-sm" href="trabajos"><i class="bi bi-hammer"></i> Trabajos</a>
+            </div>
+        </div>
+
+        @if (trabajosPredio != null && trabajosPredio.Count > 0)
+        {
+            <div class="row">
+                @foreach (var trabajo in trabajosPredio)
+                {
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="card-title mb-0">@trabajo.Descripcion</h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-text">
+                                    <strong>Fecha Inicio:</strong> @(trabajo.FechaInicio.ToString("d", new CultureInfo("es-CO")))<br>
+                                    <strong>Fecha Fin:</strong> @(trabajo.FechaFinalizacion.ToString("d", new CultureInfo("es-CO")))<br>
+                                    <strong>Tipo:</strong> @(trabajo.TipoTrabajoNavigation?.Nombre ?? trabajo.TipoTrabajo.ToString())<br>
+                                    <strong>Estado:</strong> @trabajo.Estado<br>
+                                    <strong>Asignado a:</strong> @predioNames.GetValueOrDefault(trabajo.IdPredio, trabajo.IdPredio)<br>
+                                    <strong>Personal:</strong> @trabajo.Personal
+                                </p>
+                            </div>
+                            <div class="card-footer">
+                                <a href="/trabajos/details?idtrabajo=@trabajo.IdTrabajo" class="btn btn-success btn-sm" target="_blank">Ver Detalle</a>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-info">No hay trabajos en predios registrados.</div>
+        }
+    }
+
+    <style>
+        .table-container { max-height: 70vh; overflow: auto; }
+        .fixed-header thead th, .fixed-header thead td { position: sticky; top: 0; background-color: var(--bs-light); z-index: 5; }
+    </style>
+</div>
+
+@code {
+    private IList<Trabajos> trabajos = new List<Trabajos>();
+    private IList<Trabajos> trabajosPredio = new List<Trabajos>();
+    private string errorMessage;
+    private string currentView = "TODOS";
+
+    private Dictionary<string, string> predioNames = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            using var context = DbFactory.CreateDbContext();
+
+            trabajos = await context.Trabajo
+                .Include(t => t.TipoTrabajoNavigation)
+                .OrderByDescending(t => t.FechaInicio)
+                .ToListAsync();
+
+            var predioIds = trabajos.Where(t => !string.IsNullOrEmpty(t.IdPredio)).Select(t => t.IdPredio).Distinct().ToList();
+            if (predioIds.Count > 0)
+            {
+                predioNames = await context.Predio
+                    .Where(p => predioIds.Contains(p.IdPredio))
+                    .ToDictionaryAsync(p => p.IdPredio, p => p.ApellidosNombresUsuario ?? p.IdPredio);
+            }
+
+            trabajosPredio = trabajos.Where(t => !string.IsNullOrEmpty(t.IdPredio)).ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error cargando datos: {ex.Message}";
+        }
+    }
+
+    private Task CambiaTipo(ChangeEventArgs args)
+    {
+        currentView = args.Value?.ToString() ?? "TODOS";
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+}

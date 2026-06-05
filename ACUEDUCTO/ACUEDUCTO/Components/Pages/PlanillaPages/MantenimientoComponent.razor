@@ -1,0 +1,499 @@
+﻿@page "/planillas/mantenimientocomponent"
+@layout SimpleLayout
+@using ACUEDUCTO.Models
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@inject IDbContextFactory<AcueductoContext> DbFactory
+@inject IJSRuntime JSRuntime
+
+@rendermode InteractiveServer
+
+<div class="container-fluid py-2 py-md-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <h2 class="h5 mb-0">MANTENIMIENTOS ACUEDUCTO COMUNITARIO</h2>
+        <div class="d-flex align-items-center gap-2">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text"><i class="bi bi-funnel"></i> Tipo</span>
+                <select class="form-select" id="Tipo" name="Tipo" @onchange="CambiaTipo">
+                    <option>Selecciona...</option>
+                    <option value="PREDIO">PREDIO</option>
+                    <option value="INVENTARIO">INVENTARIO</option>
+                    <option value="TODOS">TODOS</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    @if (currentView == "TODOS")
+    {
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div class="d-flex align-items-center gap-2">
+                @if (@id_planilla_anterior != "No disponible")
+                {
+                    <a class="btn btn-outline-secondary btn-sm" href="./planillas/mantenimientocomponent?id=@id_planilla_anterior" target="_self" title="Anterior">
+                        <i class="bi bi-arrow-left"></i>
+                    </a>
+                }
+                <h3 class="h6 mb-0">TODOS LOS TRABAJOS :: @str_planilla</h3>
+                @if (@id_planilla_siguiente != "No disponible")
+                {
+                    <a class="btn btn-outline-secondary btn-sm" href="./planillas/mantenimientocomponent?id=@id_planilla_siguiente" target="_self" title="Siguiente">
+                        <i class="bi bi-arrow-right"></i>
+                    </a>
+                }
+            </div>
+            <div class="text-nowrap">
+                <span class="badge bg-primary-subtle text-primary border">Periodo: <strong>@str_periodo_largo</strong></span>
+            </div>
+        </div>
+
+        @if (trabajos != null && trabajos.Count > 0)
+        {
+            <div class="row">
+                @foreach (var trabajo in trabajos)
+                {
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="card-title mb-0">@trabajo.Descripcion</h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-text">
+                                    <strong>Fecha Inicio:</strong> @(trabajo.FechaInicio?.ToString("d", new CultureInfo("es-CO")) ?? "N/A")<br>
+                                    <strong>Fecha Fin:</strong> @(trabajo.FechaFinalizacion?.ToString("d", new CultureInfo("es-CO")) ?? "N/A")<br>
+                                    <strong>Tipo:</strong> @trabajo.TipoTrabajo<br>
+                                    <strong>Estado:</strong> @trabajo.Estado<br>
+                                    <strong>Asignado a:</strong> @(trabajo.IdPredio != null ? predioNames.GetValueOrDefault(trabajo.IdPredio, trabajo.IdPredio) : trabajo.IdInventario != null ? inventarioNames.GetValueOrDefault(trabajo.IdInventario, trabajo.IdInventario) : "Ninguno")<br>
+                                    <strong>Personal:</strong> @trabajo.Personal<br>
+                                    <strong>Materiales:</strong> @trabajo.Materiales<br>
+                                    <strong>Observaciones:</strong> @trabajo.Observaciones
+                                </p>
+                            </div>
+                            <div class="card-footer">
+                                <a href="/trabajos/details?idtrabajo=@trabajo.IdTrabajo" class="btn btn-primary btn-sm" target="_blank">Ver Detalle</a>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-info">No hay trabajos registrados para este bimestre.</div>
+        }
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger mt-2">@errorMessage</div>
+        }
+    }
+    else if (currentView == "INVENTARIO")
+    {
+        mostrar = false;
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div class="d-flex align-items-center gap-2">
+                @if (@id_planilla_anterior != "No disponible")
+                {
+                    <a class="btn btn-outline-secondary btn-sm" href="./planillas/mantenimientocomponent?id=@id_planilla_anterior" target="_self" title="Anterior">
+                        <i class="bi bi-arrow-left"></i>
+                    </a>
+                }
+                <h3 class="h6 mb-0">TRABAJOS EN INVENTARIOS :: @str_planilla</h3>
+                @if (@id_planilla_siguiente != "No disponible")
+                {
+                    <a class="btn btn-outline-secondary btn-sm" href="./planillas/mantenimientocomponent?id=@id_planilla_siguiente" target="_self" title="Siguiente">
+                        <i class="bi bi-arrow-right"></i>
+                    </a>
+                }
+            </div>
+            <div class="text-nowrap">
+                <span class="badge bg-primary-subtle text-primary border">Periodo: <strong>@str_periodo_largo</strong></span>
+            </div>
+        </div>
+
+        @if (trabajosInventario != null && trabajosInventario.Count > 0)
+        {
+            <div class="row">
+                @foreach (var trabajo in trabajosInventario)
+                {
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header bg-warning text-dark">
+                                <h5 class="card-title mb-0">@trabajo.Descripcion</h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-text">
+                                    <strong>Fecha Inicio:</strong> @(trabajo.FechaInicio?.ToString("d", new CultureInfo("es-CO")) ?? "N/A")<br>
+                                    <strong>Fecha Fin:</strong> @(trabajo.FechaFinalizacion?.ToString("d", new CultureInfo("es-CO")) ?? "N/A")<br>
+                                    <strong>Tipo:</strong> @trabajo.TipoTrabajo<br>
+                                    <strong>Estado:</strong> @trabajo.Estado<br>
+                                    <strong>Asignado a:</strong> @inventarioNames.GetValueOrDefault(trabajo.IdInventario, trabajo.IdInventario)<br>
+                                    <strong>Personal:</strong> @trabajo.Personal<br>
+                                    <strong>Materiales:</strong> @trabajo.Materiales<br>
+                                    <strong>Observaciones:</strong> @trabajo.Observaciones
+                                </p>
+                            </div>
+                            <div class="card-footer">
+                                <a href="/trabajos/details?idtrabajo=@trabajo.IdTrabajo" class="btn btn-warning btn-sm" target="_blank">Ver Detalle</a>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-info">No hay trabajos en inventarios registrados para este bimestre.</div>
+        }
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger mt-2">@errorMessage</div>
+        }
+    }
+    else if (currentView == "PREDIO")
+    {
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div class="d-flex align-items-center gap-2">
+                @if(@id_planilla_anterior != "No disponible")
+                {
+                    <a class="btn btn-outline-secondary btn-sm" href="./planillas/mantenimientocomponent?id=@id_planilla_anterior" target="_self" title="Anterior">
+                        <i class="bi bi-arrow-left"></i>
+                    </a>
+                }
+                <h3 class="h6 mb-0">TRABAJOS EN PREDIOS :: @str_planilla</h3>
+                @if(@id_planilla_siguiente != "No disponible")
+                {
+                    <a class="btn btn-outline-secondary btn-sm" href="./planillas/mantenimientocomponent?id=@id_planilla_siguiente" target="_self" title="Siguiente">
+                        <i class="bi bi-arrow-right"></i>
+                    </a>
+                }
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a class="btn btn-outline-dark btn-sm" href="trabajos"><i class="bi bi-hammer"></i> Trabajos</a>
+            </div>
+        </div>
+
+        @if (trabajosPredio != null && trabajosPredio.Count > 0)
+        {
+            <div class="row">
+                @foreach (var trabajo in trabajosPredio)
+                {
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="card-title mb-0">@trabajo.Descripcion</h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-text">
+                                    <strong>Fecha Inicio:</strong> @(trabajo.FechaInicio?.ToString("d", new CultureInfo("es-CO")) ?? "N/A")<br>
+                                    <strong>Fecha Fin:</strong> @(trabajo.FechaFinalizacion?.ToString("d", new CultureInfo("es-CO")) ?? "N/A")<br>
+                                    <strong>Tipo:</strong> @trabajo.TipoTrabajo<br>
+                                    <strong>Estado:</strong> @trabajo.Estado<br>
+                                    <strong>Asignado a:</strong> @predioNames.GetValueOrDefault(trabajo.IdPredio, trabajo.IdPredio)<br>
+                                    <strong>Personal:</strong> @trabajo.Personal<br>
+                                    <strong>Materiales:</strong> @trabajo.Materiales<br>
+                                    <strong>Observaciones:</strong> @trabajo.Observaciones
+                                </p>
+                            </div>
+                            <div class="card-footer">
+                                <a href="/trabajos/details?idtrabajo=@trabajo.IdTrabajo" class="btn btn-success btn-sm" target="_blank">Ver Detalle</a>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-info">No hay trabajos en predios registrados para este bimestre.</div>
+        }
+    }
+
+    <style>
+        .table-container { max-height: 70vh; overflow: auto; }
+        .fixed-header thead th, .fixed-header thead td { position: sticky; top: 0; background-color: var(--bs-light); z-index: 5; }
+    </style>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string id { get; set; }
+    private bool HayFacturas { get; set; } = false;
+    private IList<Facturacion> facturacion = new List<Facturacion>();
+    private IList<Inventario> inventarios = new List<Inventario>();
+    private IList<Trabajo> trabajos = new List<Trabajo>();
+    private IList<Trabajo> trabajosPredio = new List<Trabajo>();
+    private IList<Trabajo> trabajosInventario = new List<Trabajo>();
+    private string str_planilla;
+    private string id_planilla_siguiente;
+    private string id_planilla_anterior;
+    private string str_periodo_corto;
+    private string str_periodo_largo;
+    private string errorMessage;
+    private bool isProcessing = false;
+    private bool facturasElaboradas = false;
+    private bool showModal = false;
+    private Facturacion selectedFactura;
+    private Planilla planilla;
+    private bool mostrar = false;
+    private DateTime? FechaTomaConsumoPlanilla;
+    private DateOnly? FechaUltimoPagoPlanilla;
+    private DateOnly? FechaSuspensionPlanilla;
+    private double totalOtrosValores;
+    private double totalValorPeriodo;
+    private double totalDeudaAnterior;
+    private double totalRecaudoPeriodoTotal;
+    private double totalDeudaPasa;
+    private bool editarObservaciones = false;
+    private string currentView = "INVENTARIO";
+
+    private Dictionary<string, string> predioNames = new();
+    private Dictionary<string, string> inventarioNames = new();
+
+    private string FormatCurrency(double? value)
+    {
+        if (value.HasValue)
+        {
+            return $"${value.Value:N0}";
+        }
+        return "";
+    }
+
+    private async Task LoadData()
+    {
+        using var context = DbFactory.CreateDbContext();
+        facturacion = await context.Facturacions
+            .Where(p => p.Idplanilla == id)
+            .Include(f => f.IdpredioNavigation).ThenInclude(c => c.IdentificacionFacturacionNavigation).OrderBy(c => c.IdpredioNavigation.ApellidosNombresUsuario)
+            .ToListAsync();
+
+        foreach (var factura in facturacion)
+        {
+            await context.Entry(factura)
+                .Reference(f => f.IdpredioNavigation)
+                .LoadAsync();
+        }
+
+        var planilla1 = await context.Planillas
+            .Where(p => p.Idplanilla == id)
+            .Include(c => c.IdperiodoNavigation)
+            .ToListAsync();
+        FechaTomaConsumoPlanilla = planilla1.Where(c => c.Idplanilla == id).Select(c => c.FechaHoraRegistroConsumo).FirstOrDefault();
+        FechaUltimoPagoPlanilla = planilla1.Where(c => c.Idplanilla == id).Select(c => c.FechaLimitePago).FirstOrDefault();
+        FechaSuspensionPlanilla = planilla1.Where(c => c.Idplanilla == id).Select(c => c.FechaSuspension).FirstOrDefault();
+        await PonerEnlacesAntesDespues(planilla1);
+
+        if (planilla1 == null)
+        {
+            str_planilla = "No hay planilla";
+        }
+        else
+        {
+            str_planilla = planilla1.FirstOrDefault()?.Descripcion ?? "No hay planilla";
+            str_periodo_corto = planilla1.FirstOrDefault()?.IdperiodoNavigation?.DescripcionCorta ?? "N/A";
+            str_periodo_largo = planilla1.FirstOrDefault()?.IdperiodoNavigation?.DescripcionLarga ?? "N/A";
+        }
+
+        // Load all trabajos for the current planilla
+        trabajos = await context.Trabajos.Where(t => t.Idplanilla == id).ToListAsync();
+
+        // Get unique IDs for predios and inventarios
+        var predioIds = trabajos.Where(t => !string.IsNullOrEmpty(t.IdPredio)).Select(t => t.IdPredio).Distinct().ToList();
+        if (predioIds.Any())
+        {
+            predioNames = await context.Predios.Where(p => predioIds.Contains(p.Idpredio)).ToDictionaryAsync(p => p.Idpredio, p => p.ApellidosNombresUsuario ?? p.Idpredio);
+        }
+
+        var inventarioIds = trabajos.Where(t => !string.IsNullOrEmpty(t.IdInventario)).Select(t => t.IdInventario).Distinct().ToList();
+        if (inventarioIds.Any())
+        {
+            inventarioNames = await context.Inventarios.Where(i => inventarioIds.Contains(i.Idinventario)).ToDictionaryAsync(i => i.Idinventario, i => i.DescripcionCorta ?? i.Codigo);
+        }
+
+        // Filter trabajos by assignment
+        trabajosPredio = trabajos.Where(t => !string.IsNullOrEmpty(t.IdPredio)).ToList();
+        trabajosInventario = trabajos.Where(t => !string.IsNullOrEmpty(t.IdInventario)).ToList();
+    }
+
+    private async Task LoadInventarios()
+    {
+        using var context = DbFactory.CreateDbContext();
+        inventarios = await context.Inventarios
+            .OrderBy(i => i.Codigo)
+            .ToListAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("setPageTitle", "MAN:" + str_periodo_corto);
+    }
+
+    private async Task OnFechaHoraTrabajoIniciaChanged(Facturacion factura, ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out DateTime fechaHoraInicia))
+        {
+            using var context = DbFactory.CreateDbContext();
+            await UpdateFactura(factura);
+        }
+    }
+
+    private async Task OnFechaHoraTrabajoTerminaChanged(Facturacion factura, ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out DateTime fechaHoraTermina))
+        {
+            await UpdateFactura(factura);
+        }
+    }
+
+    private async Task OnFechaHoraTrabajoTerminaInventarioChanged(Inventario inventario, ChangeEventArgs e)
+    {
+        // implementación futura
+    }
+
+    private async Task OnFechaHoraTrabajoIniciaInventarioChanged(Inventario trabajo, ChangeEventArgs e)
+    {
+        // implementación futura
+    }
+
+    private async Task OnTipoTrabajoChanged(Facturacion factura, ChangeEventArgs e)
+    {
+        await UpdateFactura(factura);
+    }
+
+    private async Task OnObservacionesPredioChanged(Facturacion factura, ChangeEventArgs e)
+    {
+        factura.IdpredioNavigation.Observaciones = e.Value.ToString();
+        await UpdateFactura(factura);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var culture = new System.Globalization.CultureInfo("es-CO");
+
+        await LoadData();
+        await LoadInventarios();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task OnNotasFacturaChanged(Facturacion factura, ChangeEventArgs e)
+    {
+        factura.NotasFactura = e.Value.ToString();
+        await UpdateFactura(factura);
+    }
+
+    private async Task OnNotasRecaudoChanged(Facturacion factura, ChangeEventArgs e)
+    {
+        factura.NotasRecaudo = e.Value.ToString();
+        await UpdateFactura(factura);
+    }
+
+    private void OpenModal(Facturacion factura)
+    {
+        selectedFactura = factura;
+        showModal = true;
+    }
+
+    private async Task OpenPrintWindow(string idFactura)
+    {
+        var url = $"/factura/imprimir?idFactura={idFactura}";
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+    }
+
+    private async Task PrintTextOnlyVersion()
+    {
+        var url = $"/planilla/mantenimientoimprimircomponent?id={id}";
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+    }
+
+    private async Task PonerEnlacesAntesDespues(List<Planilla> planillaActual)
+    {
+        if (planillaActual == null || !planillaActual.Any())
+        {
+            id_planilla_anterior = "No disponible";
+            id_planilla_siguiente = "No disponible";
+            return;
+        }
+
+        var fechaActual = planillaActual.FirstOrDefault()?.FechaHoraRegistroConsumo;
+
+        if (fechaActual == null)
+        {
+            id_planilla_anterior = "No disponible";
+            id_planilla_siguiente = "No disponible";
+            return;
+        }
+
+        using var context = DbFactory.CreateDbContext();
+
+        var planillaAnterior = await context.Planillas
+            .Where(p => p.FechaHoraRegistroConsumo < fechaActual)
+            .OrderByDescending(p => p.FechaHoraRegistroConsumo)
+            .FirstOrDefaultAsync();
+
+        var planillaSiguiente = await context.Planillas
+            .Where(p => p.FechaHoraRegistroConsumo > fechaActual)
+            .OrderBy(p => p.FechaHoraRegistroConsumo)
+            .FirstOrDefaultAsync();
+
+        id_planilla_anterior = planillaAnterior?.Idplanilla ?? "No disponible";
+        id_planilla_siguiente = planillaSiguiente?.Idplanilla ?? "No disponible";
+    }
+
+    private double RedondearValor(double valor)
+    {
+        int centenas = (int)(valor / 100);
+        int decenas = (int)((valor % 100) / 10);
+
+        if (decenas <= 5)
+        {
+            return centenas * 100;
+        }
+        else
+        {
+            return (centenas + 1) * 100;
+        }
+    }
+
+    private async Task UpdateFactura(Facturacion factura)
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Facturacions.Update(factura);
+        await context.SaveChangesAsync();
+    }
+
+    private async Task UpdateTrabajoMantenimientoInventario(Trabajo trabajo)
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Trabajos.Update(trabajo);
+        await context.SaveChangesAsync();
+    }
+
+    public class BootstrapModalHelper
+    {
+        private readonly IJSRuntime _jsRuntime;
+        private readonly string _modalId;
+
+        public BootstrapModalHelper(IJSRuntime jsRuntime, string modalId)
+        {
+            _jsRuntime = jsRuntime;
+            _modalId = modalId;
+        }
+
+        public async Task Hide()
+        {
+            await _jsRuntime.InvokeVoidAsync("bootstrap.Modal.getInstance", _modalId, "hide");
+        }
+    }
+
+    private async Task CambiaTipo(ChangeEventArgs args)
+    {
+        currentView = args.Value.ToString();
+        StateHasChanged();
+    }
+}

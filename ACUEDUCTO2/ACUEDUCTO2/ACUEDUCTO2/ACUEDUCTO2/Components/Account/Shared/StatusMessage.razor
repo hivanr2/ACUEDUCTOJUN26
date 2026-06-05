@@ -1,0 +1,37 @@
+﻿@if (!string.IsNullOrEmpty(DisplayMessage))
+{
+    var statusMessageClass = DisplayMessage.StartsWith("Error") ? "danger" : "success";
+    <div class="alert alert-@statusMessageClass" role="alert">
+        @DisplayMessage
+    </div>
+}
+
+@code {
+    private string? messageFromCookie;
+
+    [Parameter]
+    public string? Message { get; set; }
+
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private string? DisplayMessage => Message ?? messageFromCookie;
+
+    protected override void OnInitialized()
+    {
+        // Guard against missing HttpContext (Blazor WASM or when not cascaded)
+        if (HttpContext is not null && HttpContext.Request?.Cookies is not null && HttpContext.Request.Cookies.TryGetValue(IdentityRedirectManager.StatusCookieName, out var value))
+        {
+            messageFromCookie = value;
+
+            try
+            {
+                HttpContext.Response?.Cookies.Delete(IdentityRedirectManager.StatusCookieName);
+            }
+            catch
+            {
+                // Swallow any cookie delete errors — it's non-fatal for rendering the message
+            }
+        }
+    }
+}

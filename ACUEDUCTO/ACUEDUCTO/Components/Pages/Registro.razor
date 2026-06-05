@@ -1,0 +1,93 @@
+@page "/registro"
+@using ACUEDUCTO.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@inject IDbContextFactory<AcueductoContext> DbFactory
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider Auth
+
+<PageTitle>Registro de usuario</PageTitle>
+
+<h3>Registro de usuario</h3>
+
+@if (saved)
+{
+    <div class="alert alert-success">Datos guardados.</div>
+}
+
+<EditForm method="post" FormName="registro" Enhance Model="model" OnValidSubmit="SaveAsync">
+    <DataAnnotationsValidator />
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label">Identificación</label>
+            <InputText class="form-control" @bind-Value="model.Identificacion" />
+        </div>
+        <div class="col-md-8">
+            <label class="form-label">Apellidos y Nombres</label>
+            <InputText class="form-control" @bind-Value="model.ApellidosNombres" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Celular</label>
+            <InputText class="form-control" @bind-Value="model.Celular" />
+        </div>
+        <div class="col-md-8">
+            <label class="form-label">Correo</label>
+            <InputText type="email" class="form-control" @bind-Value="model.CorreoElectronico" />
+        </div>
+        <div class="col-12">
+            <label class="form-label">Observaciones</label>
+            <InputTextArea class="form-control" @bind-Value="model.Observaciones" />
+        </div>
+        <div class="col-12 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Guardar</button>
+            <button type="button" class="btn btn-secondary" @onclick="GoHome">Inicio</button>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    private Usuario model = new();
+    private bool saved;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Precarga con identidad autenticada si existe
+        var auth = await Auth.GetAuthenticationStateAsync();
+        var user = auth.User;
+        var name = user.Identity?.Name;
+        var email = user.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Email)?.Value;
+
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            model.ApellidosNombres = name;
+        }
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            model.CorreoElectronico = email;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(model.Identificacion)) return;
+        await using var db = DbFactory.CreateDbContext();
+        var existing = await db.Usuarios.FindAsync(model.Identificacion);
+        if (existing is null)
+        {
+            db.Usuarios.Add(model);
+        }
+        else
+        {
+            existing.ApellidosNombres = model.ApellidosNombres;
+            existing.Celular = model.Celular;
+            existing.CorreoElectronico = model.CorreoElectronico;
+            existing.NivelEducativo = model.NivelEducativo;
+            existing.Observaciones = model.Observaciones;
+            db.Usuarios.Update(existing);
+        }
+        await db.SaveChangesAsync();
+        saved = true;
+    }
+
+    private void GoHome() => Nav.NavigateTo("/");
+}

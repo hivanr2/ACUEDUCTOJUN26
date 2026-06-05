@@ -1,0 +1,26 @@
+﻿@page "/planillas/periodocomponent/{id:int}"
+@using ACUEDUCTO.Models
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<AcueductoContext> DbFactory
+@if (periodo is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <p>Descripción Corta: @periodo.DescripcionCorta</p>
+    <p>Descripción Larga: @periodo.DescripcionLarga</p>
+}
+
+@code {
+    [Parameter]
+    public int id { get; set; }
+
+    private Periodo? periodo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        periodo = await context.Periodos.FirstOrDefaultAsync(p => p.Idperiodo == id);
+    }
+}

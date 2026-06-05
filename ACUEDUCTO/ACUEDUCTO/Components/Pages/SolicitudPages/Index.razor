@@ -1,0 +1,461 @@
+﻿@page "/solicitudes"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject IJSRuntime JS
+
+@rendermode InteractiveServer
+
+<PageTitle>Solicitud o Requerimiento</PageTitle>
+
+<div class="view-switch">
+    <button class="btn btn-sm @(ShowKanban ? "btn-primary" : "btn-outline-primary")" @onclick="(()=>SetView(true))">Kanban</button>
+    <button class="btn btn-sm @(ShowKanban ? "btn-outline-secondary" : "btn-secondary")" @onclick="(()=>SetView(false))">Matriz</button>
+    <!-- Accesos rápidos a catálogos -->
+    <a class="btn btn-outline-secondary btn-sm" href="/tipos" title="Administrar Tipos">Tipos</a>
+    <a class="btn btn-outline-secondary btn-sm" href="/estados" title="Administrar Estados">Estados</a>
+</div>
+
+
+<!-- KPI Cards -->
+@if (KpiLoaded)
+{
+    <div class="kpi-container">
+        <div class="kpi-card">
+            <div class="kpi-title">Total</div>
+            <div class="kpi-value">@KpiTotal</div>
+        </div>
+        <div class="kpi-card kpi-open">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="kpi-title">Abiertas</div>
+                    <div class="kpi-value">@KpiAbiertas</div>
+                </div>
+                <label class="form-check-label" title="Mostrar solo abiertas">
+                    <input type="checkbox" class="form-check-input" checked="@filtroSoloAbiertas" @onchange="OnAbiertasCheckboxChanged" />
+                    Muestra
+                </label>
+            </div>
+        </div>
+        <div class="kpi-card kpi-closed">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="kpi-title">Cerradas</div>
+                    <div class="kpi-value">@KpiCerradas</div>
+                </div>
+                <label class="form-check-label" title="Mostrar solo cerradas">
+                    <input type="checkbox" class="form-check-input" checked="@filtroSoloCerradas" @onchange="OnCerradasCheckboxChanged" />
+                    Muestra
+                </label>
+            </div>
+        </div>
+    </div>
+}
+
+@* Opción 2: Kanban por Estado *@
+@if (ShowKanban)
+{
+    <div class="filters">
+        <select class="form-select form-select-sm" style="width: 220px;" @onchange="OnTipoChanged">
+            <option value="">Tipo (todos)</option>
+            @foreach (var t in Tipos)
+            {
+                <option value="@t.Id" selected="@(filtroTipoId == t.Id)">@t.Nombre</option>
+            }
+        </select>
+        <input @bind="filtroCodigo" @bind:event="oninput" placeholder="Palabra clave" class="form-control form-control-sm" style="width: 240px;" />
+        <button @onclick="FiltrarSolicitudes" class="btn btn-primary btn-sm">Filtrar</button>
+        <button @onclick="LimpiarTodo" class="btn btn-secondary btn-sm">Limpiar</button>
+    </div>
+
+    <div id="kanban" class="kanban">
+        @foreach (var estado in Estados)
+        {
+            <div class="kanban-col" data-estado-id="@estado.Id">
+                <div class="kanban-col-header">
+                    <span class="badge rounded-pill @GetEstadoBadgeClass(estado.Nombre)">@estado.Nombre</span>
+                    <span class="kanban-count">@SolicitudesView.Count(s=> s.EstadoID == estado.Id)</span>
+                </div>
+                <div class="kanban-col-body" data-dropzone="true">
+                    @foreach (var s in SolicitudesView.Where(x => x.EstadoID == estado.Id).OrderByDescending(x=>x.FechaHoraRecepcion))
+                    {
+                        <div class="kanban-card" draggable="true" data-id="@s.Id">
+                            <div class="card-title" title="@s.Descripción">@Shorten(s.Descripción, 80)</div>
+                            <div class="card-meta">
+                                <span class="badge bg-info text-dark">@s.TipoNavigation?.Nombre</span>
+                                <span class="chip chip-outline">@s.Codigo</span>
+                                <span class="user">@s.IdUsuarioNavigation?.ApellidosNombres</span>
+                            </div>
+                            <div class="card-actions">
+                                <a href="@($"solicitudes/details?id={s.Id}")" target="_blank">Detalles</a> ·
+                                <a href="@($"solicitudes/edit?id={s.Id}")" target="_blank">Editar</a>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    @* Opción 1 (Matriz + Lista) *@
+    @if (ResumenSolicitudes is not null && Tipos is not null && Estados is not null)
+    {
+        <div class="matrix-wrapper">
+            <h4 class="text-center">Resumen de Solicitudes por Tipo, Estado y Palabra Clave</h4>
+            <div class="matrix-table"
+                 style="grid-template-columns: 200px 200px repeat(@Estados.Count, 140px);">
+                <div class="matrix-header sticky matrix-sticky-left">Tipo \\ Estado</div>
+                <div class="matrix-header sticky matrix-sticky-left2">Palabra Clave</div>
+                @foreach (var estado in Estados)
+                {
+                    <div class="matrix-header sticky">@estado.Nombre</div>
+                }
+
+                @foreach (var tipo in Tipos)
+                {
+                    var codigos = ResumenSolicitudes
+                        .Where(r => r.TipoId == tipo.Id)
+                        .Select(r => r.Codigo)
+                        .Distinct()
+                        .OrderBy(c => c)
+                        .ToList();
+
+                    foreach (var codigo in codigos)
+                    {
+                        <div class="matrix-sticky-left matrix-cell-base">@tipo.Nombre</div>
+                        <div class="matrix-code-cell matrix-sticky-left2 matrix-cell-base">
+                            <button class="chip" @onclick="() => FiltrarPorCodigo(codigo)">@codigo</button>
+                        </div>
+                        @foreach (var est in Estados)
+                        {
+                            var count = ResumenSolicitudes
+                                .FirstOrDefault(r => r.TipoId == tipo.Id && r.EstadoId == est.Id && r.Codigo == codigo)?.Cantidad ?? 0;
+                            var intensity = GetIntensity(count);
+                            <div class="matrix-cell matrix-cell-base" style="background-color: rgba(33, 150, 243, @intensity)" @onclick="() => FiltrarPorCelda(tipo.Id, est.Id, codigo)">
+                                <span>@count</span>
+                            </div>
+                        }
+                    }
+                }
+            </div>
+            <div class="matrix-actions">
+                <button class="btn btn-sm btn-outline-secondary" @onclick="LimpiarTodo">Limpiar filtros</button>
+            </div>
+        </div>
+
+        <h1 class="text-center">Listado de Solicitudes o Requerimientos</h1>
+    }
+
+    <div class="filters">
+        <select class="form-select form-select-sm" style="width: 220px;" @onchange="OnTipoChanged">
+            <option value="">Tipo (todos)</option>
+            @foreach (var t in Tipos)
+            {
+                <option value="@t.Id" selected="@(filtroTipoId == t.Id)">@t.Nombre</option>
+            }
+        </select>
+        <select class="form-select form-select-sm" style="width: 220px;" @onchange="OnEstadoChanged">
+            <option value="">Estado (todos)</option>
+            @foreach (var e in Estados)
+            {
+                <option value="@e.Id" selected="@(filtroEstadoId == e.Id)">@e.Nombre</option>
+            }
+        </select>
+        <input @bind="filtroCodigo" @bind:event="oninput" placeholder="Palabra clave" class="form-control form-control-sm" style="width: 240px;" />
+        <button @onclick="FiltrarSolicitudes" class="btn btn-primary btn-sm">Filtrar</button>
+        <button @onclick="LimpiarTodo" class="btn btn-secondary btn-sm">Limpiar</button>
+    </div>
+
+    <QuickGrid Class="table" Items="SolicitudesView.AsQueryable()" TGridItem="Solicitud">
+        <PropertyColumn Property="s => s.Id" Title="#" Sortable="true" Class="text-center" />
+        <PropertyColumn Property="s => s.FechaHoraRecepcion" Title="Fecha" Sortable="true" Class="text-center" />
+        <TemplateColumn Title="Descripción" Context="s">
+            <span title="@s.Descripción">@Shorten(s.Descripción, 120)</span>
+        </TemplateColumn>
+        <PropertyColumn Property="s => s.IdUsuarioNavigation.ApellidosNombres" Title="Usuario" Sortable="true" />
+        <TemplateColumn Title="Palabras Clave" Context="s">
+            @if (!string.IsNullOrWhiteSpace(s.Codigo))
+            {
+                var parts = s.Codigo.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                foreach (var p in parts)
+                {
+                    <button class="chip chip-outline" @onclick="() => FiltrarPorCodigo(p)">@p</button>
+                }
+            }
+        </TemplateColumn>
+        <TemplateColumn Title="Tipo" Context="s">
+            <span class="badge rounded-pill bg-info">@s.TipoNavigation?.Nombre</span>
+        </TemplateColumn>
+        <TemplateColumn Title="Estado" Context="s">
+            <span class="badge rounded-pill @GetEstadoBadgeClass(s.EstadoNavigation?.Nombre)">@s.EstadoNavigation?.Nombre</span>
+        </TemplateColumn>
+        <TemplateColumn Title="Acciones" Context="s">
+            <a href="@($"solicitudes/edit?id={s.Id}")" target="_blank">Editar</a> |
+            <a href="@($"solicitudes/details?id={s.Id}")" target="_blank">Detalles</a> |
+            <a href="@($"solicitudes/delete?id={s.Id}")" target="_blank">Borrar</a>
+        </TemplateColumn>
+    </QuickGrid>
+}
+
+<!-- Botón flotante crear (usa imagen de wwwroot) -->
+<a href="/solicitudes/create" class="fab-create" title="Crear nueva solicitud" aria-label="Crear nueva solicitud">
+    <img src="/img/plus.svg" alt="Crear" onerror="this.onerror=null;this.outerHTML='+';" />
+</a>
+
+<script>
+    (function(){
+        function initKanban(dotNetRef){
+            const board = document.getElementById('kanban');
+            if(!board) return;
+
+            board.querySelectorAll('.kanban-card').forEach(card => {
+                card.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', card.getAttribute('data-id'));
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+            });
+
+            board.querySelectorAll('.kanban-col-body').forEach(col => {
+                col.addEventListener('dragover', (e) => { e.preventDefault(); col.classList.add('drag-over'); });
+                col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+                col.addEventListener('drop', (e) => {
+                    e.preventDefault(); col.classList.remove('drag-over');
+                    const id = parseInt(e.dataTransfer.getData('text/plain'));
+                    const estadoId = parseInt(col.closest('.kanban-col').getAttribute('data-estado-id'));
+                    if(!isNaN(id) && !isNaN(estadoId)){
+                        dotNetRef.invokeMethodAsync('MoveSolicitud', id, estadoId);
+                    }
+                });
+            });
+        }
+        window.__kanbanInit = initKanban;
+    })();
+</script>
+
+@code {
+    private AcueductoContext context = default!;
+    private List<Tipo> Tipos = new();
+    private List<Estado> Estados = new();
+
+    private class ResumenSolicitud { public int TipoId { get; set; } public int EstadoId { get; set; } public string Codigo { get; set; } = ""; public int Cantidad { get; set; } }
+    private List<ResumenSolicitud> ResumenSolicitudes = new();
+
+    private bool KpiLoaded;
+    private int KpiTotal;
+    private int KpiAbiertas;
+    private int KpiCerradas;
+
+    private HashSet<int> _estadoCerradoIds = new();
+
+    private string? filtroCodigo;
+    private int? filtroTipoId;
+    private int? filtroEstadoId;
+
+    private bool filtroSoloAbiertas = true;
+    private bool filtroSoloCerradas = true;
+
+    private List<Solicitud> SolicitudesView = new();
+    private int maxHeat = 1;
+
+    // Por defecto vista Matriz
+    private bool ShowKanban = false;
+
+    private DotNetObjectReference<ACUEDUCTO.Components.Pages.SolicitudPages.Index>? _objRef;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+
+        Tipos = context.Tipos.OrderBy(t => t.Id).AsNoTracking().ToList();
+        Estados = context.Estados.OrderBy(e => e.Id).AsNoTracking().ToList();
+
+        _estadoCerradoIds = Estados
+            .Where(e => (e.Nombre ?? string.Empty).ToLower().Contains("cerr"))
+            .Select(e => e.Id)
+            .ToHashSet();
+
+        FiltrarSolicitudes();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && ShowKanban)
+        {
+            _objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("__kanbanInit", _objRef);
+        }
+    }
+
+    private void SetView(bool kanban)
+    {
+        ShowKanban = kanban;
+        StateHasChanged();
+        if (ShowKanban)
+        {
+            if (_objRef is null) _objRef = DotNetObjectReference.Create(this);
+            _ = JS.InvokeVoidAsync("__kanbanInit", _objRef);
+        }
+    }
+
+    private void FiltrarSolicitudes()
+    {
+        var q = context.Solicitudes
+            .Include(c => c.IdUsuarioNavigation)
+            .Include(c => c.EstadoNavigation)
+            .Include(c => c.TipoNavigation)
+            .AsNoTracking()
+            .AsQueryable();
+
+        if (filtroTipoId.HasValue)
+        {
+            q = q.Where(s => s.Tipo == filtroTipoId);
+        }
+
+        if (filtroEstadoId.HasValue)
+        {
+            q = q.Where(s => s.EstadoID == filtroEstadoId);
+        }
+        else
+        {
+            // Si ambos o ninguno están seleccionados, no se aplica filtro por estado
+            if (filtroSoloAbiertas && !filtroSoloCerradas)
+            {
+                q = q.Where(s => s.EstadoID != null && !_estadoCerradoIds.Contains(s.EstadoID.Value));
+            }
+            else if (!filtroSoloAbiertas && filtroSoloCerradas)
+            {
+                q = q.Where(s => s.EstadoID != null && _estadoCerradoIds.Contains(s.EstadoID.Value));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(filtroCodigo))
+        {
+            var pattern = $"%{filtroCodigo!.Trim()}%";
+            q = q.Where(s => s.Codigo != null && EF.Functions.Like(s.Codigo, pattern));
+        }
+
+        // KPIs basados en el conjunto filtrado
+        var total = q.Count();
+        int cerradas;
+        if (_estadoCerradoIds.Count > 0)
+            cerradas = q.Count(s => s.EstadoID != null && _estadoCerradoIds.Contains(s.EstadoID.Value));
+        else
+            cerradas = q.Count(s => s.Cerrada == true);
+        var abiertas = total - cerradas;
+
+        KpiTotal = total;
+        KpiCerradas = cerradas;
+        KpiAbiertas = abiertas;
+        KpiLoaded = true;
+
+        ResumenSolicitudes = q
+            .Where(s => s.Tipo != null && s.EstadoID != null && s.Codigo != null)
+            .GroupBy(s => new { s.Tipo, s.EstadoID, s.Codigo })
+            .Select(g => new ResumenSolicitud { TipoId = g.Key.Tipo!.Value, EstadoId = g.Key.EstadoID!.Value, Codigo = g.Key.Codigo!, Cantidad = g.Count() })
+            .ToList();
+        maxHeat = Math.Max(1, ResumenSolicitudes.Any() ? ResumenSolicitudes.Max(r => r.Cantidad) : 1);
+
+        // Materializar vista
+        SolicitudesView = q.OrderByDescending(s => s.FechaHoraRecepcion).ToList();
+        StateHasChanged();
+
+        if (ShowKanban && _objRef is not null)
+        {
+            _ = JS.InvokeVoidAsync("__kanbanInit", _objRef);
+        }
+    }
+
+    private void LimpiarTodo()
+    {
+        filtroCodigo = string.Empty;
+        filtroTipoId = null;
+        filtroEstadoId = null;
+        filtroSoloAbiertas = true; // por defecto activos ambos
+        filtroSoloCerradas = true; // por defecto activos ambos
+        FiltrarSolicitudes();
+    }
+
+    private void FiltrarPorCodigo(string codigo)
+    {
+        filtroCodigo = codigo;
+        FiltrarSolicitudes();
+    }
+
+    private void FiltrarPorCelda(int tipoId, int estadoId, string codigo)
+    {
+        filtroTipoId = tipoId;
+        filtroEstadoId = estadoId;
+        filtroCodigo = codigo;
+        FiltrarSolicitudes();
+    }
+
+    private async Task OnTipoChanged(ChangeEventArgs e)
+    {
+        filtroTipoId = int.TryParse(e?.Value?.ToString(), out var v) ? v : null;
+        FiltrarSolicitudes();
+    }
+
+    private async Task OnEstadoChanged(ChangeEventArgs e)
+    {
+        filtroEstadoId = int.TryParse(e?.Value?.ToString(), out var v) ? v : null;
+        FiltrarSolicitudes();
+    }
+
+    private void OnAbiertasCheckboxChanged(ChangeEventArgs e)
+    {
+        var isChecked = e?.Value is bool b && b;
+        filtroSoloAbiertas = isChecked;
+        filtroEstadoId = null; // que prevalezcan los checkboxes
+        FiltrarSolicitudes();
+    }
+
+    private void OnCerradasCheckboxChanged(ChangeEventArgs e)
+    {
+        var isChecked = e?.Value is bool b && b;
+        filtroSoloCerradas = isChecked;
+        filtroEstadoId = null; // que prevalezcan los checkboxes
+        FiltrarSolicitudes();
+    }
+
+    private string GetEstadoBadgeClass(string? nombre)
+    {
+        if (string.IsNullOrWhiteSpace(nombre)) return "bg-secondary";
+        var n = nombre.ToLowerInvariant();
+        if (n.Contains("cerr")) return "bg-success";
+        if (n.Contains("pend") || n.Contains("abier")) return "bg-warning text-dark";
+        if (n.Contains("proc") || n.Contains("tram")) return "bg-info text-dark";
+        return "bg-secondary";
+    }
+
+    private string Shorten(string? text, int max)
+        => string.IsNullOrEmpty(text) ? "" : (text!.Length <= max ? text : text.Substring(0, max) + "…");
+
+    private double GetIntensity(int count)
+    {
+        if (maxHeat <= 0) return 0.1;
+        var x = (double)count / maxHeat;
+        return Math.Round(Math.Max(0.08, x), 2);
+    }
+
+    [JSInvokable]
+    public async Task MoveSolicitud(int id, int newEstadoId)
+    {
+        var s = await context.Solicitudes.FirstOrDefaultAsync(x => x.Id == id);
+        if (s is null) return;
+        s.EstadoID = newEstadoId;
+        s.Cerrada = _estadoCerradoIds.Contains(newEstadoId);
+        await context.SaveChangesAsync();
+
+        FiltrarSolicitudes();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_objRef is not null) _objRef.Dispose();
+        await context.DisposeAsync();
+    }
+}

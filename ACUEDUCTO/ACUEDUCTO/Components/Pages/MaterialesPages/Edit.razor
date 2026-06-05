@@ -1,0 +1,94 @@
+﻿@page "/materiales/edit"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit</PageTitle>
+
+<h1>Edit</h1>
+
+<h2>Materiale</h2>
+<hr />
+@if (Materiale is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-4">
+            <EditForm method="post" Model="Materiale" OnValidSubmit="UpdateMateriale" FormName="edit" Enhance>
+                <DataAnnotationsValidator />
+                <ValidationSummary role="alert"/>
+                <input type="hidden" name="Materiale.IdMaterial" value="@Materiale.IdMaterial" />
+                <div class="mb-3">
+                    <label for="nombre" class="form-label">Nombre:</label>
+                    <InputText id="nombre" @bind-Value="Materiale.Nombre" class="form-control" />
+                    <ValidationMessage For="() => Materiale.Nombre" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="descripcion" class="form-label">Descripción:</label>
+                    <InputText id="descripcion" @bind-Value="Materiale.Descripcion" class="form-control" />
+                    <ValidationMessage For="() => Materiale.Descripcion" class="text-danger" />
+                </div>
+                <button type="submit" class="btn btn-primary">Guardar</button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<div>
+    <a href="/materiales">Volver a la lista</a>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private int IdMaterial { get; set; }
+
+    [SupplyParameterFromForm]
+    private Material? Materiale { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        // Evita la carga de propiedades de navegación para prevenir recursión
+        Materiale ??= await context.Materiales
+            .AsNoTracking()
+            .Select(m => new Material {
+                IdMaterial = m.IdMaterial,
+                Nombre = m.Nombre,
+                Descripcion = m.Descripcion
+            })
+            .FirstOrDefaultAsync(m => m.IdMaterial == IdMaterial);
+
+        if (Materiale is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    // Para proteger contra ataques de sobrepublicación, solo actualiza las propiedades necesarias.
+    private async Task UpdateMateriale()
+    {
+        using var context = DbFactory.CreateDbContext();
+        var material = await context.Materiales.FindAsync(Materiale!.IdMaterial);
+        if (material != null)
+        {
+            material.Nombre = Materiale!.Nombre;
+            material.Descripcion = Materiale!.Descripcion;
+            await context.SaveChangesAsync();
+            NavigationManager.NavigateTo("/materiales");
+        }
+        else
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    private bool MaterialeExists(int idmaterial)
+    {
+        using var context = DbFactory.CreateDbContext();
+        return context.Materiales.Any(e => e.IdMaterial == idmaterial);
+    }
+}

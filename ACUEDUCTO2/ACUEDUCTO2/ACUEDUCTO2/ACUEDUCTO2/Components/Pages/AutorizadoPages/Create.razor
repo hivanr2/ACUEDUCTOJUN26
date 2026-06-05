@@ -1,0 +1,343 @@
+@page "/autorizados/crear"
+@page "/proceso/Nuevo Autorizado"
+@page "/proceso/Registrar Nuevo Autorizado"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO2.Data
+@using ACUEDUCTO2.Share.Models
+@attribute [Authorize]
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+@inject ILogger<Create> Logger
+
+<PageTitle>Nuevo Autorizado</PageTitle>
+
+<div class="container py-3">
+    <h1 class="h4 mb-1">Registrar Autorizado</h1>
+    <p class="text-muted">Permite que otra persona consulte los predios de un usuario. Solo el dueño del predio o un administrador pueden autorizar.</p>
+
+    <div class="alert alert-info small" role="alert">
+        <strong>ℹ️ Importante:</strong> Si la persona que desea autorizar no se encuentra, primero debe registrarse en el sistema y verificar su correo electrónico para poder ser autorizada al uso e información del sistema.
+    </div>
+
+    <hr />
+
+    @if (!string.IsNullOrEmpty(mensaje))
+    {
+        <div class="alert @(esError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+            @mensaje
+            <button type="button" class="btn-close" @onclick="() => mensaje = null"></button>
+        </div>
+    }
+
+    @if (!cargado)
+    {
+        <div class="text-center text-muted py-5">Cargando...</div>
+    }
+    else if (!tienePermiso)
+    {
+        <div class="alert alert-warning">No tiene predios asociados a su identificación. Solo el dueño de un predio o un administrador puede autorizar.</div>
+        <a class="btn btn-outline-secondary" href="/autorizados">Volver</a>
+    }
+    else
+    {
+        <div class="row g-3">
+            <div class="col-12 col-lg-7">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light"><strong>Datos de la Autorización</strong></div>
+                    <div class="card-body">
+                        <EditForm Model="modelo" OnValidSubmit="GuardarAsync" FormName="crearAutorizado">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="text-danger" />
+
+                            @if (esAdmin)
+                            {
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Quién Autoriza (Identificación del dueño)</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" @bind="buscarQuienAutoriza" placeholder="Buscar por identificación..." />
+                                        <button type="button" class="btn btn-outline-primary" @onclick="BuscarQuienAutorizaAsync">Buscar</button>
+                                    </div>
+                                    @if (quienAutorizaInfo is not null)
+                                    {
+                                        <div class="mt-2 small text-success">
+                                            ✅ @quienAutorizaInfo.ApellidosNombres — @quienAutorizaInfo.Identificacion
+                                            <span class="badge bg-secondary ms-1">@prediosQuienAutoriza predios</span>
+                                        </div>
+                                    }
+                                    else if (buscoQuienAutoriza)
+                                    {
+                                        <div class="mt-2 small text-danger">No se encontró usuario o no tiene predios.</div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Quién Autoriza</label>
+                                <div class="form-control-plaintext">
+                                    @((!string.IsNullOrWhiteSpace(usuarioActual?.ApellidosNombres) ? usuarioActual.ApellidosNombres : usuarioActual?.Email ?? "(sin nombre)")) — @usuarioActual?.Identificacion
+                                </div>
+                                </div>
+                            }
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">A Quién Autoriza (Correo o Identificación)</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" @bind="buscarAQueAutoriza" @bind:event="oninput" placeholder="Correo electrónico o identificación..." />
+                                    <button type="button" class="btn btn-outline-secondary" @onclick="BuscarAQueAutorizaAsync">Verificar</button>
+                                </div>
+                                @if (aQueAutorizaInfo is not null)
+                                {
+                                    <div class="mt-2 small text-success">
+                                        ✅ Usuario encontrado: @aQueAutorizaInfo.ApellidosNombres — @aQueAutorizaInfo.Identificacion
+                                    </div>
+                                }
+                                else if (!string.IsNullOrWhiteSpace(buscarAQueAutoriza))
+                                {
+                                    <div class="mt-2 small text-muted">
+                                        ℹ️ Se registrará con el valor ingresado. Puede verificar si existe con el botón.
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Observaciones</label>
+                                <InputTextArea @bind-Value="modelo.Observaciones" class="form-control" rows="3" placeholder="Motivo de la autorización (opcional)" />
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary" disabled="@(!PuedeGuardar || guardando)">
+                                    @if (guardando) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                                    Registrar Autorización
+                                </button>
+                                <a class="btn btn-outline-secondary" href="/autorizados">Cancelar</a>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+
+            @if (prediosPropios is not null && prediosPropios.Any())
+            {
+                <div class="col-12 col-lg-5">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light"><strong>Sus Predios</strong></div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                <table class="table table-sm table-hover mb-0">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th>Predio</th>
+                                            <th>Dirección</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var p in prediosPropios)
+                                        {
+                                            <tr>
+                                                <td>@p.ApellidosNombresUsuario</td>
+                                                <td>@p.IdentificacionFacturacion</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private AutorizadoModel modelo = new();
+    private ApplicationUser? usuarioActual;
+    private List<Predio>? prediosPropios;
+    private bool esAdmin;
+    private bool tienePermiso;
+    private bool cargado;
+    private bool guardando;
+    private string? mensaje;
+    private bool esError;
+
+    // Búsqueda QuienAutoriza (solo admin sin predios propios)
+    private string buscarQuienAutoriza = "";
+    private ApplicationUser? quienAutorizaInfo;
+    private int prediosQuienAutoriza;
+    private bool buscoQuienAutoriza;
+
+    // AQueAutoriza: acepta cualquier correo o identificación
+    private string buscarAQueAutoriza = "";
+    private ApplicationUser? aQueAutorizaInfo;
+
+    private bool PuedeGuardar =>
+        !string.IsNullOrWhiteSpace(buscarAQueAutoriza)
+        && (esAdmin ? quienAutorizaInfo is not null : prediosPropios?.Any() == true);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var claimsPrincipal = authState.User;
+
+        if (claimsPrincipal.Identity?.IsAuthenticated != true)
+        {
+            NavigationManager.NavigateTo("/Account/Login");
+            return;
+        }
+
+        esAdmin = claimsPrincipal.IsInRole("Administradores");
+
+        await using var context = await DbFactory.CreateDbContextAsync();
+
+        var userId = UserManager.GetUserId(claimsPrincipal);
+        usuarioActual = await context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (usuarioActual is null)
+        {
+            NavigationManager.NavigateTo("/Account/Login");
+            return;
+        }
+
+        prediosPropios = await context.Predio
+            .AsNoTracking()
+            .Where(p => p.IdentificacionFacturacion == usuarioActual.Identificacion)
+            .OrderBy(p => p.ApellidosNombresUsuario)
+            .ToListAsync();
+
+        tienePermiso = esAdmin || prediosPropios.Any();
+        cargado = true;
+    }
+
+    private async Task BuscarQuienAutorizaAsync()
+    {
+        buscoQuienAutoriza = true;
+        quienAutorizaInfo = null;
+        prediosQuienAutoriza = 0;
+
+        if (string.IsNullOrWhiteSpace(buscarQuienAutoriza)) return;
+
+        await using var context = await DbFactory.CreateDbContextAsync();
+
+        var user = await context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Identificacion == buscarQuienAutoriza.Trim());
+
+        if (user is null) return;
+
+        var count = await context.Predio
+            .CountAsync(p => p.IdentificacionFacturacion == user.Identificacion);
+
+        if (count > 0)
+        {
+            quienAutorizaInfo = user;
+            prediosQuienAutoriza = count;
+        }
+    }
+
+    private async Task BuscarAQueAutorizaAsync()
+    {
+        aQueAutorizaInfo = null;
+
+        if (string.IsNullOrWhiteSpace(buscarAQueAutoriza)) return;
+
+        await using var context = await DbFactory.CreateDbContextAsync();
+        var valor = buscarAQueAutoriza.Trim();
+        aQueAutorizaInfo = await context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Identificacion == valor || u.Email == valor);
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (!PuedeGuardar) return;
+
+        guardando = true;
+        mensaje = null;
+
+        try
+        {
+            // Determinar quién autoriza
+            var quienAutorizaId = esAdmin
+                ? quienAutorizaInfo!.Identificacion
+                : usuarioActual!.Identificacion;
+
+            var aQueAutorizaId = buscarAQueAutoriza.Trim();
+
+            // Validar que no se autorice a sí mismo
+            if (string.Equals(quienAutorizaId, aQueAutorizaId, StringComparison.OrdinalIgnoreCase))
+            {
+                mensaje = "No puede autorizarse a sí mismo.";
+                esError = true;
+                guardando = false;
+                return;
+            }
+
+            await using var context = await DbFactory.CreateDbContextAsync();
+
+            // Validar que no exista ya la autorización
+            var yaExiste = await context.Set<Autorizado>()
+                .AnyAsync(a => a.QuienAutoriza == quienAutorizaId && a.AQueAutoriza == aQueAutorizaId);
+
+            if (yaExiste)
+            {
+                mensaje = $"Ya existe una autorización de {quienAutorizaId} para {aQueAutorizaId}.";
+                esError = true;
+                guardando = false;
+                return;
+            }
+
+            // Buscar el Guid del usuario actual en la tabla Usuario (FK requiere Usuario.Guid, NULL si no existe)
+            // Read only the Guid from the Usuario table if present. Avoid selecting
+            // other columns (like ApellidosNombres) which may not exist in the legacy schema.
+            var usuarioTablaGuid = await context.Set<Usuario>()
+                .Where(u => u.CorreoElectronico == usuarioActual!.Email || u.Identificacion == usuarioActual!.Identificacion)
+                .Select(u => u.Guid)
+                .FirstOrDefaultAsync();
+
+            var autorizado = new Autorizado
+            {
+                Guid = System.Guid.NewGuid().ToString(),
+                QuienAutoriza = quienAutorizaId,
+                AQueAutoriza = aQueAutorizaId,
+                FechaHoraRegistro = DateTime.Now,
+                IdUsuarioRegistra = string.IsNullOrWhiteSpace(usuarioTablaGuid) ? null : usuarioTablaGuid,
+                Observaciones = modelo.Observaciones ?? ""
+            };
+
+            context.Set<Autorizado>().Add(autorizado);
+            await context.SaveChangesAsync();
+
+            var nombreAutorizado = aQueAutorizaInfo?.ApellidosNombres ?? aQueAutorizaId;
+            mensaje = $"Autorización registrada exitosamente. {nombreAutorizado} ahora puede ver los predios de {quienAutorizaId}.";
+            esError = false;
+
+            // Limpiar formulario
+            modelo = new();
+            aQueAutorizaInfo = null;
+            buscarAQueAutoriza = "";
+        }
+        catch (Exception ex)
+        {
+            var innerMsg = ex.InnerException?.Message ?? ex.Message;
+            mensaje = $"Error al guardar: {innerMsg}";
+            esError = true;
+            Logger.LogError(ex, "Error saving Autorizado");
+        }
+
+        guardando = false;
+    }
+
+    private sealed class AutorizadoModel
+    {
+        public string? Observaciones { get; set; }
+    }
+}

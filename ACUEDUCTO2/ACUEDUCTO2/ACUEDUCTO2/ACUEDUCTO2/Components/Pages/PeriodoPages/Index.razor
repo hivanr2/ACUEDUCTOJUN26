@@ -1,0 +1,80 @@
+@page "/periodos"
+@page "/proceso/Listado de Periodos"
+@page "/proceso/Busqueda por Datos Periodo"
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Periodos</PageTitle>
+
+<h3>Periodos</h3>
+<div class="mb-3 d-flex gap-2 flex-wrap">
+    <button type="button" class="btn btn-primary" @onclick="CrearPeriodo">Nuevo periodo</button>
+</div>
+
+@if (periodos is null)
+{
+    <p>Cargando...</p>
+}
+else if (periodos.Count == 0)
+{
+    <p>No hay periodos registrados.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Descripción</th>
+                <th>Fecha facturación</th>
+                <th>Fecha límite pago</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var periodo in periodos)
+            {
+                <tr>
+                    <td>@periodo.Descripcion</td>
+                    <td>@(periodo.FechaHoraFacturacion?.ToString("dd/MM/yyyy") ?? "-")</td>
+                    <td>@(periodo.FechaLimitePago?.ToString("dd/MM/yyyy") ?? "-")</td>
+                    <td>
+                        @if (periodo.Abierta == true)
+                        {
+                            <span class="badge text-bg-success">Abierta</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-secondary">Cerrada</span>
+                        }
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-info me-1" @onclick="() => VerDetalle(periodo.Guid)">Detalles</button>
+                        <button type="button" class="btn btn-sm btn-warning me-1" @onclick="() => Editar(periodo.Guid)">Editar</button>
+                        <button type="button" class="btn btn-sm btn-danger" @onclick="() => Eliminar(periodo.Guid)">Eliminar</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Periodo>? periodos;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = DbFactory.CreateDbContext();
+        periodos = await db.Periodos
+            .AsNoTracking()
+            .OrderByDescending(p => p.FechaHoraFacturacion ?? DateTime.MinValue)
+            .ToListAsync();
+    }
+
+    void CrearPeriodo() => Navigation.NavigateTo("/periodos/crear", forceLoad: true);
+    void VerDetalle(string id) => Navigation.NavigateTo($"/periodos/detalles/{id}", forceLoad: true);
+    void Editar(string id) => Navigation.NavigateTo($"/periodos/editar/{id}", forceLoad: true);
+    void Eliminar(string id) => Navigation.NavigateTo($"/periodos/eliminar/{id}", forceLoad: true);
+}

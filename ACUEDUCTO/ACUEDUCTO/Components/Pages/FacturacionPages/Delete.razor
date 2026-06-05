@@ -1,0 +1,135 @@
+﻿@page "/facturacions/delete"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Delete</PageTitle>
+
+<h1>Delete</h1>
+
+<p>Are you sure you want to delete this?</p>
+<div>
+    <h2>Facturacion</h2>
+    <hr />
+    @if (facturacion is null)
+    {
+        <p><em>Llamando...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Idpredio</dt>
+            <dd class="col-sm-10">@facturacion.Idpredio</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">CodigoUsuario</dt>
+            <dd class="col-sm-10">@facturacion.CodigoUsuario</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">FechaHoraRegistro</dt>
+            <dd class="col-sm-10">@facturacion.FechaHoraRegistro</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">MedicionAnterior</dt>
+            <dd class="col-sm-10">@facturacion.MedicionAnterior</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">MedicionActual</dt>
+            <dd class="col-sm-10">@facturacion.MedicionActual</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ConsumoM3</dt>
+            <dd class="col-sm-10">@facturacion.ConsumoM3</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">CargoFijo</dt>
+            <dd class="col-sm-10">@facturacion.CargoFijo</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorConsumo</dt>
+            <dd class="col-sm-10">@facturacion.ValorConsumo</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">PorcentajeSobreTasa</dt>
+            <dd class="col-sm-10">@facturacion.PorcentajeSobreTasa</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorSobreTasa</dt>
+            <dd class="col-sm-10">@facturacion.ValorSobreTasa</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">PorcentajeMora</dt>
+            <dd class="col-sm-10">@facturacion.PorcentajeMora</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorMora</dt>
+            <dd class="col-sm-10">@facturacion.ValorMora</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">PorcentajeSubsidio</dt>
+            <dd class="col-sm-10">@facturacion.PorcentajeSubsidio</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorSubsidio</dt>
+            <dd class="col-sm-10">@facturacion.ValorSubsidio</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">OtrosValores</dt>
+            <dd class="col-sm-10">@facturacion.OtrosValores</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorPeriodo</dt>
+            <dd class="col-sm-10">@facturacion.ValorPeriodo</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">DeudaAnterior</dt>
+            <dd class="col-sm-10">@facturacion.DeudaAnterior</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">RecaudoPeriodoTotal</dt>
+            <dd class="col-sm-10">@facturacion.RecaudoPeriodoTotal</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">DeudaPasa</dt>
+            <dd class="col-sm-10">@facturacion.DeudaPasa</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">NotasFactura</dt>
+            <dd class="col-sm-10">@facturacion.NotasFactura</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">NotasRecaudo</dt>
+            <dd class="col-sm-10">@facturacion.NotasRecaudo</dd>
+        </dl>
+        <EditForm method="post" Model="facturacion" OnValidSubmit="DeleteFacturacion" FormName="delete" Enhance>
+            <button type="submit" class="btn btn-danger" disabled="@(facturacion is null)">Delete</button> |
+            <a href="/facturacions">Volve a la Lista</a>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private Facturacion? facturacion;
+
+    [SupplyParameterFromQuery]
+    private string Idplanilla { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        facturacion = await context.Facturacions.FirstOrDefaultAsync(m => m.Idplanilla == Idplanilla);
+
+        if (facturacion is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    private async Task DeleteFacturacion()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Facturacions.Remove(facturacion!);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/facturacion");
+    }
+}

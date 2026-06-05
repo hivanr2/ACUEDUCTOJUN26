@@ -1,0 +1,35 @@
+@using ACUEDUCTO.COMPARTIR.DTO
+@using System.Collections.Generic
+@using System.Linq
+
+@if (Items == null || !Items.Any())
+{
+    <div class="small text-muted">Sin bimestres por encima del promedio.</div>
+}
+else
+{
+    <table class="table table-sm mb-0">
+        <thead>
+            <tr>
+                <th>Bimestre</th>
+                <th>Fecha</th>
+                <th class="text-end">Consumo (m³)</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var b in Items)
+            {
+                <tr>
+                    <td>@(string.IsNullOrWhiteSpace(b.Periodo) ? "(sin periodo)" : b.Periodo)</td>
+                    <td>@(b.Fecha.HasValue ? b.Fecha.Value.ToString("yyyy-MM-dd") : "-")</td>
+                    <td class="text-end">@b.Consumo.ToString("0.##")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter]
+    public IEnumerable<AboveBimestreInfo>? Items { get; set; }
+}

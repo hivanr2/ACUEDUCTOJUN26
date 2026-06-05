@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root { --gap: 14px; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+.wrap { width: 100%; padding: 16px 0; }
+
+.org-container { 
+  position: relative; 
+  width: 100%; 
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+svg.org {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-width: 1060px;
+}
+
+.card {
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.card:hover { opacity: .85; }
+
+.panel-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.panel-overlay.open { display: flex; }
+
+.panel {
+  background: var(--color-background-primary, #FFFFFF);
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: 16px;
+  padding: 28px 32px;
+  max-width: 560px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.panel h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+.panel .subtitle {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0 0 20px;
+}
+.panel .func-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.panel .func-list li {
+  font-size: 16px;
+  color: var(--color-text-primary);
+  line-height: 1.6;
+  padding: 10px 12px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  background: #F5F8FF;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  display: flex;
+  gap: 10px;
+}
+.panel .func-list li:last-child { border-bottom: none; margin-bottom: 0; }
+.panel .func-text {
+  font-size: 16px;
+  font-weight: 500;
+}
+.func-num {
+  min-width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.close-btn {
+  position: absolute;
+  top: 16px; right: 16px;
+  background: none;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: 8px;
+  width: 28px; height: 28px;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 12px 0 4px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  align-items: center;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+.mobile-hint {
+  display: none;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  padding: 0 10px 8px;
+}
+
+@media (max-width: 768px) {
+  .wrap { padding: 10px 0; }
+  .legend { gap: 10px; padding: 10px 10px 6px; font-size: 11px; }
+  .legend > span { font-size: 12px !important; }
+  .org-container { padding: 0 8px 8px; }
+  .mobile-hint { display: block; }
+  .panel-overlay { padding: 12px; }
+  .panel { padding: 20px 16px; border-radius: 12px; max-height: 85vh; }
+  .panel h2 { font-size: 16px; padding-right: 30px; }
+  .panel .subtitle { font-size: 12px; margin-bottom: 14px; }
+  .panel .func-list li, .panel .func-text { font-size: 14px; line-height: 1.45; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<div class="legend">
+  <span style="font-weight:500;color:var(--color-text-primary);font-size:13px;">Junta de Acción Comunal – CP Tobia Chica, Nocaima</span>
+  <div class="legend-item"><div class="legend-dot" style="background:#534AB7"></div> Órganos de dirección</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#0F6E56"></div> Dignatarios ejecutivos</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#993C1D"></div> Control y vigilancia</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#185FA5"></div> Representación</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#854F0B"></div> Comisiones de trabajo</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3B6D11"></div> Conciliación</div>
+</div>
+
+<div class="mobile-hint">En móvil, desliza horizontalmente para ver el organigrama completo.</div>
+
+<div class="org-container">
+<svg class="org" viewBox="0 0 1060 940" width="100%">
+<defs>
+  <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+</defs>
+
+<!-- CONNECTOR LINES -->
+<line x1="530" y1="88" x2="530" y2="188" stroke="#7F77DD" stroke-width="1.5" marker-end="url(#arr)" fill="none"/>
+<path d="M630 55 Q870 55 870 188" stroke="#E24B4A" stroke-width="1" fill="none" stroke-dasharray="5 3" marker-end="url(#arr)"/>
+<path d="M430 55 Q160 55 160 188" stroke="#639922" stroke-width="1" fill="none" stroke-dasharray="5 3" marker-end="url(#arr)"/>
+<path d="M570 72 Q980 72 980 132" stroke="#378ADD" stroke-width="1" fill="none" stroke-dasharray="5 3" marker-end="url(#arr)"/>
+<line x1="530" y1="274" x2="530" y2="354" stroke="#1D9E75" stroke-width="1.5" marker-end="url(#arr)" fill="none"/>
+<path d="M460 232 L300 232 L300 354" stroke="#1D9E75" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+<path d="M600 232 L760 232 L760 354" stroke="#1D9E75" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+<path d="M480 232 L110 232 L110 354" stroke="#1D9E75" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+<line x1="530" y1="436" x2="530" y2="520" stroke="#BA7517" stroke-width="1.2" fill="none" marker-end="url(#arr)"/>
+<path d="M606 395 Q678 320 694 395" stroke="#1D9E75" stroke-width="0.8" fill="none" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+<text x="678" y="346" text-anchor="middle" font-size="10" fill="#1D9E75" opacity="0.85">firma conjunta</text>
+<path d="M870 274 L870 232 L600 232" stroke="#E24B4A" stroke-width="1" fill="none" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+<path d="M870 274 Q870 330 806 370" stroke="#E24B4A" stroke-width="0.8" fill="none" stroke-dasharray="3 3" marker-end="url(#arr)"/>
+<path d="M160 274 L160 232 L460 232" stroke="#639922" stroke-width="1" fill="none" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+
+<path d="M530 520 L115 520 L115 554" stroke="#BA7517" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+<path d="M530 520 L250 520 L250 554" stroke="#BA7517" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+<path d="M530 520 L385 520 L385 554" stroke="#BA7517" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+<path d="M530 520 L520 520 L520 554" stroke="#BA7517" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+<path d="M530 520 L655 520 L655 554" stroke="#BA7517" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+<path d="M530 520 L880 520 L880 554" stroke="#BA7517" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+
+<line x1="115" y1="620" x2="115" y2="645" stroke="#EF9F27" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+<line x1="250" y1="620" x2="250" y2="645" stroke="#EF9F27" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+<line x1="385" y1="620" x2="385" y2="645" stroke="#EF9F27" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+<line x1="520" y1="620" x2="520" y2="645" stroke="#EF9F27" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+<line x1="655" y1="620" x2="655" y2="645" stroke="#EF9F27" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+<line x1="880" y1="620" x2="880" y2="645" stroke="#EF9F27" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+
+<line x1="980" y1="184" x2="980" y2="354" stroke="#378ADD" stroke-width="1.2" fill="none" marker-end="url(#arr)"/>
+<path d="M655 554 Q655 280 610 88" stroke="#BA7517" stroke-width="0.9" fill="none" stroke-dasharray="3 4" opacity="0.65" marker-end="url(#arr)"/>
+<text x="645" y="310" font-size="10" fill="#854F0B" opacity="0.85">rinde informe</text>
+<path d="M896 260 Q920 430 880 548" stroke="#E24B4A" stroke-width="0.7" fill="none" stroke-dasharray="3 4" opacity="0.65" marker-end="url(#arr)"/>
+<text x="912" y="505" font-size="10" fill="#A32D2D" opacity="0.85">fiscaliza</text>
+
+<!-- BOXES -->
+<g class="card" data-card-id="asamblea">
+  <rect x="380" y="16" width="300" height="72" rx="10" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.2"/>
+  <text x="530" y="46" text-anchor="middle" font-size="14" font-weight="500" fill="#3C3489">Asamblea general de afiliados</text>
+  <text x="530" y="66" text-anchor="middle" font-size="12" fill="#534AB7">Máximo órgano — haz clic para ver funciones</text>
+</g>
+
+<g class="card" data-card-id="jdirectiva">
+  <rect x="380" y="188" width="300" height="86" rx="10" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.2"/>
+  <text x="530" y="218" text-anchor="middle" font-size="14" font-weight="500" fill="#085041">Junta directiva</text>
+  <text x="530" y="238" text-anchor="middle" font-size="11" fill="#0F6E56">Presidente · Vicepresidente · Secretario</text>
+  <text x="530" y="255" text-anchor="middle" font-size="11" fill="#0F6E56">Tesorero · Coordinadores</text>
+</g>
+
+<g class="card" data-card-id="fiscal">
+  <rect x="816" y="188" width="160" height="72" rx="10" fill="#FCEBEB" stroke="#A32D2D" stroke-width="1.2"/>
+  <text x="896" y="220" text-anchor="middle" font-size="14" font-weight="500" fill="#791F1F">Fiscal</text>
+  <text x="896" y="240" text-anchor="middle" font-size="12" fill="#A32D2D">Control y vigilancia</text>
+</g>
+
+<g class="card" data-card-id="conciliacion">
+  <rect x="60" y="188" width="180" height="72" rx="10" fill="#EAF3DE" stroke="#3B6D11" stroke-width="1.2"/>
+  <text x="150" y="216" text-anchor="middle" font-size="13" font-weight="500" fill="#27500A">Comisión de</text>
+  <text x="150" y="233" text-anchor="middle" font-size="13" font-weight="500" fill="#27500A">convivencia y</text>
+  <text x="150" y="250" text-anchor="middle" font-size="12" fill="#3B6D11">conciliación</text>
+</g>
+
+<g class="card" data-card-id="delegados">
+  <rect x="915" y="354" width="130" height="72" rx="10" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.2"/>
+  <text x="980" y="381" text-anchor="middle" font-size="12" font-weight="500" fill="#0C447C">Delegados a la</text>
+  <text x="980" y="398" text-anchor="middle" font-size="12" font-weight="500" fill="#0C447C">Asociación</text>
+  <text x="980" y="414" text-anchor="middle" font-size="11" fill="#185FA5">de juntas</text>
+</g>
+
+<g class="card" data-card-id="delegados">
+  <rect x="915" y="132" width="130" height="52" rx="10" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.2"/>
+  <text x="980" y="154" text-anchor="middle" font-size="11" font-weight="500" fill="#0C447C">Delegados</text>
+  <text x="980" y="172" text-anchor="middle" font-size="11" fill="#185FA5">Asoc. de juntas</text>
+</g>
+
+<g class="card" data-card-id="presidente">
+  <rect x="420" y="354" width="220" height="82" rx="10" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.5"/>
+  <text x="530" y="382" text-anchor="middle" font-size="14" font-weight="500" fill="#085041">Presidente</text>
+  <text x="530" y="400" text-anchor="middle" font-size="11" fill="#0F6E56">Representante legal</text>
+  <text x="530" y="418" text-anchor="middle" font-size="11" fill="#0F6E56">Ejecuta decisiones · Convoca</text>
+</g>
+
+<g class="card" data-card-id="secretario">
+  <rect x="220" y="354" width="160" height="72" rx="10" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.2"/>
+  <text x="300" y="384" text-anchor="middle" font-size="14" font-weight="500" fill="#085041">Secretario</text>
+  <text x="300" y="404" text-anchor="middle" font-size="12" fill="#0F6E56">Actas · Archivo</text>
+</g>
+
+<g class="card" data-card-id="tesorero">
+  <rect x="680" y="354" width="160" height="72" rx="10" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.2"/>
+  <text x="760" y="384" text-anchor="middle" font-size="14" font-weight="500" fill="#085041">Tesorero</text>
+  <text x="760" y="404" text-anchor="middle" font-size="12" fill="#0F6E56">Finanzas · Libros</text>
+</g>
+
+<g class="card" data-card-id="vicepresidente">
+  <rect x="30" y="354" width="150" height="72" rx="10" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.2"/>
+  <text x="105" y="382" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">Vicepresidente</text>
+  <text x="105" y="402" text-anchor="middle" font-size="12" fill="#0F6E56">Suplencia</text>
+  <text x="105" y="418" text-anchor="middle" font-size="11" fill="#0F6E56">Comisiones</text>
+</g>
+
+<g class="card" data-card-id="coord_obras">
+  <rect x="50" y="554" width="130" height="66" rx="8" fill="#FFF0E0" stroke="#854F0B" stroke-width="1.5"/>
+  <text x="115" y="575" text-anchor="middle" font-size="11" font-weight="600" fill="#412402">Coordinador</text>
+  <text x="115" y="591" text-anchor="middle" font-size="11" font-weight="600" fill="#412402">Obras</text>
+  <text x="115" y="607" text-anchor="middle" font-size="11" fill="#854F0B">Públicas</text>
+</g>
+
+<g class="card" data-card-id="coord_acueducto">
+  <rect x="185" y="554" width="130" height="66" rx="8" fill="#E6F4FF" stroke="#1565A3" stroke-width="1.5"/>
+  <text x="250" y="575" text-anchor="middle" font-size="11" font-weight="600" fill="#0B3D6B">Coordinador</text>
+  <text x="250" y="591" text-anchor="middle" font-size="11" font-weight="600" fill="#0B3D6B">Acueducto</text>
+  <text x="250" y="607" text-anchor="middle" font-size="11" fill="#1565A3">Servicio de agua</text>
+</g>
+
+<g class="card" data-card-id="coord_salud">
+  <rect x="320" y="554" width="130" height="66" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1.2"/>
+  <text x="385" y="575" text-anchor="middle" font-size="11" font-weight="500" fill="#412402">Coordinador</text>
+  <text x="385" y="591" text-anchor="middle" font-size="11" fill="#854F0B">Salud y</text>
+  <text x="385" y="607" text-anchor="middle" font-size="11" fill="#854F0B">saneamiento</text>
+</g>
+
+<g class="card" data-card-id="coord_cultura">
+  <rect x="455" y="554" width="130" height="66" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1.2"/>
+  <text x="520" y="575" text-anchor="middle" font-size="11" font-weight="500" fill="#412402">Coordinador</text>
+  <text x="520" y="591" text-anchor="middle" font-size="11" fill="#854F0B">Cultura y</text>
+  <text x="520" y="607" text-anchor="middle" font-size="11" fill="#854F0B">deportes</text>
+</g>
+
+<g class="card" data-card-id="coord_empresarial">
+  <rect x="590" y="554" width="130" height="66" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1.2"/>
+  <text x="655" y="575" text-anchor="middle" font-size="11" font-weight="500" fill="#412402">Coordinador</text>
+  <text x="655" y="591" text-anchor="middle" font-size="11" fill="#854F0B">Comisión</text>
+  <text x="655" y="607" text-anchor="middle" font-size="11" fill="#854F0B">empresarial</text>
+</g>
+
+<g class="card" data-card-id="coord_riesgos">
+  <rect x="815" y="554" width="130" height="66" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1.2"/>
+  <text x="880" y="575" text-anchor="middle" font-size="11" font-weight="500" fill="#412402">Coordinador</text>
+  <text x="880" y="591" text-anchor="middle" font-size="11" fill="#854F0B">Riesgos y</text>
+  <text x="880" y="607" text-anchor="middle" font-size="11" fill="#854F0B">emergencias</text>
+</g>
+
+<rect x="50" y="645" width="130" height="46" rx="6" fill="#FFF7E6" stroke="#EF9F27" stroke-width="0.8"/>
+<text x="115" y="664" text-anchor="middle" font-size="11" fill="#633806">Comisión</text>
+<text x="115" y="679" text-anchor="middle" font-size="11" fill="#854F0B">Obras públicas</text>
+
+<rect x="185" y="645" width="130" height="46" rx="6" fill="#DBEEFF" stroke="#1565A3" stroke-width="0.8"/>
+<text x="250" y="664" text-anchor="middle" font-size="11" fill="#0B3D6B">Comisión</text>
+<text x="250" y="679" text-anchor="middle" font-size="11" fill="#1565A3">Acueducto</text>
+
+<rect x="320" y="645" width="130" height="46" rx="6" fill="#FFF7E6" stroke="#EF9F27" stroke-width="0.8"/>
+<text x="385" y="664" text-anchor="middle" font-size="11" fill="#633806">Comisión</text>
+<text x="385" y="679" text-anchor="middle" font-size="11" fill="#854F0B">Salud ambiental</text>
+
+<rect x="455" y="645" width="130" height="46" rx="6" fill="#FFF7E6" stroke="#EF9F27" stroke-width="0.8"/>
+<text x="520" y="664" text-anchor="middle" font-size="11" fill="#633806">Comisión</text>
+<text x="520" y="679" text-anchor="middle" font-size="11" fill="#854F0B">Cultura / deporte</text>
+
+<rect x="590" y="645" width="130" height="46" rx="6" fill="#FFF7E6" stroke="#EF9F27" stroke-width="0.8"/>
+<text x="655" y="664" text-anchor="middle" font-size="11" fill="#633806">Comisión</text>
+<text x="655" y="679" text-anchor="middle" font-size="11" fill="#854F0B">Empresarial</text>
+
+<rect x="815" y="645" width="130" height="46" rx="6" fill="#FFF7E6" stroke="#EF9F27" stroke-width="0.8"/>
+<text x="880" y="664" text-anchor="middle" font-size="11" fill="#633806">Comisión</text>
+<text x="880" y="679" text-anchor="middle" font-size="11" fill="#854F0B">de riesgos</text>
+
+<line x1="60" y1="768" x2="96" y2="768" stroke="#534AB7" stroke-width="1.5" marker-end="url(#arr)" fill="none"/>
+<text x="102" y="772" font-size="11" fill="#534AB7">Autoridad / elección</text>
+<line x1="240" y1="768" x2="276" y2="768" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr)" fill="none"/>
+<text x="282" y="772" font-size="11" fill="#1D9E75">Reporte / rendición</text>
+<line x1="430" y1="768" x2="466" y2="768" stroke="#E24B4A" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arr)" fill="none"/>
+<text x="472" y="772" font-size="11" fill="#A32D2D">Control / fiscalización</text>
+<line x1="640" y1="768" x2="676" y2="768" stroke="#BA7517" stroke-width="1" marker-end="url(#arr)" fill="none"/>
+<text x="682" y="772" font-size="11" fill="#854F0B">Coordinación</text>
+
+<text x="530" y="820" text-anchor="middle" font-size="11" fill="#888780">Haz clic en cualquier cargo para ver todas sus funciones</text>
+
+</svg>
+</div>
+</div>
+
+<!-- PANEL MODAL -->
+<div class="panel-overlay" id="overlay">
+  <div class="panel" id="panel">
+    <button class="close-btn" onclick="closeAll()">✕</button>
+    <h2 id="panel-title"></h2>
+    <div class="subtitle" id="panel-sub"></div>
+    <ul class="func-list" id="panel-funcs"></ul>
+  </div>
+</div>
+
+<script>
+const DATA = {
+  asamblea: {
+    title: "Asamblea general de afiliados",
+    sub: "Máxima autoridad de la organización · Art. 18",
+    color: "#534AB7",
+    bg: "#EEEDFE",
+    funcs: ["Elegir y remover dignatarios (Junta Directiva, Fiscal y Conciliadores) por el período de 4 años.", "Aprobar el presupuesto de ingresos, gastos e inversiones de la Junta.", "Aprobar el plan de desarrollo y el programa de trabajo de la Junta.", "Decidir sobre la adquisición, disposición y gravamen de bienes inmuebles.", "Autorizar contratos superiores a 120 salarios mínimos legales vigentes.", "Aprobar los reglamentos internos de la Fiscalía, Comisiones Empresariales y Comisión de Convivencia.", "Determinar el número, nombre y funciones de las Comisiones de Trabajo.", "Conocer y decidir sobre los estados financieros e informes de gestión.", "Elegir al Tesorero y designar a los tres Conciliadores.", "Resolver los asuntos que no estén atribuidos a otro órgano.", "Convocar Asambleas extraordinarias cuando las circunstancias lo requieran."]
+  },
+  jdirectiva: {
+    title: "Junta directiva",
+    sub: "Órgano de dirección y administración · Art. 38",
+    color: "#0F6E56",
+    bg: "#E1F5EE",
+    funcs: ["Aprobar su reglamento y el de las Comisiones de Trabajo.", "Autorizar la celebración de contratos hasta por 10 salarios mínimos.", "Elaborar y presentar el plan estratégico de desarrollo a la Asamblea.", "Convocar a foros y eventos de deliberación comunitaria.", "Ejecutar el programa de trabajo del período correspondiente.", "Estudiar y resolver solicitudes de permiso de los dignatarios (hasta 60 días/año).", "Buscar integración con organismos oficiales y privados para obras comunitarias.", "Llevar censos de recursos humanos, materiales y obras de la comunidad.", "Fijar la fianza del Tesorero para el manejo de fondos.", "Elaborar el presupuesto anual de ingresos y gastos para aprobación de la Asamblea.", "Definir las Comisiones de Trabajo cuando no lo haya hecho la Asamblea.", "Resolver las solicitudes de recusación e impedimentos contra los Conciliadores.", "Las demás que le asigne la Asamblea y no estén atribuidas a otro órgano."]
+  },
+  presidente: {
+    title: "Presidente",
+    sub: "Representante legal · Arts. 41–42",
+    color: "#0F6E56",
+    bg: "#E1F5EE",
+    funcs: ["Ostentar la representación legal de la Junta y suscribir actos, contratos y poderes.", "Ejecutar las decisiones de la Asamblea y de la Junta Directiva.", "Ser delegado a la Asociación de Juntas por derecho propio.", "Presidir y dirigir las sesiones de la Junta Directiva; convocar reuniones.", "Suscribir contratos hasta 120 salarios mínimos; superiores requieren autorización de la Asamblea.", "Firmar conjuntamente con el Tesorero los cheques y órdenes de pago.", "Informar a la entidad de control cuando la Junta no cuente con el mínimo de afiliados.", "Hacer el empalme con el presidente entrante en los 10 días hábiles siguientes.", "Presentar proyectos de mejoramiento y mantenimiento del acueducto.", "Rendir informes de gestión y estado de finanzas a la Asamblea.", "Nombrar el personal necesario para el funcionamiento del acueducto y otros servicios.", "Presentar planes y proyectos para el desarrollo comunitario.", "Las demás funciones que señalen la Asamblea, la Directiva y los reglamentos."]
+  },
+  vicepresidente: {
+    title: "Vicepresidente",
+    sub: "Suplencia y comisiones · Art. 43",
+    color: "#0F6E56",
+    bg: "#E1F5EE",
+    funcs: ["Reemplazar al Presidente en sus ausencias temporales o definitivas.", "Si la ausencia del Presidente es definitiva, convocar Asamblea dentro de 30 días.", "Hacer parte, por derecho propio, de las Comisiones Empresariales.", "Ejercer las funciones que le delegue el Presidente.", "Proponer ante la Asamblea la creación de Comisiones de Trabajo.", "Supervisar y apoyar las actividades de las Comisiones de Trabajo.", "Hacer el empalme con el Vicepresidente entrante en los 10 días hábiles siguientes.", "Las demás que le encomiende la Asamblea, la Directiva y el reglamento."]
+  },
+  secretario: {
+    title: "Secretario",
+    sub: "Gestión documental y comunicaciones · Art. 45",
+    color: "#0F6E56",
+    bg: "#E1F5EE",
+    funcs: ["Comunicar la convocatoria a reuniones de Asamblea y Directiva.", "Registrar, cuidar y mantener actualizados los libros de afiliados, actas y Comisión de Convivencia.", "Llevar, custodiar y organizar el archivo y documentos de la Junta.", "Certificar sobre la condición de afiliados de los miembros.", "Llevar el control de afiliados suspendidos y sancionados.", "Elaborar las actas de la Directiva y de la Comisión de Convivencia.", "Llevar el control de asistencia en Asambleas y reuniones.", "Informar a la Comisión de Convivencia los listados de personas afiliadas.", "Registrar la afiliación de quienes lo soliciten.", "Fijar en sede comunal el horario de atención (mínimo 2 horas semanales).", "Hacer el empalme con el Secretario entrante en los 10 días hábiles siguientes.", "Llevar el archivo de correspondencia recibida y enviada.", "Tramitar las actas ante el Instituto Departamental de Acción Comunal.", "Las demás que le señale la Asamblea, Directiva, Comisión de Convivencia y reglamentos."]
+  },
+  tesorero: {
+    title: "Tesorero",
+    sub: "Finanzas y bienes · Art. 44",
+    color: "#0F6E56",
+    bg: "#E1F5EE",
+    funcs: ["Asumir la responsabilidad en el cuidado y manejo de los dineros y bienes de la Junta.", "Llevar los libros de Caja General, Bancos, Caja Menor e Inventarios.", "Constituir la garantía o fianza de manejo para responder por los fondos de la Junta.", "Firmar conjuntamente con el Presidente cheques y documentos de manejo de dinero.", "Rendir informe de movimiento de tesorería en cada Asamblea Ordinaria y reunión de Directiva.", "Cobrar oportunamente los aportes y cuotas asignadas a la Junta.", "Hacer el empalme con el Tesorero entrante en los 10 días hábiles siguientes.", "Asumir la administración temporal de bienes cuando se anule la elección de dignatarios.", "Las demás que le señale la Asamblea, la Directiva y el reglamento."]
+  },
+  fiscal: {
+    title: "Fiscal",
+    sub: "Control y vigilancia · Art. 49",
+    color: "#A32D2D",
+    bg: "#FCEBEB",
+    funcs: ["Revisar mínimo trimestralmente los libros, registros y comprobantes de la Junta.", "Verificar que todo gasto haya sido autorizado por el órgano competente en debida forma.", "Vigilar el cumplimiento de normas legales y estatutarias dentro de la Junta.", "Rendir informes a la Asamblea y a la Directiva en cada una de sus reuniones.", "Velar porque la contabilidad se lleve de forma regular y en debida forma.", "Examinar las cuentas y verificar el estado de tesorería.", "Informar sobre cualquier irregularidad a la Comisión de Convivencia o autoridad competente.", "Ejercer fiscalización de trabajos de mantenimiento del acueducto y demás obras.", "Convocar Asamblea General ordinaria o extraordinaria cuando las circunstancias lo requieran.", "Hacer el empalme con el Fiscal entrante en los 10 días hábiles siguientes.", "Las demás que le sean asignadas por la Asamblea."]
+  },
+  conciliacion: {
+    title: "Comisión de convivencia y conciliación",
+    sub: "Órgano de conciliación · Art. 60–61",
+    color: "#3B6D11",
+    bg: "#EAF3DE",
+    funcs: ["Promover y preservar la armonía en las relaciones interpersonales y colectivas de la comunidad.", "Surtir la vía conciliatoria de todos los conflictos organizativos al interior de la Junta.", "Avocar mediante conciliación en equidad los conflictos comunitarios susceptibles de transacción.", "Declarar mediante debido proceso la pérdida de la calidad de afiliado (fallecimiento, cambio de residencia, inhabilidad).", "Resolver las solicitudes de afiliación contempladas en el Parágrafo 3 del Art. 11.", "Resolver conflictos en un plazo máximo de 40 días hábiles; vencido el término, remite al nivel superior.", "Procurar que las actas de conciliación presten mérito ejecutivo.", "Designar su Coordinador entre sus propios miembros.", "Actuar como árbitro en caso de empate en votaciones sucesivas sobre el mismo asunto."]
+  },
+  delegados: {
+    title: "Delegados a la asociación de juntas",
+    sub: "Representación externa · Art. 48",
+    color: "#185FA5",
+    bg: "#E6F1FB",
+    funcs: ["Representar a la Junta ante la Asociación de Juntas del Municipio de Nocaima.", "Defender los derechos y prerrogativas de la Junta ante la Asociación.", "Asistir puntualmente a las reuniones de los órganos de los cuales forman parte.", "Votar con responsabilidad y mantener informada a la Junta sobre las decisiones de la Asociación.", "Rendir informe de su gestión a la Asamblea y a la Directiva en cada reunión.", "Hacer el empalme con el Delegado entrante en los 10 días hábiles siguientes.", "Desempeñarse como integrante de la Junta Directiva que representa.", "El Presidente de la Junta es Delegado por derecho propio."]
+  },
+  coord_obras: {
+    title: "Coordinador – Obras públicas",
+    sub: "Comisión de Trabajo · Art. 46",
+    color: "#854F0B",
+    bg: "#FFF0E0",
+    funcs: ["Convocar a reuniones de la Comisión de Obras Públicas y presidirlas.", "Nombrar, entre los miembros inscritos en la Comisión, al afiliado que ejerza la secretaría.", "Rendir informes de la gestión de la Comisión a la Directiva y a la Asamblea en cada reunión ordinaria.", "Llevar, junto con el secretario de la Comisión, las estadísticas de las labores efectuadas.", "Elaborar los presupuestos necesarios para la ejecución de las funciones encomendadas.", "Ejercer las funciones de asesoría en el área de obras e infraestructura comunitaria.", "Asistir a las reuniones de la Junta Directiva con voz y voto.", "Hacer el empalme con el Coordinador entrante en los 10 días hábiles siguientes."]
+  },
+  coord_acueducto: {
+    title: "Coordinador – Acueducto",
+    sub: "Comisión de Trabajo · Art. 47",
+    color: "#1565A3",
+    bg: "#E6F4FF",
+    funcs: ["Controlar el funcionamiento del acueducto en lo referente a condiciones de la bocatoma, tanques de almacenamiento y redes de conducción.", "Controlar que se realicen las muestras diarias del estado de cloración y pH del agua.", "Revisar los informes mensuales del lavado de los tanques de bocatoma, floculación y almacenamiento.", "Ejercer control sobre las muestras de agua enviadas al laboratorio.", "Coordinar los trabajos para el control de fugas e instalaciones nuevas en la red de acueducto.", "Rendir informes de gestión a la Directiva y a la Asamblea.", "Elaborar los presupuestos necesarios para el mantenimiento y operación del acueducto.", "Hacer el empalme con el Coordinador entrante en los 10 días hábiles siguientes."]
+  },
+  coord_salud: {
+    title: "Coordinador – Salud y saneamiento ambiental",
+    sub: "Comisión de trabajo · Art. 47",
+    color: "#854F0B",
+    bg: "#FAEEDA",
+    funcs: ["Convocar y presidir las reuniones de la Comisión.", "Ejercer control sobre el manejo de basuras, materiales de podas y residuos de construcción.", "Coordinar el apoyo de la comunidad en brigadas de salud preventiva.", "Ejercer control sobre la limpieza de lotes sin construcción y las bermas.", "Elaborar las notificaciones necesarias para enviar a los infractores ambientales.", "Rendir informes de gestión a la Directiva y a la Asamblea.", "Llevar estadísticas de labores ejecutadas, en ejecución y proyectadas.", "Hacer el empalme con el Coordinador entrante en los 10 días hábiles siguientes."]
+  },
+  coord_cultura: {
+    title: "Coordinador – Cultura y deportes",
+    sub: "Comisión de trabajo · Art. 47",
+    color: "#854F0B",
+    bg: "#FAEEDA",
+    funcs: ["Convocar y presidir las reuniones de la Comisión.", "Organizar actividades de recreación y cultura para los alumnos de la escuela y la comunidad.", "Proponer el uso de espacios comunitarios para actividades culturales y deportivas.", "Nombrar al afiliado que ejerza la secretaría de la Comisión.", "Rendir informes de gestión a la Directiva y a la Asamblea.", "Llevar estadísticas de labores ejecutadas, en ejecución y proyectadas.", "Elaborar presupuestos para las actividades encomendadas.", "Hacer el empalme con el Coordinador entrante en los 10 días hábiles siguientes."]
+  },
+  coord_empresarial: {
+    title: "Coordinador – Comisión empresarial",
+    sub: "Comisión de trabajo empresarial · Arts. 55–56",
+    color: "#854F0B",
+    bg: "#FAEEDA",
+    funcs: ["Adoptar las decisiones empresariales de especial importancia para el desarrollo de los proyectos.", "Nombrar al gerente, auditor y demás empleados de la empresa comunitaria.", "Fijar los salarios y retribuciones del personal de la empresa.", "Determinar la porción de utilidades que se entregará a la Junta.", "Designar entre sus miembros al Coordinador de la Comisión.", "Rendir informe financiero y de gestión a la Asamblea.", "Reglamentar las reuniones de la Comisión necesarias para el normal desarrollo.", "Hacer el empalme con el Coordinador entrante en los 10 días hábiles siguientes."]
+  },
+  coord_riesgos: {
+    title: "Coordinador – Riesgos y emergencias",
+    sub: "Comisión de trabajo · Gestión del riesgo comunitario",
+    color: "#854F0B",
+    bg: "#FAEEDA",
+    funcs: ["Convocar y presidir las reuniones de la comisión de riesgos.", "Identificar, actualizar y socializar el mapa de riesgos de la comunidad.", "Coordinar acciones preventivas frente a deslizamientos, inundaciones e incendios.", "Promover jornadas de capacitación en prevención y atención de emergencias.", "Articular con la Junta Directiva y entidades de socorro los planes de contingencia.", "Rendir informes de gestión a la Directiva y a la Asamblea.", "Llevar registro de incidentes, puntos críticos y acciones correctivas.", "Hacer el empalme con el Coordinador entrante en los 10 días hábiles siguientes."]
+  }
+};
+
+function showCard(id) {
+  const d = DATA[id];
+  if (!d) return;
+  document.getElementById('panel-title').textContent = d.title;
+  document.getElementById('panel-sub').textContent = d.sub;
+  const ul = document.getElementById('panel-funcs');
+  ul.innerHTML = '';
+  d.funcs.forEach(function(f, i) {
+    const li = document.createElement('li');
+    li.innerHTML = '<span class="func-num" style="background:' + d.bg + ';color:' + d.color + '">' + (i+1) + '</span><span class="func-text">' + f + '</span>';
+    ul.appendChild(li);
+  });
+  document.getElementById('overlay').classList.add('open');
+}
+
+function closeAll() {
+  document.getElementById('overlay').classList.remove('open');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const overlay = document.getElementById('overlay');
+  if (overlay) {
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) closeAll();
+    });
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeAll();
+  });
+
+  const cards = document.querySelectorAll('.card');
+  cards.forEach(function(card) {
+    card.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const cardId = card.getAttribute('data-card-id');
+      if (cardId) {
+        showCard(cardId);
+      }
+    });
+  });
+});
+</script>
+
+</body>
+</html>

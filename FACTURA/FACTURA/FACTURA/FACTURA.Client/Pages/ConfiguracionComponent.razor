@@ -1,0 +1,58 @@
+﻿@page "/configuracion"
+@using FACTURA.Client.Models
+@using FACTURA.Client.Services
+@inject IConfiguracionService Configuracion
+
+<h3>Configuración</h3>
+
+@if (loading)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <EditForm Model="model" OnValidSubmit="GuardarAsync">
+        <DataAnnotationsValidator />
+        <div class="row g-3">
+            <div class="col-md-6"><label class="form-label">Nombre</label><InputText class="form-control" @bind-Value="model.Nombre" /></div>
+            <div class="col-md-3"><label class="form-label">NIT</label><InputText class="form-control" @bind-Value="model.NIT" /></div>
+            <div class="col-md-3"><label class="form-label">Email</label><InputText class="form-control" @bind-Value="model.Email" /></div>
+            <div class="col-md-6"><label class="form-label">Dirección</label><InputText class="form-control" @bind-Value="model.Direccion" /></div>
+            <div class="col-md-3"><label class="form-label">Teléfono</label><InputText class="form-control" @bind-Value="model.Telefono" /></div>
+            <div class="col-md-3"><label class="form-label">IVA por defecto (%)</label><InputNumber class="form-control" @bind-Value="model.ImpuestoPorDefecto" /></div>
+
+            <div class="col-12"><hr /></div>
+            <div class="col-md-3"><label class="form-label">Prefijo Factura</label><InputText class="form-control" @bind-Value="model.ConsecutivoFacturaPrefijo" /></div>
+            <div class="col-md-3"><label class="form-label">Siguiente Factura</label><InputNumber class="form-control" @bind-Value="model.ConsecutivoFacturaSiguiente" /></div>
+            <div class="col-md-3"><label class="form-label">Prefijo Cotización</label><InputText class="form-control" @bind-Value="model.ConsecutivoCotizacionPrefijo" /></div>
+            <div class="col-md-3"><label class="form-label">Siguiente Cotización</label><InputNumber class="form-control" @bind-Value="model.ConsecutivoCotizacionSiguiente" /></div>
+
+            <div class="col-12 d-flex gap-2 mt-3">
+                <button class="btn btn-success" type="submit">Guardar</button>
+                <button class="btn btn-secondary" type="button" @onclick="ResetAsync">Restaurar</button>
+            </div>
+        </div>
+    </EditForm>
+}
+
+@code {
+    private bool loading;
+    private EmpresaConfig model = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        loading = true;
+        try { model = await Configuracion.GetAsync(); }
+        finally { loading = false; }
+    }
+
+    private async Task GuardarAsync()
+    {
+        model = await Configuracion.SaveAsync(model);
+    }
+
+    private async Task ResetAsync()
+    {
+        model = await Configuracion.GetAsync();
+    }
+}

@@ -1,0 +1,72 @@
+@page "/pdffacturaspdf"
+@rendermode InteractiveServer
+@using ACUEDUCTO.Services
+@inject PdfProcessorService PdfProcessor
+
+<h3>Procesar c/u de los PDFs:</h3>
+<h3>CARPETA ORIGEN :: "/wwwroot/FACTURAS/"</h3>
+<h3>CARPETA DESTINO :: "/wwwroot/Imagenes/"</h3>
+<h4>SUB CARPETA DESTINO :: "/(Codigo N°)/"</h4> 
+<h4>DOCUMENTO DESTINO :: "(Numero Factura)".pdf</h4>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-info">@message</div>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+<button class="btn btn-primary" @onclick="ProcessPdfs" disabled="@isProcessing">
+    @if (isProcessing)
+    {
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        @("Procesando...")
+    }
+    else
+    {
+        @("Procesar PDFs")
+    }
+</button>
+
+@code {
+    private string? message;
+    private string? errorMessage;
+    private bool isProcessing = false;
+
+    private async Task ProcessPdfs()
+    {
+        isProcessing = true;
+        message = null;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await PdfProcessor.ProcessFacturasPdfs();
+            if (!string.IsNullOrEmpty(result.Error))
+            {
+                errorMessage = result.Error;
+            }
+            else
+            {
+                message = $"Archivos totales: {result.TotalFiles}, Procesados: {result.ProcessedFiles}";
+                if (result.Errors.Any())
+                {
+                    errorMessage = "Errores:\n" + string.Join("\n", result.Errors);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
+        }
+    }
+}

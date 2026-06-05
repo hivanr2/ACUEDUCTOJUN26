@@ -1,0 +1,181 @@
+﻿@page "/predios/delete"
+@page "/proceso/Eliminar Predio o Punto de Agua de Servicio de Acueducto"
+@using ACUEDUCTO2.Share.Models
+@inject ACUEDUCTO2.Services.PredioServices.PredioService PredioService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Eliminar Predio</PageTitle>
+
+<h1>Eliminar Predio</h1>
+
+<p>¿Está seguro de que desea eliminar este predio?</p>
+<div>
+    <h2>Predio</h2>
+    <hr />
+    @if (predio is null)
+    {
+        <p><em>Cargando...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Propietario</dt>
+            <dd class="col-sm-10">@predio.ApellidosNombresUsuario</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Código Usuario</dt>
+            <dd class="col-sm-10">@predio.CodigoUsuario</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Identificación Facturación</dt>
+            <dd class="col-sm-10">@predio.IdentificacionFacturacion</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Estrato</dt>
+            <dd class="col-sm-10">@predio.Estrato</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Ruta</dt>
+            <dd class="col-sm-10">@predio.Ruta</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Dirección</dt>
+            <dd class="col-sm-10">@predio.Direccion</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Número Catastral</dt>
+            <dd class="col-sm-10">@predio.NumeroCatastral</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Información Catastral</dt>
+            <dd class="col-sm-10">@predio.InformacionCatastral</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Extensión (m²)</dt>
+            <dd class="col-sm-10">@predio.ExtensionM2</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Construidos (m²)</dt>
+            <dd class="col-sm-10">@predio.M2construidos</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Puntos Futuros</dt>
+            <dd class="col-sm-10">@predio.PuntosFuturos</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Número Medidor</dt>
+            <dd class="col-sm-10">@predio.NumeroMedidor</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Marca Medidor</dt>
+            <dd class="col-sm-10">@predio.MarcaMedidor</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Estado Medidor</dt>
+            <dd class="col-sm-10">@predio.EstadoMedidor</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Última Medición</dt>
+            <dd class="col-sm-10">@predio.UltimaMedicion</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Consumo m³ Promedio</dt>
+            <dd class="col-sm-10">@predio.ConsumoM3promedio</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Último Consumo m³</dt>
+            <dd class="col-sm-10">@predio.UltimoConsumoM3</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Valor Total Cobros</dt>
+            <dd class="col-sm-10">@predio.ValorTotalCobros</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Cuotas Cobros</dt>
+            <dd class="col-sm-10">@predio.CantidadCoutasCobros</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Cuotas Pagadas</dt>
+            <dd class="col-sm-10">@predio.CantidadCuotasPagadas</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Valor Total Pagos</dt>
+            <dd class="col-sm-10">@predio.ValorTotalPagos</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Valor Total Deuda</dt>
+            <dd class="col-sm-10">@predio.ValorTotalDeuda</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Tiene Subsidio</dt>
+            <dd class="col-sm-10">@(predio.TieneSubsidio == true ? "Sí" : "No")</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Imprime Factura</dt>
+            <dd class="col-sm-10">@(predio.ImprimeFactura == true ? "Sí" : "No")</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Envía WhatsApp</dt>
+            <dd class="col-sm-10">@(predio.EnviaWhatsapp == true ? "Sí" : "No")</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Envía Correo</dt>
+            <dd class="col-sm-10">@(predio.EnviaCorreo == true ? "Sí" : "No")</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Contador en Seguimiento</dt>
+            <dd class="col-sm-10">@(predio.ContadorEnSeguimiento == true ? "Sí" : "No")</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Latitud</dt>
+            <dd class="col-sm-10">@predio.Latitud</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Longitud</dt>
+            <dd class="col-sm-10">@predio.Longitud</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Activo</dt>
+            <dd class="col-sm-10">@(predio.Activo == true ? "Sí" : "No")</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Fecha Registro</dt>
+            <dd class="col-sm-10">@predio.FechaHoraRegistro</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Observaciones</dt>
+            <dd class="col-sm-10">@predio.Observaciones</dd>
+        </dl>
+        <EditForm method="post" Model="predio" OnValidSubmit="DeletePredio" FormName="delete" Enhance>
+            <button type="submit" class="btn btn-danger" disabled="@(predio is null)">Eliminar</button> |
+            <a href="/predios">Volver a la Lista</a>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private Predio? predio;
+
+    [SupplyParameterFromQuery]
+    private string Idpredio { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        predio = await PredioService.GetByIdAsync(Idpredio, includeTipoConsumo: true, includeUsuarioFacturacion: true);
+
+        if (predio is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    private async Task DeletePredio()
+    {
+        if (predio is null)
+        {
+            return;
+        }
+
+        await PredioService.DeleteAsync(predio.IdPredio);
+        NavigationManager.NavigateTo("/predios");
+    }
+}

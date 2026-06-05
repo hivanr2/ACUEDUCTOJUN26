@@ -1,0 +1,28 @@
+﻿@inherits LayoutComponentBase
+
+<div class="page">
+
+    <main class="text-center">
+
+        <article class="content px-4">
+            @Body
+        </article>
+        <footer>
+            <div class="h6">Powered By: Xcursor.Org</div>
+            <div class="h6"><VersionComponent /></div>
+        </footer>
+    </main>
+</div>
+
+<script>
+    window.cerrarVentana = function (url) {
+        try { window.close(); } catch (e) { }
+        setTimeout(function () {
+            if (!window.closed && url) {
+                window.location.href = url;
+            }
+        }, 50);
+        return false;
+    };
+</script>
+

@@ -1,0 +1,199 @@
+@page "/periodos/editar/{id}"
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Editar periodo</PageTitle>
+
+<h3>Editar periodo</h3>
+<div class="mb-3 d-flex gap-2 flex-wrap">
+    <button type="button" class="btn btn-secondary" @onclick="Volver">Volver al listado</button>
+</div>
+
+@if (!string.IsNullOrEmpty(alerta))
+{
+    <div class="alert alert-danger">@alerta</div>
+}
+
+@if (cargando)
+{
+    <p>Cargando...</p>
+}
+else if (periodo is null)
+{
+    <p>No se encontró el periodo solicitado.</p>
+}
+else
+{
+    <EditForm Model="periodo" OnValidSubmit="GuardarAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Descripción</label>
+                <InputText class="form-control" @bind-Value="periodo.Descripcion" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">ID periodo referencia</label>
+                <InputNumber class="form-control" @bind-Value="periodo.PeriodoReferenciaId" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Inicio registro de consumos</label>
+                <InputDate class="form-control" @bind-Value="periodo.FechaHoraIniciaRegistroConsumo" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Fin registro de consumos</label>
+                <InputDate class="form-control" @bind-Value="periodo.FechaHoraTerminaRegistroConsumo" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Fecha facturación</label>
+                <InputDate class="form-control" @bind-Value="periodo.FechaHoraFacturacion" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Fecha límite de pago</label>
+                <InputDate class="form-control" @bind-Value="periodo.FechaLimitePago" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Fecha suspensión</label>
+                <InputDate class="form-control" @bind-Value="periodo.FechaSuspension" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Porcentaje de mora</label>
+                <InputNumber class="form-control" @bind-Value="periodo.PorcentajeMora" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Porcentaje de subsidio</label>
+                <InputNumber class="form-control" @bind-Value="periodo.PorcentajeSubsidio" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Total de predios</label>
+                <InputNumber class="form-control" @bind-Value="periodo.TotalPredios" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Consumo total m³</label>
+                <InputNumber class="form-control" @bind-Value="periodo.CantidadConsumoM3Total" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Valor total planilla</label>
+                <InputNumber class="form-control" @bind-Value="periodo.ValorTotalPlanilla" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Valor total recaudo</label>
+                <InputNumber class="form-control" @bind-Value="periodo.ValorTotalRecaudo" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Valor total mora</label>
+                <InputNumber class="form-control" @bind-Value="periodo.ValorTotalMora" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Valor total sobretasa</label>
+                <InputNumber class="form-control" @bind-Value="periodo.ValorTotalSobreTasa" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Valor total subsidio</label>
+                <InputNumber class="form-control" @bind-Value="periodo.ValorTotalSubsidio" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Encargado registro de consumos</label>
+                <InputText class="form-control" @bind-Value="periodo.EncargadoRegistroConsumos" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Encargado facturación</label>
+                <InputText class="form-control" @bind-Value="periodo.EncargadoFacturacion" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Última factura registrada</label>
+                <InputText class="form-control" @bind-Value="periodo.UltimaFacturaRegistrada" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Valor total otros</label>
+                <InputNumber class="form-control" @bind-Value="periodo.ValorTotalOtros" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Valor total consumo básico</label>
+                <InputNumber class="form-control" @bind-Value="periodo.ValorTotalConsumoBasico" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Valor total consumo adicional</label>
+                <InputNumber class="form-control" @bind-Value="periodo.ValorTotalConsumoAdicional" />
+            </div>
+            <div class="col-12">
+                <label class="form-label">Observaciones</label>
+                <InputTextArea class="form-control" rows="3" @bind-Value="periodo.Observaciones" />
+            </div>
+            <div class="col-12 form-check mt-2">
+                <InputCheckbox id="abierta" class="form-check-input" @bind-Value="AbiertaFormulario" />
+                <label class="form-check-label" for="abierta">¿Periodo abierto?</label>
+            </div>
+        </div>
+        <div class="mt-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Guardar</button>
+            <button type="button" class="btn btn-secondary" @onclick="Volver">Cancelar</button>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public string id { get; set; } = string.Empty;
+
+    private Periodo? periodo;
+    private bool cargando = true;
+    private string? alerta;
+    private bool AbiertaFormulario
+    {
+        get => periodo?.Abierta ?? false;
+        set
+        {
+            if (periodo != null)
+            {
+                periodo.Abierta = value;
+            }
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        cargando = true;
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            alerta = "El identificador es obligatorio.";
+            periodo = null;
+            cargando = false;
+            return;
+        }
+
+        using var db = DbFactory.CreateDbContext();
+        periodo = await db.Periodos.FirstOrDefaultAsync(p => p.Guid == id);
+        if (periodo == null)
+        {
+            alerta = "El periodo solicitado no existe.";
+        }
+        cargando = false;
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (periodo is null)
+        {
+            alerta = "No hay datos para guardar.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(periodo.Descripcion))
+        {
+            alerta = "La descripción es obligatoria.";
+            return;
+        }
+
+        periodo.Abierta ??= false;
+
+        using var db = DbFactory.CreateDbContext();
+        db.Periodos.Update(periodo);
+        await db.SaveChangesAsync();
+        Navigation.NavigateTo("/periodos", forceLoad: true);
+    }
+
+    void Volver() => Navigation.NavigateTo("/periodos", forceLoad: true);
+}

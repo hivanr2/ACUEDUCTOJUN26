@@ -1,0 +1,210 @@
+﻿@page "/trabajos"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+
+@rendermode InteractiveServer
+
+@implements IAsyncDisposable
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+<PageTitle>Trabajos</PageTitle>
+
+<div class="container-fluid py-2 py-md-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <h1 class="h4 mb-0">Trabajos</h1>
+            <small class="text-muted">Gestión de trabajos abiertos y finalizados</small>
+        </div>
+        <!-- Botón superior eliminado a petición -->
+    </div>
+
+    <div class="row g-2 align-items-center mb-2">
+        <div class="col-12 col-md-6">
+            <input type="search" class="form-control" autofocus @bind=filterText @bind:event="oninput" placeholder="Buscar por descripción..." />
+        </div>
+        <div class="col-12 col-md-6 text-md-end text-muted">
+            <span class="me-2">Abiertos: <span class="badge bg-info text-dark">@abiertos.Count()</span></span>
+            <span>Finalizados: <span class="badge bg-success">@finalizados.Count()</span></span>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h2 class="h6 mb-0">Trabajos abiertos</h2>
+            <span class="badge rounded-pill bg-info text-dark">@abiertos.Count()</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover table-sm align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Descripción</th>
+                        <th>Tipo</th>
+                        <th>Estado</th>
+                        <th>Responsable</th>
+                        <th class="text-center">Inicia</th>
+                        <th class="text-center">Fin</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (abiertos.Any())
+                    {
+                        @foreach (var row in abiertos)
+                        {
+                            <tr>
+                                <td>@row.Descripcion</td>
+                                <td><span class="badge rounded-pill bg-secondary-subtle text-dark">@GetTipoNombre(row.TipoTrabajo)</span></td>
+                                <td><span class="badge rounded-pill @GetEstadoBadgeClass(row.Estado)">@row.Estado</span></td>
+                                <td>@GetResponsable(row)</td>
+                                <td class="text-center">@(row.FechaInicio?.ToString("dd/MM/yyyy HH:mm") ?? "")</td>
+                                <td class="text-center">@(row.FechaFinalizacion?.ToString("dd/MM/yyyy HH:mm") ?? "")</td>
+                                <td class="text-end">
+                                    <a class="btn btn-link btn-sm" href="@($"/trabajos/edit?idtrabajo={row.IdTrabajo}")" target="_blank">Editar</a>
+                                    <span class="text-muted">|</span>
+                                    <a class="btn btn-link btn-sm" href="@($"/trabajos/details?idtrabajo={row.IdTrabajo}")" target="_blank">Detalles</a>
+                                    <span class="text-muted">|</span>
+                                    <a class="btn btn-link btn-sm text-danger" href="@($"/trabajos/delete?idtrabajo={row.IdTrabajo}")" target="_blank">Borrar</a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">Sin trabajos abiertos</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h2 class="h6 mb-0">Trabajos finalizados</h2>
+            <span class="badge rounded-pill bg-success">@finalizados.Count()</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover table-sm align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Descripción</th>
+                        <th>Tipo</th>
+                        <th>Estado</th>
+                        <th>Responsable</th>
+                        <th class="text-center">Inicia</th>
+                        <th class="text-center">Fin</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (finalizados.Any())
+                    {
+                        @foreach (var row in finalizados)
+                        {
+                            <tr>
+                                <td>@row.Descripcion</td>
+                                <td><span class="badge rounded-pill bg-secondary-subtle text-dark">@GetTipoNombre(row.TipoTrabajo)</span></td>
+                                <td><span class="badge rounded-pill @GetEstadoBadgeClass(row.Estado)">@row.Estado</span></td>
+                                <td>@GetResponsable(row)</td>
+                                <td class="text-center">@(row.FechaInicio?.ToString("dd/MM/yyyy HH:mm") ?? "")</td>
+                                <td class="text-center">@(row.FechaFinalizacion?.ToString("dd/MM/yyyy HH:mm") ?? "")</td>
+                                <td class="text-end">
+                                    <a class="btn btn-link btn-sm" href="@($"/trabajos/edit?idtrabajo={row.IdTrabajo}")" target="_blank">Editar</a>
+                                    <span class="text-muted">|</span>
+                                    <a class="btn btn-link btn-sm" href="@($"/trabajos/details?idtrabajo={row.IdTrabajo}")" target="_blank">Detalles</a>
+                                    <span class="text-muted">|</span>
+                                    <a class="btn btn-link btn-sm text-danger" href="@($"/trabajos/delete?idtrabajo={row.IdTrabajo}")" target="_blank">Borrar</a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">Sin trabajos finalizados</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-3">@errorMessage</div>
+    }
+</div>
+
+<!-- Botón flotante crear (igual que Solicitudes) -->
+<a href="/trabajos/create" target="_blank" class="fab-create" title="Crear nuevo trabajo" aria-label="Crear nuevo trabajo">
+    <img src="/img/plus.svg" alt="Crear" onerror="this.onerror=null;this.outerHTML='+';" />
+</a>
+
+@code {
+    private AcueductoContext context = default!;
+    private string? filterText = string.Empty;
+    private string? errorMessage = null;
+
+    private List<Trabajo> trabajos = new();
+    private List<TiposTrabajo> tipos = new();
+    private Dictionary<int, string> tiposMap = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        context = DbFactory.CreateDbContext();
+        try
+        {
+            trabajos = await context.Trabajos
+                .AsNoTracking()
+                .OrderByDescending(t => t.IdTrabajo)
+                .ToListAsync();
+
+            tipos = await context.TiposTrabajos
+                .AsNoTracking()
+                .OrderBy(t => t.Nombre)
+                .ToListAsync();
+
+            tiposMap = tipos.ToDictionary(t => t.IdTipoTrabajo, t => t.Nombre ?? string.Empty);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private string GetTipoNombre(int id) => tiposMap.TryGetValue(id, out var nombre) ? nombre : string.Empty;
+
+    IEnumerable<Trabajo> filterTrabajos => string.IsNullOrWhiteSpace(filterText)
+        ? trabajos
+        : trabajos.Where(x => (x.Descripcion ?? string.Empty).Contains(filterText, StringComparison.OrdinalIgnoreCase));
+
+    private DateTime Now => DateTime.Now;
+
+    // Abiertos: todos los trabajos excepto los finalizados (sin fecha de fin o fin futuro)
+    IEnumerable<Trabajo> abiertos => filterTrabajos.Where(t => !t.FechaFinalizacion.HasValue || t.FechaFinalizacion >= Now);
+
+    // Finalizados: tienen fin pasado
+    IEnumerable<Trabajo> finalizados => filterTrabajos.Where(t => t.FechaFinalizacion.HasValue && t.FechaFinalizacion < Now);
+
+    private string GetEstadoBadgeClass(string? estado)
+    {
+        var e = (estado ?? string.Empty).ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(e)) return "bg-secondary";
+        if (e.Contains("final")) return "bg-success";
+        if (e.Contains("pend") || e.Contains("prog") || e.Contains("abier")) return "bg-warning text-dark";
+        return "bg-info text-dark";
+    }
+
+    private string GetResponsable(Trabajo t)
+    {
+        // Se asume que el campo Personal almacena el responsable (texto). Si hay múltiples, se muestra el primero.
+        var p = t.Personal ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(p)) return "—";
+        // Intentar separar por comas o saltos si hay varios
+        var first = p.Split(new[] { '\n', '\r', ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+        return string.IsNullOrWhiteSpace(first) ? p : first!;
+    }
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}

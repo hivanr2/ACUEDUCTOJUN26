@@ -1,0 +1,85 @@
+@page "/proceso/Usuarios"
+@page "/proceso/Listado de Usuarios"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using ACUEDUCTO2-0_0.Data
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Administradores")]
+
+@inject ACUEDUCTO2-0_0.Data.SeguridadService SeguridadService
+
+<h3>Listado de Usuarios</h3>
+<p class="text-muted">Usuarios registrados en la tabla AspNetUsers</p>
+
+@if (usuarios == null)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (!usuarios.Any())
+{
+    <div class="alert alert-info">No hay usuarios registrados.</div>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>Usuario</th>
+                <th>Email</th>
+                <th>Teléfono</th>
+                <th>Confirmado</th>
+                <th>Roles</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var usuario in usuarios)
+            {
+                var id = usuario.Id;
+                var userRoles = rolesDeUsuarios.ContainsKey(id) ? rolesDeUsuarios[id] : new List<string>();
+                <tr>
+                    <td>@(string.IsNullOrWhiteSpace(usuario.UserName) ? usuario.Email : usuario.UserName)</td>
+                    <td>@usuario.Email</td>
+                    <td>@usuario.PhoneNumber</td>
+                    <td>@(usuario.EmailConfirmed ? "Sí" : "No")</td>
+                    <td>
+                        @if (userRoles.Any())
+                        {
+                            @foreach (var r in userRoles)
+                            {
+                                <span class="badge bg-secondary me-1">@r</span>
+                            }
+                        }
+                        else
+                        {
+                            <span class="text-muted">Sin roles</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<ApplicationUser>? usuarios;
+    private Dictionary<string, List<string>> rolesDeUsuarios = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDatos();
+    }
+
+    private async Task CargarDatos()
+    {
+        usuarios = await SeguridadService.ObtenerUsuariosAsync();
+        rolesDeUsuarios.Clear();
+
+        if (usuarios != null)
+        {
+            foreach (var u in usuarios)
+            {
+                var r = await SeguridadService.ObtenerRolesDeUsuarioAsync(u.Id);
+                rolesDeUsuarios[u.Id] = r.ToList();
+            }
+        }
+    }
+}

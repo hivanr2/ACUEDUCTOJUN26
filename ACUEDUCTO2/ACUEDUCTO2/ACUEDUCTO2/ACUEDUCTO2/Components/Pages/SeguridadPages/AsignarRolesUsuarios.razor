@@ -1,0 +1,235 @@
+@page "/proceso/Asignar Roles a Usuarios"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using ACUEDUCTO2.Data
+@attribute [Authorize(Roles = "Administradores")]
+
+@inject ACUEDUCTO2.Data.SeguridadService SeguridadService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h3>Asignar Roles a Usuarios</h3>
+<p class="text-muted">Administre la asignación de roles a cada usuario del sistema.</p>
+
+@if (!string.IsNullOrEmpty(mensaje))
+{
+    <div class="alert @(esError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+        @mensaje
+        <button type="button" class="btn-close" @onclick="() => mensaje = null"></button>
+    </div>
+}
+
+@if (usuarios == null || roles == null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <div class="row g-2 align-items-center mb-3">
+        <div class="col-12 col-md-5">
+            <input type="search" class="form-control" autofocus
+                   @bind="filtroTexto" @bind:event="oninput"
+                   placeholder="Buscar por nombre, identificación, correo, teléfono..." />
+        </div>
+        <div class="col-12 col-md-3">
+            <select class="form-select" @bind="filtroRol">
+                <option value="">-- Todos los roles --</option>
+                <option value="__SIN_ROL__">Sin roles</option>
+                @foreach (var role in roles)
+                {
+                    <option value="@role.Name">@role.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-12 col-md-4 text-md-end small text-muted">
+            <span>Usuarios: <span class="badge bg-secondary">@UsuariosFiltrados.Count()</span></span>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-striped table-hover table-sm align-middle mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Apellidos y Nombres</th>
+                        <th>Identificación</th>
+                        <th>Correo</th>
+                        <th>Teléfono</th>
+                        <th>Roles Asignados</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var (usuario, userRoles) in UsuariosFiltrados)
+                    {
+                        var userId = usuario.Id;
+
+                        <tr>
+                            <td>@usuario.ApellidosNombres</td>
+                            <td>@usuario.Identificacion</td>
+                            <td>@usuario.Email</td>
+                            <td>@usuario.PhoneNumber</td>
+                            <td>
+                                @if (userRoles.Any())
+                                {
+                                    @foreach (var rol in userRoles)
+                                    {
+                                        <span class="badge @(rol == "Administradores" ? "bg-warning text-dark" : "bg-primary") me-1">@rol</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Sin roles</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" @onclick="() => ToggleDropdown(userId)">
+                                        Gestionar Roles
+                                    </button>
+                                    <ul class="dropdown-menu p-2 @(openDropdownUserId == userId ? "show" : "")" style="min-width: 250px; display:@(openDropdownUserId == userId ? "block" : "none");">
+                                        @foreach (var role in roles)
+                                        {
+                                            var roleName = role.Name!;
+                                            var asignado = userRoles.Contains(roleName);
+                                            <li class="mb-1">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox"
+                                                           checked="@asignado"
+                                                           @onchange="e => ToggleRolUsuario(userId, roleName, (bool)e.Value!)" />
+                                                    <label class="form-check-label">
+                                                        @roleName
+                                                    </label>
+                                                </div>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ApplicationUser>? usuarios;
+    private List<ApplicationRole>? roles;
+    private Dictionary<string, List<string>> rolesDeUsuarios = new();
+    private string? mensaje;
+    private bool esError;
+    private string? filtroRol;
+    private string? openDropdownUserId;
+
+    [SupplyParameterFromQuery(Name = "filtro")]
+    public string? filtroTexto { get; set; }
+
+    private IEnumerable<(ApplicationUser usuario, List<string> userRoles)> UsuariosFiltrados
+    {
+        get
+        {
+            if (usuarios == null)
+                return [];
+
+            IEnumerable<ApplicationUser> resultado = usuarios;
+
+            if (!string.IsNullOrWhiteSpace(filtroTexto))
+            {
+                var ft = filtroTexto;
+                resultado = resultado.Where(u =>
+                    (u.ApellidosNombres ?? "").Contains(ft, StringComparison.OrdinalIgnoreCase) ||
+                    (u.Identificacion ?? "").Contains(ft, StringComparison.OrdinalIgnoreCase) ||
+                    (u.Email ?? "").Contains(ft, StringComparison.OrdinalIgnoreCase) ||
+                    (u.PhoneNumber ?? "").Contains(ft, StringComparison.OrdinalIgnoreCase));
+            }
+
+            return resultado.Select(u =>
+            {
+                var ur = rolesDeUsuarios.TryGetValue(u.Id, out var list) ? list : [];
+                return (u, ur);
+            })
+            .Where(x =>
+            {
+                if (string.IsNullOrEmpty(filtroRol))
+                    return true;
+                if (filtroRol == "__SIN_ROL__")
+                    return x.ur.Count == 0;
+
+                return x.ur.Contains(filtroRol);
+            });
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDatos();
+    }
+
+    private async Task CargarDatos()
+    {
+        usuarios = await SeguridadService.ObtenerUsuariosAsync();
+        if (usuarios != null)
+        {
+            usuarios = usuarios.OrderBy(u => u.ApellidosNombres).ToList();
+        }
+        roles = await SeguridadService.ObtenerRolesAsync();
+        rolesDeUsuarios.Clear();
+
+        foreach (var usuario in usuarios)
+        {
+            var userRoles = await SeguridadService.ObtenerRolesDeUsuarioAsync(usuario.Id);
+            rolesDeUsuarios[usuario.Id] = userRoles.ToList();
+        }
+    }
+
+    private async Task ToggleRolUsuario(string userId, string roleName, bool asignar)
+    {
+        IdentityResult result;
+        if (asignar)
+        {
+            result = await SeguridadService.AsignarRolAUsuarioAsync(userId, roleName);
+        }
+        else
+        {
+            result = await SeguridadService.RemoverRolDeUsuarioAsync(userId, roleName);
+        }
+
+        if (result.Succeeded)
+        {
+            // Update local state
+            if (asignar)
+            {
+                if (!rolesDeUsuarios.ContainsKey(userId))
+                    rolesDeUsuarios[userId] = new List<string>();
+                if (!rolesDeUsuarios[userId].Contains(roleName))
+                    rolesDeUsuarios[userId].Add(roleName);
+            }
+            else
+            {
+                if (rolesDeUsuarios.ContainsKey(userId))
+                    rolesDeUsuarios[userId].Remove(roleName);
+            }
+
+            var userName = usuarios?.FirstOrDefault(u => u.Id == userId)?.Email ?? userId;
+            mensaje = asignar
+                ? $"Rol '{roleName}' asignado a '{userName}'."
+                : $"Rol '{roleName}' removido de '{userName}'.";
+            esError = false;
+        }
+        else
+        {
+            mensaje = string.Join(" ", result.Errors.Select(e => e.Description));
+            esError = true;
+        }
+    }
+
+    private void ToggleDropdown(string userId)
+    {
+        if (openDropdownUserId == userId)
+            openDropdownUserId = null;
+        else
+            openDropdownUserId = userId;
+    }
+}

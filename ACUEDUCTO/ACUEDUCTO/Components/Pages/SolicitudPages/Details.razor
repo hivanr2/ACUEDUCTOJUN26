@@ -1,0 +1,164 @@
+﻿@page "/solicitudes/details"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Detalle de Solicitud</PageTitle>
+
+@if (solicitud is null)
+{
+    <div class="container py-3"><p><em>Cargando…</em></p></div>
+}
+else
+{
+    <div class="container-fluid py-2 py-md-3">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-10 col-xl-9">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <div>
+                            <h2 class="h5 mb-0">Solicitud #@solicitud.Id</h2>
+                            <small class="text-muted">Detalle completo de la solicitud</small>
+                        </div>
+                        <div>
+                            <span class="badge rounded-pill @GetEstadoBadgeClass(solicitud.EstadoNavigation?.Nombre)">
+                                @solicitud.EstadoNavigation?.Nombre
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <div class="kv">
+                                    <div class="k">Usuario</div>
+                                    <div class="v">@(!string.IsNullOrWhiteSpace(solicitud.IdUsuarioNavigation?.ApellidosNombres) ? solicitud.IdUsuarioNavigation?.ApellidosNombres : solicitud.IdUsuario)</div>
+                                </div>
+                                <div class="kv">
+                                    <div class="k">Palabras clave</div>
+                                    <div class="v">
+                                        @if (!string.IsNullOrWhiteSpace(solicitud.Codigo))
+                                        {
+                                            var parts = solicitud.Codigo.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                                            foreach (var p in parts)
+                                            {
+                                                <span class="chip chip-outline">@p</span>
+                                            }
+                                        }
+                                        else { <span>—</span>; }
+                                    </div>
+                                </div>
+                                <div class="kv">
+                                    <div class="k">Tipo</div>
+                                    <div class="v"><span class="badge rounded-pill bg-info">@solicitud.TipoNavigation?.Nombre</span></div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="kv">
+                                    <div class="k">Fecha recepción</div>
+                                    <div class="v">@(solicitud.FechaHoraRecepcion?.ToString("g") ?? "—")</div>
+                                </div>
+                                <div class="kv">
+                                    <div class="k">Estado</div>
+                                    <div class="v"><span class="badge rounded-pill @GetEstadoBadgeClass(solicitud.EstadoNavigation?.Nombre)">@solicitud.EstadoNavigation?.Nombre</span></div>
+                                </div>
+                                <div class="kv">
+                                    <div class="k">Cerrada</div>
+                                    <div class="v">
+                                        @if (solicitud.Cerrada == true)
+                                        { <span class="badge rounded-pill bg-success">Sí</span> }
+                                        else { <span class="badge rounded-pill bg-warning text-dark">No</span> }
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <h3 class="section-title">Descripción</h3>
+                                <div class="desc-box">@solicitud.Descripción</div>
+                            </div>
+
+                            <div class="col-12">
+                                <h3 class="section-title">Ciclo PHVA</h3>
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <div class="kv"><div class="k">Planear</div><div class="v">@(!string.IsNullOrWhiteSpace(solicitud.Planear) ? solicitud.Planear : "—")</div></div>
+                                <div class="kv"><div class="k">Usuario Planear</div><div class="v">@(solicitud.UsuarioPlanear?.ToString() ?? "—")</div></div>
+                                <div class="kv"><div class="k">Fecha Planear</div><div class="v">@(solicitud.FechaHoraPlanear?.ToString("g") ?? "—")</div></div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="kv"><div class="k">Hacer</div><div class="v">@(!string.IsNullOrWhiteSpace(solicitud.Hacer) ? solicitud.Hacer : "—")</div></div>
+                                <div class="kv"><div class="k">Usuario Hacer</div><div class="v">@(solicitud.UsuarioHacer?.ToString() ?? "—")</div></div>
+                                <div class="kv"><div class="k">Fecha Hacer</div><div class="v">@(solicitud.FechaHoraHacer?.ToString("g") ?? "—")</div></div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="kv"><div class="k">Verificar</div><div class="v">@(!string.IsNullOrWhiteSpace(solicitud.Verificar) ? solicitud.Verificar : "—")</div></div>
+                                <div class="kv"><div class="k">Usuario Verifica</div><div class="v">@(solicitud.UsuarioVerifica?.ToString() ?? "—")</div></div>
+                                <div class="kv"><div class="k">Fecha Verifica</div><div class="v">@(solicitud.FechaHoraVerifica?.ToString("g") ?? "—")</div></div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="kv"><div class="k">Actuar para mejorar</div><div class="v">@(!string.IsNullOrWhiteSpace(solicitud.ActuarMejora) ? solicitud.ActuarMejora : "—")</div></div>
+                                <div class="kv"><div class="k">Usuario Actúa Mejora</div><div class="v">@(solicitud.UsuarioActuaMejora?.ToString() ?? "—")</div></div>
+                                <div class="kv"><div class="k">Fecha Actúa Mejora</div><div class="v">@(solicitud.FechaHoraActuaMejora?.ToString("g") ?? "—")</div></div>
+                            </div>
+
+                            <div class="col-12">
+                                <h3 class="section-title">Cierre</h3>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="kv"><div class="k">Usuario Cierre</div><div class="v">@(solicitud.UsuarioCerrada?.ToString() ?? "—")</div></div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="kv"><div class="k">Fecha Cierre</div><div class="v">@(solicitud.FechaHoraCerrada?.ToString("g") ?? "—")</div></div>
+                            </div>
+                            <div class="col-12">
+                                <div class="kv"><div class="k">Observaciones</div><div class="v">@(!string.IsNullOrWhiteSpace(solicitud.Observaciones) ? solicitud.Observaciones : "—")</div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-footer bg-white">
+                        <div class="actions-bar">
+                            <a class="btn btn-outline-secondary" href="/solicitudes" onclick="return cerrarVentana('/solicitudes');">Cerrar</a>
+                            <a class="btn btn-primary" href="@($"/solicitudes/edit?id={solicitud.Id}")">Editar</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Solicitud? solicitud;
+
+    [SupplyParameterFromQuery]
+    private int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        solicitud = await context.Solicitudes
+            .Include(s => s.IdUsuarioNavigation)
+            .Include(s => s.TipoNavigation)
+            .Include(s => s.EstadoNavigation)
+            .FirstOrDefaultAsync(m => m.Id == Id);
+
+        if (solicitud is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    private string GetEstadoBadgeClass(string? nombre)
+    {
+        if (string.IsNullOrWhiteSpace(nombre)) return "bg-secondary";
+        var n = nombre.ToLowerInvariant();
+        if (n.Contains("cerr")) return "bg-success";
+        if (n.Contains("pend") || n.Contains("abier")) return "bg-warning text-dark";
+        if (n.Contains("proc") || n.Contains("tram")) return "bg-info text-dark";
+        return "bg-secondary";
+    }
+}

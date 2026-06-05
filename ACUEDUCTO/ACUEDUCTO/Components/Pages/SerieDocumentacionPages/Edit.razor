@@ -1,0 +1,95 @@
+﻿@page "/seriedocumentacions/edit"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Edit</PageTitle>
+
+<h1>Edit</h1>
+
+<h2>SerieDocumentacion</h2>
+<hr />
+@if (SerieDocumentacion is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-4">
+            <EditForm method="post" Model="SerieDocumentacion" OnValidSubmit="UpdateSerieDocumentacion" FormName="edit" Enhance>
+                <DataAnnotationsValidator />
+                <ValidationSummary role="alert"/>
+                <input type="hidden" name="SerieDocumentacion.Id" value="@SerieDocumentacion.Id" />
+                <div class="mb-3">
+                    <label for="nombre" class="form-label">Nombre:</label>
+                    <InputText id="nombre" @bind-Value="SerieDocumentacion.Nombre" class="form-control" />
+                    <ValidationMessage For="() => SerieDocumentacion.Nombre" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="descripcion" class="form-label">Descripcion:</label>
+                    <InputText id="descripcion" @bind-Value="SerieDocumentacion.Descripcion" class="form-control" />
+                    <ValidationMessage For="() => SerieDocumentacion.Descripcion" class="text-danger" />
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<div>
+    <a href="/seriedocumentacions">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private int Id { get; set; }
+
+    [SupplyParameterFromForm]
+    private SerieDocumentacion? SerieDocumentacion { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        SerieDocumentacion ??= await context.SerieDocumentacions.FirstOrDefaultAsync(m => m.Id == Id);
+
+        if (SerieDocumentacion is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    // To protect from overposting attacks, enable the specific properties you want to bind to.
+    // For more information, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task UpdateSerieDocumentacion()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Attach(SerieDocumentacion!).State = EntityState.Modified;
+
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (!SerieDocumentacionExists(SerieDocumentacion!.Id))
+            {
+                NavigationManager.NavigateTo("notfound");
+            }
+            else
+            {
+                throw;
+            }
+        }
+
+        NavigationManager.NavigateTo("/seriedocumentacions");
+    }
+
+    private bool SerieDocumentacionExists(int id)
+    {
+        using var context = DbFactory.CreateDbContext();
+        return context.SerieDocumentacions.Any(e => e.Id == id);
+    }
+}

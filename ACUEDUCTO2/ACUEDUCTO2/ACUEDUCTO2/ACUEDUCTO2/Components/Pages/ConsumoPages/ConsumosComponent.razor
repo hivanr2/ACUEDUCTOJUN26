@@ -1,0 +1,1058 @@
+@page "/consumoscomponent"
+@layout SimpleLayout
+@using ACUEDUCTO2.Components.Layout
+@using ACUEDUCTO2.Share.Models
+@using Facturacion = ACUEDUCTO2.Share.Models.Factura
+@* QuickGrid removed - not available in this target. Use plain lists/tables *@
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IJSRuntime JSRuntime
+@inject NavigationManager nav
+@inject ACUEDUCTO2.Services.Email.EmailService EmailService
+@using ACUEDUCTO2.Services
+@using System.Globalization
+@inject ACUEDUCTO2.Services.IWhatsAppService WhatsAppService
+@inject ACUEDUCTO2.Services.IPdfService PdfService
+@inject IWebHostEnvironment Env
+@using Microsoft.AspNetCore.Components.Forms
+@using System.IO
+@using System.Net.Http
+@using System.Net.Http.Json
+@using System.Text.Json
+@using System.Text
+@using System.Text.RegularExpressions
+
+@rendermode InteractiveServer
+
+<style>
+    @@media (max-width: 768px) {
+        .table-container.table-responsive table {
+            min-width: 860px;
+        }
+
+        .table-container input.form-control-lg {
+            padding-top: .35rem;
+            padding-bottom: .35rem;
+            font-size: 1.1rem;
+        }
+
+        /* Mobile capture mode: keep header/footer visible, scroll list in the center */
+        .consumos-mobile-shell {
+            height: calc(100svh - 220px);
+            min-height: 220px;
+        }
+        .consumos-mobile-list {
+            height: 100%;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .consumos-mobile-card-a {
+            border-left: 6px solid #6ea8fe;
+            border-top-left-radius: .5rem;
+            border-bottom-left-radius: .5rem;
+        }
+
+        .consumos-mobile-card-b {
+            border-left: 6px solid #a3cfbb;
+            border-top-left-radius: .5rem;
+            border-bottom-left-radius: .5rem;
+        }
+
+        .consumos-mobile-list .card.consumos-mobile-card-a {
+            background-color: #e7f1ff !important;
+        }
+
+        .consumos-mobile-list .card.consumos-mobile-card-b {
+            background-color: #eaf7f0 !important;
+        }
+
+        .consumos-mobile-list .consumos-mobile-card-a > .card-body,
+        .consumos-mobile-list .consumos-mobile-card-b > .card-body {
+            background-color: rgba(255, 255, 255, 0.55) !important;
+        }
+        /* Make note areas full width on mobile for better UX */
+        .notes-col, .note-block {
+            width: 100% !important;
+            max-width: none !important;
+            min-width: 0 !important;
+            display: block;
+        }
+        /* Center control checkboxes and actions on mobile to avoid overflow.
+           Show checkboxes side-by-side by using inline-flex and auto width. */
+        .controls-row {
+            justify-content: center !important;
+        }
+        .controls-row .form-check {
+            display: inline-flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            width: auto !important;
+            margin: .25rem !important;
+        }
+        /* smaller filter link on mobile */
+        .btn-link.small {
+            font-size: .85rem;
+            padding: 0;
+        }
+    }
+    /* Fixed width for observation/notes columns so both occupy the same space on desktop */
+    .notes-col { width: 220px; max-width: 220px; }
+    .note-block { min-width: 220px; max-width: 220px; }
+
+    /* Responsive: override fixed widths on small screens */
+    @@media (max-width: 768px) {
+        .notes-col, .note-block {
+            width: 100% !important;
+            max-width: none !important;
+            min-width: 0 !important;
+            display: block;
+        }
+    }
+</style>
+
+
+<!-- Encabezado moderno con navegación -->
+<div class="container-fluid @(tomaDatos ? "p-0" : "py-2 py-md-3")">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div class="d-flex align-items-center gap-2">
+            @if (facturacion != null && facturacion.Count == 1)
+            {
+                @if (@id_planilla_anterior != "No disponible")
+                {
+                    <a class="btn btn-outline-secondary btn-sm" href="/consumoscomponent?id=@id_planilla_anterior" target="_self" title="Anterior">
+                        <i class="bi bi-arrow-left"></i>
+                    </a>
+                }
+            }
+            <h3 class="h5 mb-0">CONSUMOS :: @str_planilla</h3>
+            @if (facturacion != null && facturacion.Count == 1)
+            {
+                @if (@id_planilla_siguiente != "No disponible")
+                {
+                    <a class="btn btn-outline-secondary btn-sm" href="/consumoscomponent?id=@id_planilla_siguiente" target="_self" title="Siguiente">
+                        <i class="bi bi-arrow-right"></i>
+                    </a>
+                }
+            }
+        </div>
+        <div class="text-nowrap">
+            <span class="badge bg-primary-subtle text-primary border">Periodo: <strong>@str_periodo_largo</strong></span>
+        </div>
+    </div>
+
+    @if (!editaPlanilla)
+    {
+        <div class="alert alert-warning py-2 mb-2 text-center">
+            La planilla está cerrada. La edición está deshabilitada.
+        </div>
+    }
+
+    @if (mostrar && !tomaDatos)
+    {
+        <div class="alert alert-info py-2 mb-2 d-flex flex-wrap gap-2 align-items-center">
+            <div>
+                <strong>Fecha Toma de Consumos:</strong>
+                <span>@(FechaTomaConsumoPlanilla.HasValue? FechaTomaConsumoPlanilla.Value.ToString("D", new CultureInfo("es-CO")) : "")</span>
+            </div>
+            <div>
+                <strong>Último día de Pago:</strong>
+                <span>@(FechaUltimoPagoPlanilla.HasValue? FechaUltimoPagoPlanilla.Value.ToString("D", new CultureInfo("es-CO")) : "")</span>
+            </div>
+            <div>
+                <strong>Fecha de Suspensión:</strong>
+                <span>@(FechaSuspensionPlanilla.HasValue? FechaSuspensionPlanilla.Value.ToString("D", new CultureInfo("es-CO")) : "")</span>
+            </div>
+                <div class="ms-auto">
+                <a class="btn btn-outline-primary btn-sm" href="/periodos/edit?idplanilla=@id" title="Editar periodo" target="_blank">
+                    <i class="bi bi-pencil-square"></i> Edita
+                </a>
+            </div>
+        </div>
+    }
+
+    <!-- Controles principales -->
+    @if (facturacion is not null && facturacion.Count > 0)
+    {
+        <div class="card shadow-sm mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex flex-wrap align-items-center justify-content-center gap-2">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-12 col-lg-auto d-flex justify-content-center align-items-center gap-2">
+                            <InputFile OnChange="OnImageSelected" accept="image/*" class="form-control form-control-sm" style="width: 200px;" />
+                            <button class="btn btn-primary btn-sm" @onclick="RegistroAutomatico" disabled="@(!editaPlanilla || _registroAutomaticoEnProceso)">
+                                @if (_registroAutomaticoEnProceso)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                    <span>@_registroAutomaticoEstado</span>
+                                }
+                                else
+                                {
+                                    <span>Registro Automático</span>
+                                }
+                            </button>
+                            @if (!tomaDatos)
+                            {
+                                <button class="btn btn-secondary btn-sm d-none d-md-inline-block" @onclick="PrintTextOnlyVersion">
+                                    <i class="bi bi-printer"></i> Formato de Impresión de Consumos
+                                </button>
+                            }
+                        </div>
+                        <div class="col-12 col-lg d-flex flex-wrap align-items-center gap-3 justify-content-lg-end controls-row">
+                            <div class="d-flex align-items-center gap-3 flex-wrap">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" id="tomaDatos" class="form-check-input" @bind="tomaDatos" @bind:after="OnTomaDatosToggled" disabled="@(!editaPlanilla)" />
+                                    <label for="tomaDatos" class="form-check-label">Toma Datos</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" id="editarRuta" class="form-check-input" @bind="editarRuta" disabled="@(!editaPlanilla)" />
+                                    <label for="editarRuta" class="form-check-label">Editar Ruta</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" id="editarObservaciones" class="form-check-input" @bind="editarObservaciones" disabled="@(!editaPlanilla)" />
+                                    <label for="editarObservaciones" class="form-check-label">Editar Observaciones Predio</label>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <div class="input-group input-group-sm" style="width: 180px;">
+                                    <input id="filtroNombrePredio" class="form-control" placeholder="Filtrar predio" @bind="filtroNombrePredio" @bind:event="oninput" @bind:after="OnFiltroNombrePredioChanged" />
+                                    <button class="btn btn-outline-secondary" type="button" @onclick="ClearFiltroNombrePredio" title="Limpiar filtro">×</button>
+                                </div>
+                                <div class="input-group input-group-sm" style="width: 140px;">
+                                    <input id="filtroCodigoUsuario" class="form-control" placeholder="Filtrar código" @bind="filtroCodigoUsuario" @bind:event="oninput" @bind:after="OnFiltroCodigoUsuarioChanged" />
+                                    <button class="btn btn-outline-secondary" type="button" @onclick="ClearFiltroCodigoUsuario" title="Limpiar filtro">×</button>
+                                </div>
+                                <div class="input-group input-group-sm" style="width: 170px;">
+                                    <input id="filtroNumeroContador" class="form-control" placeholder="Filtrar contador" @bind="filtroNumeroContador" @bind:event="oninput" @bind:after="OnFiltroNumeroContadorChanged" />
+                                    <button class="btn btn-outline-secondary" type="button" @onclick="ClearFiltroNumeroContador" title="Limpiar filtro">×</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* Tabla principal *@
+    @if (facturacion == null)
+    {
+        <div>Cargando...</div>
+    }
+    else if (facturacion.Count > 0)
+    {
+        @* Mobile: when data capture is enabled, use a card layout for easier input.
+           The list scrolls in the center so header and footer remain visible. *@
+        <div class="d-md-none">
+            <div class="consumos-mobile-shell">
+                <div class="consumos-mobile-list">
+                    @{ var facturacionFiltradaMobile = GetFacturacionFiltrada().ToList(); }
+                    @for (int i = 0; i < facturacionFiltradaMobile.Count; i++)
+                    {
+                        var factura = facturacionFiltradaMobile[i];
+                        <div class="card shadow-sm mb-2">
+                            <div class="card-body py-2">
+                                <div class="d-flex justify-content-between gap-2">
+                                    @if (editarRuta)
+                                    {
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="small text-muted">Ruta: <strong>@factura.IdpredioNavigation.Ruta</strong></div>
+                                            <div class="d-flex gap-1">
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => MoveUp(factura)" title="Subir" disabled="@(!editaPlanilla)">
+                                                    <i class="bi bi-arrow-up"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => MoveDown(factura)" title="Bajar" disabled="@(!editaPlanilla)">
+                                                    <i class="bi bi-arrow-down"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="small text-muted">Ruta: <strong>@factura.IdpredioNavigation.Ruta</strong></div>
+                                    }
+                                    <div class="small text-muted">Medidor: <strong>@factura.IdpredioNavigation.NumeroMedidor</strong></div>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-2 mt-1">
+                                    <div class="fw-semibold">@factura.IdpredioNavigation.ApellidosNombresUsuario</div>
+                                        <a class="small" href="/predios/details?idpredio=@factura.Idpredio" target="_blank">Ver</a>
+                                    <button type="button" class="btn btn-link p-0 text-decoration-underline small" title="Filtrar por código" @onclick="() => FiltrarPorCodigo(factura.CodigoUsuario ?? string.Empty)">@factura.CodigoUsuario</button>
+                                </div>
+                                <div class="small text-muted">@factura.IdpredioNavigation.Direccion</div>
+
+                                @* Mostrar observaciones del predio solo cuando se está editando observaciones *@
+                                @if (editarObservaciones)
+                                {
+                                    <div class="mt-2">
+                                        <div class="small text-muted">Observaciones</div>
+                                        @if (editaPlanilla && editarObservaciones)
+                                        {
+                                            <textarea class="form-control form-control-sm mt-1 note-block" value="@factura.IdpredioNavigation.Observaciones" @onchange="async (e) => await OnObservacionesPredioChanged(factura, e)"></textarea>
+                                        }
+                                        else
+                                        {
+                                            <div class="small text-muted mt-1 note-block">@(!string.IsNullOrWhiteSpace(factura.IdpredioNavigation.Observaciones) ? factura.IdpredioNavigation.Observaciones : "N/A")</div>
+                                        }
+                                    </div>
+                                    @* Notas Factura: mostrar solo cuando se activa Ver Observaciones Predio *@
+                                    <div class="mt-2">
+                                        <div class="small text-muted">Notas Factura</div>
+                                        @if (editaPlanilla)
+                                        {
+                                            <textarea class="form-control form-control-sm mt-1 note-block" @bind="factura.NotasFactura" @bind:after="async () => await OnNotasFacturaChanged(factura)"></textarea>
+                                        }
+                                        else
+                                        {
+                                            <div class="small text-muted mt-1 note-block">@(!string.IsNullOrWhiteSpace(factura.NotasFactura) ? factura.NotasFactura : "N/A")</div>
+                                        }
+                                    </div>
+                                }
+
+                                <div class="row g-2 mt-2 align-items-end">
+                                    <div class="col-6">
+                                        <label class="form-label small mb-1">Anterior</label>
+                                        <input class="form-control" value="@factura.MedicionAnterior" readonly />
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small mb-1">Actual</label>
+                                        <input type="number" inputmode="numeric" pattern="[0-9]*"
+                                               class="form-control form-control-lg"
+                                               value="@factura.MedicionActual"
+                                               @onfocus="() => OnFocusedFacturaChanged(factura.Idfactura)"
+                                               @onchange="async (e) => await OnMedicionActualChanged(factura, e)"
+                                               tabindex="@((i * 1000) + 1)"
+                                               disabled="@(!(editaPlanilla && tomaDatos))" />
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-between mt-2">
+                                    <div class="small">Consumo: <strong>@factura.ConsumoM3</strong></div>
+                                    <div class="small">Valor: <strong>@FormatCurrency(factura.ValorConsumo)</strong></div>
+                                </div>
+
+                                @if (factura.MedicionActual.HasValue && factura.MedicionAnterior.HasValue && factura.MedicionActual.Value >= factura.MedicionAnterior.Value)
+                                {
+                                    <div class="d-flex justify-content-end mt-2">
+                                        @if (factura.IdpredioNavigation.ImprimeFactura ?? false)
+                                        {
+                                            @if (!editaPlanilla)
+                                            {
+                                                <a class="btn btn-outline-primary btn-sm" title="Ver Factura (PDF)" href="@($"/imagenes/{factura.IdpredioNavigation.CodigoUsuario}/{factura.CodigoFactura}.pdf")" target="_blank">
+                                                    <i class="bi bi-printer"></i>
+                                                </a>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-outline-primary btn-sm" title="Imprimir / Ver Factura" @onclick="() => OpenPrintWindow(factura.Idfactura)">
+                                                    <i class="bi bi-printer"></i>
+                                                </button>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="small text-muted">Factura</span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* Desktop/tablet: keep the original table *@
+        <div class="d-none d-md-block">
+            <div class="table-container table-responsive">
+                <table class="table table-sm table-hover table-striped align-middle fixed-header">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col" role="button" title="Ordenar" @onclick='() => OnHeaderClick("Ruta")'>Ruta</th>
+                        <th scope="col" role="button" title="Ordenar" @onclick='() => OnHeaderClick("Predio")'>Predio</th>
+                        <th scope="col" role="button" title="Ordenar" @onclick='() => OnHeaderClick("Anterior")'>Anterior</th>
+                        <th scope="col" role="button" title="Ordenar" @onclick='() => OnHeaderClick("Actual")' class="border-blue">Actual</th>
+                        <th scope="col" role="button" title="Ordenar" @onclick='() => OnHeaderClick("ConsumoM3")' class="border-blue">ConsumoM3</th>
+                        <th scope="col" role="button" title="Ordenar" @onclick='() => OnHeaderClick("Valor Consumo")'>Valor Consumo</th>
+                        @if(!tomaDatos)
+                        {
+                            <th scope="col">Seguimiento</th>
+                        }
+                        @if (editarObservaciones)
+                        {
+                            <th scope="col" class="notes-col">Notas Predio</th>
+                        }
+                        @if (editarObservaciones)
+                        {
+                            <th scope="col" class="notes-col">Notas Factura</th>
+                        }
+                        <th scope="col">Factura</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{ var facturacionFiltrada = GetFacturacionFiltrada().ToList(); }
+                    @for (int i = 0; i < facturacionFiltrada.Count; i++)
+                    {
+                        var factura = facturacionFiltrada[i];
+                        <tr>
+                            <td class="text-center">
+                                @if (editarRuta)
+                                {
+                                    <div>@factura.IdpredioNavigation.Ruta</div>
+                                    <div class="d-flex justify-content-center gap-1 mt-1">
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => MoveUp(factura)" title="Subir" disabled="@(!editaPlanilla)">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => MoveDown(factura)" title="Bajar" disabled="@(!editaPlanilla)">
+                                            <i class="bi bi-arrow-down"></i>
+                                        </button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    @factura.IdpredioNavigation.Ruta
+                                }
+                            </td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="fw-semibold">@factura.IdpredioNavigation.ApellidosNombresUsuario</div>
+                                        <a class="small" href="/predios/details?idpredio=@factura.Idpredio" target="_blank">Ver</a>
+                                <button type="button" class="small ms-2 btn btn-link p-0 text-decoration-underline" title="Filtrar por código" @onclick="() => FiltrarPorCodigo(factura.CodigoUsuario ?? factura.IdpredioNavigation?.CodigoUsuario ?? string.Empty)">@((factura.CodigoUsuario ?? factura.IdpredioNavigation?.CodigoUsuario) ?? string.Empty)</button>
+                                    </div>
+                                    <div class="small text-muted">@factura.IdpredioNavigation.Direccion - #@factura.IdpredioNavigation.NumeroMedidor</div>
+                                </td>
+                            <td class="text-center">@factura.MedicionAnterior</td>
+                            <td class="text-center border-blue">
+                                <div>@factura.MedicionActual</div>
+                                @if (editaPlanilla && tomaDatos)
+                                {
+                                    <input type="number" inputmode="numeric" pattern="[0-9]*"
+                                           class="form-control @(tomaDatos ? "form-control-lg" : "form-control-sm") mt-1"
+                                           style="min-width: 7.5rem;"
+                                           value="@factura.MedicionActual"
+                                           @onchange="async (e) => await OnMedicionActualChanged(factura, e)"
+                                           tabindex="@((i * 1000) + 1)"
+                                           disabled="@(!editaPlanilla)" />
+                                }
+                            </td>
+                            <td class="text-center border-blue"><span class="h6 mb-0">@factura.ConsumoM3</span></td>
+                            <td class="text-center">
+                                <div>@FormatCurrency(factura.ValorConsumo)</div>
+                            </td>
+                            @if (!tomaDatos)
+                            {
+                                <td class="text-center">
+                                    @if(editaPlanilla){
+                                        <input type="checkbox" @bind="factura.IdpredioNavigation.ContadorEnSeguimiento" tabindex="@((i * 1000) + 3)" disabled="@(!editaPlanilla)" />
+                                    }else{
+                                        <input type="checkbox" readonly @bind="factura.IdpredioNavigation.ContadorEnSeguimiento" tabindex="@((i * 1000) + 3)" disabled="@(!editaPlanilla)" />
+                                    }
+                                </td>
+                            }
+                            @if (editarObservaciones)
+                            {
+                                <td>
+                                    @if (editaPlanilla && editarObservaciones)
+                                    {
+                                        <textarea class="form-control form-control-sm mt-1 note-block" value="@factura.IdpredioNavigation.Observaciones" @onchange="async (e) => await OnObservacionesPredioChanged(factura, e)" tabindex="@((i * 1000) + 4)"></textarea>
+                                    }
+                                    else
+                                    {
+                                        <div class="small text-muted note-block">@(!string.IsNullOrWhiteSpace(factura.IdpredioNavigation.Observaciones) ? factura.IdpredioNavigation.Observaciones : "N/A")</div>
+                                    }
+                                </td>
+                            }
+                            @if (editarObservaciones)
+                            {
+                                <td>
+                                    <div class="small note-block">@factura.NotasFactura</div>
+                                    @if (editaPlanilla)
+                                    {
+                                        <textarea class="form-control form-control-sm mt-1 note-block" @bind="factura.NotasFactura" @bind:after="async () => await OnNotasFacturaChanged(factura)" tabindex="@((i * 1000) + 4)" disabled="@(!editaPlanilla)"></textarea>
+                                    }
+                                </td>
+                            }
+                            <td>
+                                @if (factura.MedicionActual.HasValue && factura.MedicionAnterior.HasValue && factura.MedicionActual.Value >= factura.MedicionAnterior.Value)
+                                {
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        @if (factura.IdpredioNavigation.ImprimeFactura ?? false)
+                                        {
+                                            @* If planilla closed show static pdf from wwwroot/imagenes/{codigoUsuario}/{codigoDocumento}.pdf, otherwise keep current behavior *@
+                                            @if (!editaPlanilla)
+                                            {
+                                                <a class="btn btn-outline-primary" title="Ver Factura (PDF)" href="@($"/imagenes/{factura.IdpredioNavigation.CodigoUsuario}/{factura.CodigoFactura}.pdf")" target="_blank"><i class="bi bi-printer"></i></a>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-outline-primary" title="Imprimir / Ver Factura" @onclick="() => OpenPrintWindow(factura.Idfactura)"><i class="bi bi-printer"></i></button>
+                                            }
+                                        }
+                                        @if (factura.IdpredioNavigation.EnviaWhatsapp ?? false)
+                                        {
+                                            <button class="btn btn-success" title="WhatsApp" @onclick="() => EnviarPorWhatsApp(factura)"><i class="bi bi-whatsapp"></i></button>
+                                        }
+                                        @if (factura.IdpredioNavigation.EnviaCorreo ?? false)
+                                        {
+                                            @if (PuedeEnviarCorreo(factura) && !sentEmails.Contains(factura.Idfactura))
+                                            {
+                                                <button class="btn btn-info" title="Correo" @onclick="() => EnviarPorCorreo(factura)"><i class="bi bi-envelope"></i></button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-info" title="@GetCorreoDisabledTitle(factura)" disabled><i class="bi bi-envelope"></i></button>
+                                            }
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">Consumo no Registrado</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    <tr class="table-secondary fw-semibold">
+                        <td colspan="5" class="text-end">Total ConsumoM3</td>
+                        <td class="text-center border-blue">@totalConsumoM3</td>
+                    </tr>
+                    <tr>
+                        <td colspan="6">
+                            <input type="text" id="nombreRegistrador" class="form-control" placeholder="Nombre de quien registra los consumos" value="@nombreRegistrador"
+                                   @onchange="OnNombreRegistradorChanged" disabled="@(!editaPlanilla)" />
+                        </td>
+                    </tr>
+                </tbody>
+                </table>
+            </div>
+        </div>
+
+        <style>
+            .table-container {
+                max-height: @(tomaDatos ? "100vh" : "70vh"); /* altura visible */
+                overflow: auto;    /* scroll vertical y horizontal si aplica */
+            }
+            .fixed-header thead th, .fixed-header thead td {
+                position: sticky;
+                top: 0;
+                background-color: var(--bs-light);
+                z-index: 5;
+            }
+            .border-blue {
+                border: 1px solid #007bff;
+                border-radius: 4px;
+            }
+            /* Equal width for Predio Observaciones and Notas Factura */
+            .notes-col {
+                max-width: 220px;
+                width: 220px;
+                vertical-align: top;
+                white-space: normal;
+            }
+            .note-block {
+                max-width: 220px;
+                width: 220px;
+                overflow: auto;
+                word-break: break-word;
+            }
+        </style>
+    }
+    else
+    {
+        <div class="alert alert-info">SE DEBE CREAR EN FACTURACIÓN LA PLANILLA por cada Predio Existente</div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-2">@errorMessage</div>
+    }
+
+    @if (_lastOcrResult is not null)
+    {
+        <div class="card mt-2">
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2 align-items-end">
+                    <div>
+                        <label class="form-label mb-1">Serial</label>
+                        <input class="form-control form-control-sm" @bind="_correctionSerial" @bind:event="oninput" @bind:after="OnSerialChanged" />
+                    </div>
+                    <div>
+                        <label class="form-label mb-1">Lectura (m³)</label>
+                        <input class="form-control form-control-sm" type="number" @bind="_correctionLectura" />
+                    </div>
+                    <button class="btn btn-success btn-sm" @onclick="SaveOcrCorrectionAsync" disabled="@(_lastImageBytes is null)">
+                        Save correction
+                    </button>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(_correctionStatus))
+                {
+                    <div class="small text-muted mt-2">@_correctionStatus</div>
+                }
+            </div>
+        </div>
+    }
+</div>
+@code {
+    // ... código existente ...
+
+    [Inject] private ConsumoOcrAppService OcrApp { get; set; } = default!;
+
+    private IBrowserFile? selectedImage;
+    private byte[]? _lastImageBytes;
+    private OcrScanResult? _lastOcrResult;
+    private string? _correctionSerial;
+    private double? _correctionLectura;
+    private string? _correctionStatus;
+    private int _errorMessageVersion = 0;
+
+    private CancellationTokenSource? _serialDebounceCts;
+
+    private string? filtroNumeroContador;
+
+
+
+    private IEnumerable<Facturacion> GetFacturacionFiltrada()
+    {
+        if (facturacion is null) return Array.Empty<Facturacion>();
+
+        IEnumerable<Facturacion> q = facturacion;
+
+        if (!string.IsNullOrWhiteSpace(filtroNombrePredio))
+        {
+            var term = filtroNombrePredio.Trim();
+            q = q.Where(f => (f.IdpredioNavigation?.ApellidosNombresUsuario ?? string.Empty)
+                .Contains(term, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filtroCodigoUsuario))
+        {
+            var term = filtroCodigoUsuario.Trim();
+            q = q.Where(f => (f.IdpredioNavigation?.CodigoUsuario ?? string.Empty)
+                .Contains(term, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // If page was opened with 'codigo' query param, filter to that usuario only
+        if (!string.IsNullOrWhiteSpace(codigo))
+        {
+            var term = codigo.Trim();
+            q = q.Where(f => (f.IdpredioNavigation?.CodigoUsuario ?? string.Empty)
+                .Equals(term, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filtroNumeroContador))
+        {
+            var termDigits = OnlyDigits(filtroNumeroContador);
+            if (!string.IsNullOrWhiteSpace(termDigits) && termDigits.Length >= 4 && termDigits.Trim('0').Length > 0)
+            {
+                q = q.Where(f =>
+                {
+                    var digits = OnlyDigits(f.IdpredioNavigation?.NumeroMedidor);
+                    if (string.IsNullOrWhiteSpace(digits)) return false;
+                    if (digits.Length < 4) return false;
+                    if (digits.Trim('0').Length == 0) return false; // evita "0", "00", etc.
+                    return digits.Contains(termDigits) || termDigits.Contains(digits);
+                });
+            }
+        }
+
+        return q;
+    }
+
+    private sealed class OcrScanResult
+    {
+        public string? NumeroMedidor { get; set; }
+        public double? LecturaActual { get; set; }
+        public double? Confianza { get; set; }
+    }
+
+    private async Task SetErrorMessageAsync(string? message)
+    {
+        errorMessage = message;
+        _errorMessageVersion++;
+        var version = _errorMessageVersion;
+        StateHasChanged();
+
+        if (string.IsNullOrWhiteSpace(message)) return;
+
+        try { await Task.Delay(5000); } catch { }
+
+        if (version != _errorMessageVersion) return;
+
+        errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void OnImageSelected(InputFileChangeEventArgs e)
+    {
+        selectedImage = e.File;
+        _lastImageBytes = null;
+        _lastOcrResult = null;
+        _correctionSerial = null;
+        _correctionLectura = null;
+        _correctionStatus = null;
+        _ = Task.Run(() => SaveUploadedImageAsync(selectedImage));
+        StateHasChanged();
+    }
+
+    private async Task SaveUploadedImageAsync(IBrowserFile? file)
+    {
+        if (file is null) return;
+
+        try
+        {
+            var factura = GetFacturacionFiltrada().FirstOrDefault();
+            var predio = factura?.IdpredioNavigation;
+            var codigoUsuario = predio?.CodigoUsuario;
+            if (string.IsNullOrWhiteSpace(codigoUsuario)) return;
+
+            var predioNombre = predio?.ApellidosNombresUsuario ?? predio?.Direccion ?? "Predio";
+            predioNombre = SanitizeFileName(predioNombre);
+
+            var dateStamp = DateTime.Now.ToString("d", CultureInfo.GetCultureInfo("es-CO"));
+            dateStamp = dateStamp.Replace("/", string.Empty).Replace("-", string.Empty).Replace(" ", string.Empty);
+
+            var ext = Path.GetExtension(file.Name);
+            if (string.IsNullOrWhiteSpace(ext)) ext = ".jpg";
+            ext = ext.StartsWith('.') ? ext : "." + ext;
+
+            var safeFileName = $"{predioNombre}_{dateStamp}{ext}";
+
+            var folder = Path.Combine(Env.WebRootPath, "imagenes", codigoUsuario);
+            Directory.CreateDirectory(folder);
+
+            var fullPath = Path.Combine(folder, safeFileName);
+            await using var read = file.OpenReadStream(maxAllowedSize: 15_000_000);
+            await using var write = File.Create(fullPath);
+            await read.CopyToAsync(write);
+        }
+        catch
+        {
+            // best-effort save; OCR flow must continue even if file I/O fails
+        }
+    }
+
+    private static string SanitizeFileName(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return "";
+        var invalid = Path.GetInvalidFileNameChars();
+        var cleaned = string.Join("_", input.Split(invalid, StringSplitOptions.RemoveEmptyEntries)).Trim();
+        return string.IsNullOrWhiteSpace(cleaned) ? "Predio" : cleaned;
+    }
+
+    private async Task OnSerialChanged()
+    {
+        _serialDebounceCts?.Cancel();
+        _serialDebounceCts?.Dispose();
+        _serialDebounceCts = new CancellationTokenSource();
+        var ct = _serialDebounceCts.Token;
+
+        // Espera un poco a que el usuario termine de escribir
+        try { await Task.Delay(600, ct); } catch { return; }
+
+        // Setear filtro de contador automáticamente con el serial (tal como lo escribió el usuario)
+        if (!string.IsNullOrWhiteSpace(_correctionSerial))
+        {
+            await InvokeAsync(() =>
+            {
+                filtroNumeroContador = _correctionSerial;
+                StateHasChanged();
+            });
+        }
+
+        var serialDigits = OnlyDigits(_correctionSerial);
+        if (string.IsNullOrWhiteSpace(serialDigits) || serialDigits.Length < 4) return;
+
+        // Requiere lectura para poder aplicar el valor automáticamente
+        if (_correctionLectura is null) return;
+
+        var match = FindFacturaByMeterDigits(serialDigits);
+        if (match is null) return;
+
+        match.MedicionActual = _correctionLectura;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnFiltroNumeroContadorChanged()
+    {
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void ClearFiltroNumeroContador()
+    {
+        filtroNumeroContador = null;
+        StateHasChanged();
+    }
+
+    private static string OnlyDigits(string? input)
+        => string.IsNullOrWhiteSpace(input) ? string.Empty : Regex.Replace(input, "\\D+", string.Empty);
+
+
+
+    private Facturacion? FindFacturaByMeterDigits(string serialDigits)
+    {
+        if (facturacion is null || facturacion.Count == 0) return null;
+
+        Facturacion? bestFactura = null;
+        var bestScore = 0;
+
+        foreach (var f in facturacion)
+        {
+            var digits = OnlyDigits(f.IdpredioNavigation?.NumeroMedidor);
+            if (string.IsNullOrWhiteSpace(digits)) continue;
+
+            var score = LongestCommonEdgeMatch(digits, serialDigits);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestFactura = f;
+            }
+        }
+
+        // mínimo 4 dígitos para evitar falsos positivos
+        return bestScore >= 4 ? bestFactura : null;
+    }
+
+    private static int LongestCommonEdgeMatch(string a, string b)
+    {
+        if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return 0;
+
+        var max = Math.Min(a.Length, b.Length);
+        var best = 0;
+        for (var len = 1; len <= max; len++)
+        {
+            if (a.EndsWith(b[^len..], StringComparison.Ordinal)) best = Math.Max(best, len);
+            if (a.StartsWith(b[..len], StringComparison.Ordinal)) best = Math.Max(best, len);
+            if (b.EndsWith(a[^len..], StringComparison.Ordinal)) best = Math.Max(best, len);
+            if (b.StartsWith(a[..len], StringComparison.Ordinal)) best = Math.Max(best, len);
+        }
+        return best;
+    }
+
+    public async Task RegistroAutomatico()
+    {
+        if (_registroAutomaticoEnProceso)
+        {
+            return;
+        }
+
+        if (selectedImage == null)
+        {
+            await SetErrorMessageAsync("Por favor, selecciona una imagen.");
+            return;
+        }
+
+        try
+        {
+            _registroAutomaticoEnProceso = true;
+            _registroAutomaticoEstado = "Processing...";
+            await InvokeAsync(StateHasChanged);
+
+            _registroAutomaticoEstado = "Reading image...";
+            await InvokeAsync(StateHasChanged);
+
+            await using var stream = selectedImage.OpenReadStream(maxAllowedSize: 15_000_000);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            _lastImageBytes = ms.ToArray();
+
+            _registroAutomaticoEstado = "Running OCR...";
+            await InvokeAsync(StateHasChanged);
+
+            var scan = await OcrApp.ScanAsync(new MemoryStream(_lastImageBytes), CancellationToken.None);
+
+            var result = new OcrScanResult
+            {
+                NumeroMedidor = scan.NumeroMedidor,
+                LecturaActual = scan.LecturaActual,
+                Confianza = scan.Confianza
+            };
+
+            _lastOcrResult = result;
+            _correctionSerial = result.NumeroMedidor;
+            _correctionLectura = result.LecturaActual;
+            _correctionStatus = null;
+            filtroNumeroContador = _correctionSerial;
+
+            _registroAutomaticoEstado = "Applying results...";
+            await InvokeAsync(StateHasChanged);
+
+            if (result.LecturaActual is null)
+            {
+                await SetErrorMessageAsync("No fue posible detectar la lectura del medidor en la imagen.");
+                return;
+            }
+
+            var serial = string.IsNullOrWhiteSpace(result.NumeroMedidor) ? "N/A" : result.NumeroMedidor;
+            var confTxt = result.Confianza is null ? "N/A" : result.Confianza.Value.ToString("N0", CultureInfo.InvariantCulture) + "%";
+            await SetErrorMessageAsync($"Lectura: {result.LecturaActual:0} | Serial: {serial} | Confianza: {confTxt}");
+        }
+        catch (Exception ex)
+        {
+            await SetErrorMessageAsync($"Error: {ex.Message}");
+        }
+        finally
+        {
+            _registroAutomaticoEnProceso = false;
+            _registroAutomaticoEstado = "";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private sealed class OcrCorrectionRequest
+    {
+        public required string ImageBase64 { get; set; }
+        public string? NumeroMedidor { get; set; }
+        public double? LecturaM3 { get; set; }
+
+        public string? IdPlanilla { get; set; }
+    }
+
+    private async Task SaveOcrCorrectionAsync()
+    {
+        if (_lastImageBytes is null)
+        {
+            _correctionStatus = "No image data to save.";
+            return;
+        }
+
+        var req = new OcrCorrectionRequest
+        {
+            ImageBase64 = Convert.ToBase64String(_lastImageBytes),
+            NumeroMedidor = string.IsNullOrWhiteSpace(_correctionSerial) ? null : _correctionSerial.Trim(),
+            LecturaM3 = _correctionLectura,
+            IdPlanilla = id
+        };
+
+        try
+        {
+            var save = await OcrApp.SaveCorrectionAsync(
+                imageBytes: _lastImageBytes,
+                numeroMedidor: req.NumeroMedidor,
+                lecturaM3: req.LecturaM3,
+                idPlanilla: req.IdPlanilla,
+                cancellationToken: CancellationToken.None);
+
+            _correctionStatus = $"Correction {save.Status}.";
+        }
+        catch (Exception ex)
+        {
+            _correctionStatus = $"Failed to save: {ex.Message}";
+        }
+    }
+
+    private async Task MoveUp(Facturacion factura)
+    {
+        if (!editaPlanilla) return;
+        using var context = DbFactory.CreateDbContext();
+        // Get all facturas in the planilla ordered
+        var allFacturas = await context.Facturacions
+            .Where(f => f.Idplanilla == id)
+            .Include(f => f.IdpredioNavigation)
+            .OrderBy(f => f.IdpredioNavigation.Ruta)
+            .ToListAsync();
+        // Find the index of the current factura
+        int index = allFacturas.FindIndex(f => f.Idfactura == factura.Idfactura);
+        if (index <= 0) return; // cannot move up
+        // Swap routes with the previous one
+        var current = allFacturas[index];
+        var previous = allFacturas[index - 1];
+        double temp = current.IdpredioNavigation.Ruta ?? 0;
+        current.IdpredioNavigation.Ruta = previous.IdpredioNavigation.Ruta;
+        previous.IdpredioNavigation.Ruta = temp;
+        // Save changes
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            await SetErrorMessageAsync($"Error moving up: {ex.Message}");
+            return;
+        }
+        // Renumber all routes consecutively
+        var allPredios = allFacturas.Select(f => f.IdpredioNavigation).OrderBy(p => p.Ruta).ToList();
+        double routeNumber = 1;
+        foreach (var predio in allPredios)
+        {
+            predio.Ruta = routeNumber;
+            routeNumber++;
+        }
+        await context.SaveChangesAsync();
+        // Update the local list
+        foreach (var f in facturacion)
+        {
+            var updated = allFacturas.FirstOrDefault(af => af.Idfactura == f.Idfactura);
+            if (updated != null)
+            {
+                f.IdpredioNavigation.Ruta = updated.IdpredioNavigation.Ruta;
+            }
+        }
+        StateHasChanged();
+    }
+
+    private async Task MoveDown(Facturacion factura)
+    {
+        if (!editaPlanilla) return;
+        using var context = DbFactory.CreateDbContext();
+        // Get all facturas in the planilla ordered by route
+        var allFacturas = await context.Facturacions
+            .Where(f => f.Idplanilla == id)
+            .Include(f => f.IdpredioNavigation)
+            .OrderBy(f => f.IdpredioNavigation.Ruta)
+            .ToListAsync();
+        // Find the index of the current factura
+        int index = allFacturas.FindIndex(f => f.Idfactura == factura.Idfactura);
+        if (index >= allFacturas.Count - 1 || index < 0) return; // cannot move down
+        // Swap routes with the next one
+        var current = allFacturas[index];
+        var next = allFacturas[index + 1];
+        double temp = current.IdpredioNavigation.Ruta ?? 0;
+        current.IdpredioNavigation.Ruta = next.IdpredioNavigation.Ruta;
+        next.IdpredioNavigation.Ruta = temp;
+        // Save changes
+        try
+        {
+            await context.SaveChangesAsync();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await SetErrorMessageAsync($"Error moving down: {ex.Message}");
+            return;
+        }
+        // Renumber all routes consecutively
+        var allPredios = allFacturas.Select(f => f.IdpredioNavigation).OrderBy(p => p.Ruta).ToList();
+        double routeNumber = 1;
+        foreach (var predio in allPredios)
+        {
+            predio.Ruta = routeNumber;
+            routeNumber++;
+        }
+        await context.SaveChangesAsync();
+        // Update the local list
+        foreach (var f in facturacion)
+        {
+            var updated = allFacturas.FirstOrDefault(af => af.Idfactura == f.Idfactura);
+            if (updated != null)
+            {
+                f.IdpredioNavigation.Ruta = updated.IdpredioNavigation.Ruta;
+            }
+        }
+        StateHasChanged();
+    }
+
+    private async Task FiltrarPorCodigo(string codigo)
+    {
+        filtroCodigoUsuario = codigo ?? string.Empty;
+        // if opening from Facturacion link and planilla is editable, enable tomaDatos
+        if (!string.IsNullOrWhiteSpace(codigo) && editaPlanilla)
+        {
+            // enable tomaDatos so the user can edit the consumo
+            tomaDatos = true;
+        }
+        await LoadData();
+        // StateHasChanged();
+    }
+
+}

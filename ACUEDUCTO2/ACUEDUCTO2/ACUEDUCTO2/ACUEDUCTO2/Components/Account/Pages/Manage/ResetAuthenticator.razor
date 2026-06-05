@@ -1,0 +1,52 @@
+﻿@page "/Account/Manage/ResetAuthenticator"
+
+@using Microsoft.AspNetCore.Identity
+@using ACUEDUCTO2.Data
+
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IdentityUserAccessor UserAccessor
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<ResetAuthenticator> Logger
+
+<PageTitle>Restablecer clave del autenticador</PageTitle>
+
+<StatusMessage />
+<h3>Restablecer clave del autenticador</h3>
+<div class="alert alert-warning" role="alert">
+    <p>
+        <span class="glyphicon glyphicon-warning-sign"></span>
+        <strong>Si restablece la clave de su autenticador, su aplicación autenticadora no funcionará hasta que la reconfigure.</strong>
+    </p>
+    <p>
+        Este proceso deshabilita la 2FA hasta que verifique su aplicación autenticadora.
+        Si no completa la configuración de su aplicación autenticadora puede perder el acceso a su cuenta.
+    </p>
+</div>
+<div>
+    <form @formname="reset-authenticator" @onsubmit="OnSubmitAsync" method="post">
+        <AntiforgeryToken />
+        <button class="btn btn-danger" type="submit">Restablecer clave del autenticador</button>
+    </form>
+</div>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private async Task OnSubmitAsync()
+    {
+        var user = await UserAccessor.GetRequiredUserAsync(HttpContext);
+        await UserManager.SetTwoFactorEnabledAsync(user, false);
+        await UserManager.ResetAuthenticatorKeyAsync(user);
+        var userId = await UserManager.GetUserIdAsync(user);
+        Logger.LogInformation("User with ID '{UserId}' has reset their authentication app key.", userId);
+
+        await SignInManager.RefreshSignInAsync(user);
+
+        RedirectManager.RedirectToWithStatus(
+            "Account/Manage/EnableAuthenticator",
+            "La clave de su aplicación autenticadora ha sido restablecida. Deberá configurar su aplicación autenticadora usando la nueva clave.",
+            HttpContext);
+    }
+}

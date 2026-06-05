@@ -1,0 +1,48 @@
+﻿@page "/cuentaporpagars"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.Models
+@implements IAsyncDisposable
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+
+<PageTitle>Cuentas por Pagar</PageTitle>
+
+<h1>Cuentas por Pagar</h1>
+
+<p>
+    <a href="cuentaporpagars/create">Create New</a>
+</p>
+
+<QuickGrid Class="table" Items="context.CuentaPorPagars" Pagination="@pagination">
+    <PropertyColumn Property="cuentaporpagar => cuentaporpagar.Numero" />
+    <PropertyColumn Property="cuentaporpagar => cuentaporpagar.Identificacion" />
+    <PropertyColumn Property="cuentaporpagar => cuentaporpagar.Descripcion" />
+    <PropertyColumn Property="cuentaporpagar => cuentaporpagar.FechaHora" />
+    <PropertyColumn Property="cuentaporpagar => cuentaporpagar.Vencimiento" />
+    <PropertyColumn Property="cuentaporpagar => cuentaporpagar.ValorDebe" />
+    <PropertyColumn Property="cuentaporpagar => cuentaporpagar.ValorPagado" />
+    <PropertyColumn Property="cuentaporpagar => cuentaporpagar.CuotasTotales" />
+    <PropertyColumn Property="cuentaporpagar => cuentaporpagar.CuotasPagadas" />
+
+    <TemplateColumn Context="cuentaporpagar">
+        <a href="@($"cuentaporpagars/edit?idcuentaxp={cuentaporpagar.IdcuentaxP}")">Edit</a> |
+        <a href="@($"cuentaporpagars/details?idcuentaxp={cuentaporpagar.IdcuentaxP}")">Details</a> |
+        <a href="@($"cuentaporpagars/delete?idcuentaxp={cuentaporpagar.IdcuentaxP}")">Delete</a>
+    </TemplateColumn>
+</QuickGrid>
+<Paginator State="@pagination" />
+
+@code {
+    private AcueductoContext context = default!;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+    PaginationState pagination = new PaginationState { ItemsPerPage = 10 };
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}

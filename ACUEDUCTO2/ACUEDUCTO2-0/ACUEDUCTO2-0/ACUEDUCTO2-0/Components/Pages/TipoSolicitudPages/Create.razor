@@ -1,0 +1,40 @@
+@page "/tipo-solicitud/crear"
+@using ACUEDUCTO2-0_0.Data
+@using ACUEDUCTO2-0_0.Compartir.MODELS
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Crear tipo de solicitud</PageTitle>
+
+<h3>Crear tipo de solicitud</h3>
+<div class="mb-3">
+    <button class="btn btn-secondary me-2" @onclick="Volver">Volver a solicitudes</button>
+    <button class="btn btn-primary" @onclick="Guardar">Guardar</button>
+    <button class="btn btn-secondary ms-2" @onclick="Cancelar">Cancelar</button>
+</div>
+
+<label class="form-label">Nombre</label>
+<InputText @bind-Value="nombre" class="form-control mb-2" />
+
+@code {
+    private string nombre = string.Empty;
+
+    private async Task Guardar()
+    {
+        if (string.IsNullOrWhiteSpace(nombre)) return;
+        using var db = DbFactory.CreateDbContext();
+        var item = new TipoSolicitud
+        {
+            Guid = System.Guid.NewGuid().ToString(),
+            NombreTipoSolicitud = nombre
+        };
+        db.TipoSolicitud.Add(item);
+        await db.SaveChangesAsync();
+        Navigation.NavigateTo("/tipo-solicitud");
+    }
+
+    void Cancelar() => Navigation.NavigateTo("/tipo-solicitud");
+    void Volver() => Navigation.NavigateTo("/solicitud");
+}

@@ -1,0 +1,49 @@
+@page "/account/login"
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authentication.Cookies
+@inject NavigationManager Nav
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject IHttpContextAccessor Http
+
+@rendermode InteractiveServer
+
+<PageTitle>Iniciar sesión</PageTitle>
+
+<div class="container py-4" style="max-width:520px">
+ <h1 class="h4 mb-3">Iniciar sesión</h1>
+ @if (!string.IsNullOrEmpty(error))
+ {
+ <div class="alert alert-danger">@error</div>
+ }
+ <EditForm Model="model" FormName="login" method="post" action="/account/login">
+ <DataAnnotationsValidator />
+ <ValidationSummary class="text-danger" />
+ <div class="mb-3">
+ <label class="form-label">Usuario o correo</label>
+ <InputText class="form-control" @bind-Value="model.UserOrEmail" name="userOrEmail" />
+ </div>
+ <div class="mb-3">
+ <label class="form-label">Contraseña</label>
+ <InputText type="password" class="form-control" @bind-Value="model.Password" name="password" />
+ </div>
+ <button type="submit" class="btn btn-primary w-100">Entrar</button>
+ </EditForm>
+</div>
+
+@code {
+ private LoginModel model = new();
+ private string? error;
+
+ private sealed class LoginModel
+ {
+ [Required]
+ public string UserOrEmail { get; set; } = string.Empty;
+ [Required]
+ public string Password { get; set; } = string.Empty;
+ }
+
+ // El post se maneja en el endpoint /account/login (Program.cs)
+}

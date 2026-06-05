@@ -1,0 +1,100 @@
+﻿------------------------------------------------------------------------------------------------------------------------------
+# Acueducto Comunitario – Sistema Web
+
+
+
+Este sistema gestiona ciclos bimestrales del servicio de agua: captura de consumos, facturación, recaudo, cuentas por cobrar, registros de mantenimiento y gestión del servicio (SGS).
+Módulos principales • Planillas (bimestres que controlan un ciclo de facturación) • Consumos (lecturas de medidor) • Facturación (generación y ajustes de facturas) • Recaudo / Ingresos (pagos, abonos, cobertura de periodos anteriores) • CxC (seguimiento y verificación de cuentas por cobrar) • Predios y Usuarios (registro de clientes/predios) • SGS (Solicitudes / Seguimiento de trabajos / Estados / Tipos) • Mantenimiento (registro de mantenimiento de infraestructura) • Reportes (gráficas: recaudo diario, consumo, clasificación)
+Planillas (Ciclos Bimestrales) Propósito Una Planilla define la ventana temporal para lecturas, facturación, fechas límite de pago y reglas de suspensión.
+Campos clave • Idplanilla (clave string, formato: firma de periodo YYYY-MM) • Descripción corta / larga • FechaHoraRegistroConsumo (corte para ingresar lecturas) • FechaLimitePago (fecha límite para pago oportuno) • FechaSuspension (disparador de suspensión del servicio) • Abierta (true = editable; false = congelada para control)
+Cuándo crear Crear solo después de cerrar la planilla anterior y antes de iniciar la captura de consumos.
+Convención de nombres Formato: "YYYY-MM DESCRIPCION_LARGA" Ejemplo: 2025-02 ENERO - FEBRERO Descripción corta: ENE-FEB
+Flujo
+1.	Navegar: Menú → Planillas → Crear Planilla.
+2.	Ingresar: • Nombres (corto y largo). • Fecha de consumos (FechaHoraRegistroConsumo). • FechaLimitePago. • FechaSuspension.
+3.	Guardar: la Planilla inicia con Abierta = true.
+4.	Mientras esté Abierta: • Se pueden ingresar Consumos. • Se puede generar Facturación.
+5.	Cerrar (poner Abierta = false) una vez validadas las facturas para evitar desviaciones.
+6.	Tras el cierre: • Solo consulta / reportes. • Recaudo continúa referenciando sus facturas.
+Reglas de integridad • Nunca superponer fechas. • No reabrir salvo con auditoría estricta. • Si se reabre, volver a ejecutar “Verificar CXC” cuando aplique.
+Procesos relacionados • “Verificar CXC” puede agregar saldos del ciclo anterior. • La gráfica de Recaudo Diario usa FechaLimitePago y FechaSuspension como marcadores.
+Planillas (Ciclos Bimestrales) Propósito Una Planilla define la ventana temporal para lecturas, facturación, fechas límite de pago y reglas de suspensión.
+Campos clave • Idplanilla (clave string, formato: firma de periodo YYYY-MM) • Descripción corta / larga • FechaHoraRegistroConsumo (corte para ingresar lecturas) • FechaLimitePago (fecha límite para pago oportuno) • FechaSuspension (disparador de suspensión del servicio) • Abierta (true = editable; false = congelada para control)
+Cuándo crear Crear solo después de cerrar la planilla anterior y antes de iniciar la captura de consumos.
+Convención de nombres Formato: "YYYY-MM DESCRIPCION_LARGA" Ejemplo: 2025-02 ENERO - FEBRERO Descripción corta: ENE-FEB
+Flujo
+1.	Navegar: Menú → Planillas → Crear Planilla.
+2.	Ingresar: • Nombres (corto y largo). • Fecha de consumos (FechaHoraRegistroConsumo). • FechaLimitePago. • FechaSuspension.
+3.	Guardar: la Planilla inicia con Abierta = true.
+4.	Mientras esté Abierta: • Se pueden ingresar Consumos. • Se puede generar Facturación.
+5.	Cerrar (poner Abierta = false) una vez validadas las facturas para evitar desviaciones.
+6.	Tras el cierre: • Solo consulta / reportes. • Recaudo continúa referenciando sus facturas.
+Reglas de integridad • Nunca superponer fechas. • No reabrir salvo con auditoría estricta. • Si se reabre, volver a ejecutar “Verificar CXC” cuando aplique.
+Procesos relacionados • “Verificar CXC” puede agregar saldos del ciclo anterior. • La gráfica de Recaudo Diario usa FechaLimitePago y FechaSuspension como marcadores.
+Facturación Propósito Generar facturas por Predio con base en consumo + saldos arrastrados + otros cobros (mora, otros, subsidio, etc.).
+Entradas • Planilla (debe estar Abierta) • Lecturas de consumo • Saldo del periodo anterior (DeudaPasa / DeudaViene) • Ajustes de CxC • Porcentajes de Subsidios / Mora
+Flujo estándar
+1.	Asegurar Planilla creada y Abierta.
+2.	Completar todas las lecturas de medidor (Consumos).
+3.	Disparar la generación de facturas (página de Facturación).
+4.	Revisar cada factura: • Cargo fijo • Consumo básico / adicional • Subsidio / Mora • Otros (incluye cuota desde la lógica de CxC)
+5.	Si un valor se edita manualmente: • El sistema actualiza hacia adelante (p. ej., afecta la DeudaAnterior del siguiente periodo).
+6.	Usar “Verificar CXC” para sincronizar cuotas hacia “Otros” de la factura actual.
+7.	Bloquear cerrando la Planilla cuando esté estable.
+Reglas de edición • Cambios después de iniciar Recaudo deben auditarse. • Recalcular la DeudaPasa subsiguiente debe validarse.
+Impresión / Email • El formato incluye: Fechas (Consumo, Pago, Corte), Observaciones, gráfica de Consumo, Cuenta Bancaria. • Email envía adjunto (SMTP configurado en appsettings).
+Recaudo (Ingresos) Propósito Registrar pagos (totales, parciales, periodos anteriores) y mantener analítica de recaudo en curso.
+Características • Filtro: “No Pago” / por código de usuario / texto • Enlace a factura de periodo anterior (valor aplicado) • Actualización automática de Deuda que pasa • Gráfica: Diario + Acumulado + Total del bimestre anterior + Líneas de Límite/Suspensión
+Flujo
+1.	Seleccionar Planilla o seleccionar la actual automáticamente.
+2.	Buscar usuario / factura.
+3.	Ingresar pago: • Total / parcial (abono) • Identificar si cubre periodo anterior
+4.	El sistema actualiza: • ValorPagado • Mora si paga por debajo de lo debido • Movimiento de CxC si está configurado
+5.	Volver a calcular la gráfica para visualizar progreso.
+Integridad de datos • Evitar doble registro para la misma factura en el mismo momento. • Usar filtros para verificar quién sigue sin pagar.
+Interacción con CxC Si un pago cubre cuotas, asegurarse de que “Verificar CXC” haya alineado antes los valores de la factura.
+Consumos Propósito Capturar el consumo de agua por Predio en una Planilla.
+Flujo
+1.	La Planilla debe estar Abierta.
+2.	Importar (Excel) o entrada manual.
+3.	Valores: • Lectura actual • Consumo calculado • Tipo de Consumo (lógica de clasificación – umbrales)
+4.	Al guardar: • El ConsumoAnterior de la planilla futura puede actualizarse (si la propagación entre periodos está activa).
+5.	Opcional: mostrar/ocultar Observaciones del Predio.
+Umbrales de clasificación (Proporcione su tabla de categorías 1–8 con rangos.)
+Mejores prácticas • Completar todos los consumos antes de generar facturas. • Cerrar la Planilla para congelar la base.
+Cuentas por Cobrar (CxC) Propósito Rastrear saldos pendientes y cuotas que impactan la facturación actual.
+Mecanismo • “Verificar CXC” escanea Facturaciones con cuotas pendientes (COUTASporpagar > 0). • Distribuye ValorDebe / cuotas restantes → agrega a “Otros” en la factura actual. • Disminuye cuotas pendientes, incrementa cuotas pagadas.
+Riesgos • Modificar manualmente IDs de usuario o claves de factura sin sincronizar CxC genera inconsistencias. • Registros nulos o malformados pueden bloquear SGS o la lógica de CxC.
+Auditoría • Ejecutar la verificación después de ajustes de facturas de la planilla y antes del cierre.
+SGS (Solicitudes / Gestión / Servicio) Propósito Registrar y seguir solicitudes de servicio y trabajos asociados.
+Elementos • Solicitud (Tipo, Estado, Observaciones) • Trabajo (TipoTrabajo, Estado, Descripción) • Archivos adjuntos (por Predio o Inventario)
+Flujo
+1.	Crear Solicitud (validar que Tipo y Estado no sean nulos).
+2.	Asignar / crear Trabajo si se requiere acción operativa.
+3.	Actualizar Estado conforme avanza.
+4.	Adjuntar evidencias (imagenes/predios/...).
+5.	Reportar por tipo, estado, palabra clave.
+Problema común Valores nulos en Tipo/Estado pueden romper listados—limpiar datos semilla inválidos.
+Mantenimiento Propósito Documentar actividades de mantenimiento de infraestructura por bimestre o ad-hoc.
+Campos recomendados • Fecha • Activo / Infraestructura • Descripción • Materiales / Costos • Responsable • Evidencias (archivos)
+Integración • No altera directamente la facturación, pero útil para histórico y cumplimiento normativo.
+Reportes y Gráficos Actuales • Recaudo Diario (Barras + Acumulado + Línea del total anterior + Líneas de Fecha Límite / Suspensión) • Consumo por Predio (en impresión de factura) • Clasificación por Tipo de Consumo (Inicio)
+Mejoras (Opcional) • Evolución de morosidad • Envejecimiento de CxC (aging buckets)
+Configuración appsettings.json • ConnectionString DefaultConnection • EmailSettings (servidor SMTP, credenciales) • WhatsApp (integración pendiente) • TrustServerCertificate = true para SQL hospedado
+Certificados Si usa autofirmado: PowerShell: New-SelfSignedCertificate -FriendlyName AcueductoJAC -DnsName Acueducto -KeyUsage DigitalSignature -NotAfter (Get-Date).AddYears(20) Enlazar en IIS → binding HTTPS del sitio.
+Despliegue Ambientes • Desarrollo local (.NET 9, EF Core) • Hosting (Adaptive Web Hosting SQL + IIS)
+Pasos
+1.	Publicar (dotnet publish -c Release).
+2.	Desplegar artefactos al raíz del sitio en IIS.
+3.	Asegurar subcarpetas en wwwroot (imagenes/predios, inventario).
+4.	Aplicar migraciones EF (o asegurar sincronía con scaffold de la BD).
+5.	Verificar puerto saliente 587 para SMTP.
+6.	Probar componentes interactivos (Blazor Server + WebAssembly).
+Backup y Recuperación Base de datos • Recomendado backup completo nocturno (SQL Server). • Conservar 30 días rodantes.
+Archivos • wwwroot/imagenes/* (Predios, Inventario, Documentación) • Código fuente en control de versiones (Git remoto)
+Prueba de recuperación
+1.	Restaurar BD a punto en el tiempo.
+2.	Restaurar activos de wwwroot.
+3.	Verificar integridad de Planillas.
+Seguridad e Integridad de Datos Recomendado • Mover credenciales en texto plano fuera de NOTAS.txt (eliminar info sensible). • Usar roles de usuario (Admin, Operador, Consulta). • Hacer cumplir reglas de cierre de Planilla. • Registrar ediciones a Facturación después de iniciar Recaudo.
+Datos sensibles • Cadenas de conexión y contraseñas SMTP: usar un almacén seguro cuando sea posible.

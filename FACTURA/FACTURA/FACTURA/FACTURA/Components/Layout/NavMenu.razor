@@ -1,0 +1,55 @@
+﻿@inherits LayoutComponentBase
+
+<div class="d-flex" style="min-height: 100vh;">
+    <!-- Botón hamburguesa solo visible en móvil -->
+    <button class="btn btn-dark d-md-none" style="position:fixed;top:1rem;left:1rem;z-index:1101;" @onclick="ToggleSidebar">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Sidebar -->
+    <nav class="sidebar bg-dark text-white p-3 @(sidebarVisible ? "show" : "")">
+        <h4 class="mb-4">📄 FacturaPro</h4>
+
+        <NavLink class="nav-link text-white" href="/" @onclick="HideSidebar">
+            <i class="fas fa-home me-2"></i> Inicio
+        </NavLink>
+        <NavLink class="nav-link text-white" href="/facturacion" @onclick="HideSidebar">
+            <i class="fas fa-file-invoice-dollar me-2"></i> Facturación
+        </NavLink>
+        <NavLink class="nav-link text-white" href="/cotizaciones" @onclick="HideSidebar">
+            <i class="fas fa-file-alt me-2"></i> Cotizaciones
+        </NavLink>
+        <NavLink class="nav-link text-white" href="/clientes" @onclick="HideSidebar">
+            <i class="fas fa-users me-2"></i> Clientes
+        </NavLink>
+        <NavLink class="nav-link text-white" href="/productos" @onclick="HideSidebar">
+            <i class="fas fa-box-open me-2"></i> Productos / Servicios
+        </NavLink>
+        <NavLink class="nav-link text-white" href="/pagos" @onclick="HideSidebar">
+            <i class="fas fa-cash-register me-2"></i> Recaudos
+        </NavLink>
+        <NavLink class="nav-link text-white" href="/reportes" @onclick="HideSidebar">
+            <i class="fas fa-chart-bar me-2"></i> Reportes
+        </NavLink>
+        <NavLink class="nav-link text-white" href="/configuracion" @onclick="HideSidebar">
+            <i class="fas fa-cogs me-2"></i> Configuración
+        </NavLink>
+        <NavLink class="nav-link text-white" href="/cuenta" @onclick="HideSidebar">
+            <i class="fas fa-user-circle me-2"></i> Mi Cuenta
+        </NavLink>
+        <NavLink class="nav-link text-white" href="/logout" @onclick="HideSidebar">
+            <i class="fas fa-sign-out-alt me-2"></i> Salir
+        </NavLink>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="flex-grow-1 p-4 bg-light">
+        @Body
+    </div>
+</div>
+
+@code {
+    private bool sidebarVisible = false;
+    private void ToggleSidebar() => sidebarVisible = !sidebarVisible;
+    private void HideSidebar() => sidebarVisible = false;
+}

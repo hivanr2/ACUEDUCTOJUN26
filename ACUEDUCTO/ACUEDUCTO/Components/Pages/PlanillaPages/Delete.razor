@@ -1,0 +1,144 @@
+﻿@page "/planillas/delete"
+@layout SimpleLayout
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Delete</PageTitle>
+
+<h1>Delete</h1>
+
+<p>Are you sure you want to delete this?</p>
+<div>
+    <h2>Planilla</h2>
+    <hr />
+    @if (planilla is null)
+    {
+        <p><em>Llamando...</em></p>
+    }
+    else {
+        <dl class="row">
+            <dt class="col-sm-2">Descripcion</dt>
+            <dd class="col-sm-10">@planilla.Descripcion</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Idperiodo</dt>
+            <dd class="col-sm-10">@planilla.Idperiodo</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">FechaHoraRegistroConsumo</dt>
+            <dd class="col-sm-10">@planilla.FechaHoraRegistroConsumo</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">PorcentajeMora</dt>
+            <dd class="col-sm-10">@planilla.PorcentajeMora</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">PorcentajeSubsidio</dt>
+            <dd class="col-sm-10">@planilla.PorcentajeSubsidio</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">FechaHoraRegistroConsumos</dt>
+            <dd class="col-sm-10">@planilla.FechaHoraRegistroConsumos</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">EncargadoRegistroConsumos</dt>
+            <dd class="col-sm-10">@planilla.EncargadoRegistroConsumos</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">FechaHoraFacturacion</dt>
+            <dd class="col-sm-10">@planilla.FechaHoraFacturacion</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">EncargadoFacturacion</dt>
+            <dd class="col-sm-10">@planilla.EncargadoFacturacion</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">FechaLimitePago</dt>
+            <dd class="col-sm-10">@planilla.FechaLimitePago</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">FechaSuspension</dt>
+            <dd class="col-sm-10">@planilla.FechaSuspension</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">TotalPredios</dt>
+            <dd class="col-sm-10">@planilla.TotalPredios</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">CantidadConsumoM3total</dt>
+            <dd class="col-sm-10">@planilla.CantidadConsumoM3total</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorTotalConsumoBasico</dt>
+            <dd class="col-sm-10">@planilla.ValorTotalConsumoBasico</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorTotalConsumoAdicional</dt>
+            <dd class="col-sm-10">@planilla.ValorTotalConsumoAdicional</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorTotalConsumoM3</dt>
+            <dd class="col-sm-10">@planilla.ValorTotalConsumoM3</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorTotalMora</dt>
+            <dd class="col-sm-10">@planilla.ValorTotalMora</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorTotalSobreTasa</dt>
+            <dd class="col-sm-10">@planilla.ValorTotalSobreTasa</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorTotalSubsidio</dt>
+            <dd class="col-sm-10">@planilla.ValorTotalSubsidio</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorTotalOtros</dt>
+            <dd class="col-sm-10">@planilla.ValorTotalOtros</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorTotalPlanilla</dt>
+            <dd class="col-sm-10">@planilla.ValorTotalPlanilla</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">ValorTotalRecaudo</dt>
+            <dd class="col-sm-10">@planilla.ValorTotalRecaudo</dd>
+        </dl>
+        <dl class="row">
+            <dt class="col-sm-2">Observaciones</dt>
+            <dd class="col-sm-10">@planilla.Observaciones</dd>
+        </dl>
+        <EditForm method="post" Model="planilla" OnValidSubmit="DeletePlanilla" FormName="delete" Enhance>
+            <button type="submit" class="btn btn-danger" disabled="@(planilla is null)">Delete</button> |
+            <a href="/planillas">Volve a la Lista</a>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private Planilla? planilla;
+
+    [SupplyParameterFromQuery]
+    private string Idplanilla { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        planilla = await context.Planillas.FirstOrDefaultAsync(m => m.Idplanilla == Idplanilla);
+
+        if (planilla is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    private async Task DeletePlanilla()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Planillas.Remove(planilla!);
+        await context.SaveChangesAsync();
+        NavigationManager.NavigateTo("/planillas");
+    }
+}

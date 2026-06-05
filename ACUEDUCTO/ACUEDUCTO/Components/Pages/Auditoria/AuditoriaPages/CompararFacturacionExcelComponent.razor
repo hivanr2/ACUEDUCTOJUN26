@@ -1,0 +1,803 @@
+@page "/auditoria/comparar-excel"
+@using ACUEDUCTO.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@using OfficeOpenXml
+@inject IDbContextFactory<AcueductoContext> DbFactory
+
+@rendermode InteractiveServer
+
+<h3>Comparar facturación desde Excel</h3>
+
+<div class="mb-3">
+    <label>Año</label>
+    <input type="number" class="form-control" @bind="selectedYear" min="2000" max="2100" />
+</div>
+
+<div class="mb-3">
+    <label>Predio</label>
+    <select class="form-select" value="@selectedPredioId" @onchange="OnPredioChanged">
+        <option value="">-- Seleccione predio --</option>
+        @foreach (var p in predios)
+        {
+            <option value="@p.Idpredio">@p.CodigoUsuario - @p.ApellidosNombresUsuario</option>
+        }
+    </select>
+</div>
+
+<div class="mb-3">
+    <label>Archivo Excel</label>
+    <InputFile OnChange="HandleFileSelected" />
+    @if (!string.IsNullOrEmpty(uploadedFileName))
+    {
+        <div class="mt-2">Archivo cargado: <strong>@uploadedFileName</strong></div>
+        <div class="mt-1">
+            <button class="btn btn-sm btn-outline-primary" @onclick="ProcessStoredFile" disabled="@(uploadedFileBytes == null || string.IsNullOrEmpty(selectedPredioId))">Procesar para predio seleccionado</button>
+            <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="ClearUploadedFile">Limpiar archivo</button>
+        </div>
+    }
+</div>
+
+<div class="form-check mb-3">
+    <input class="form-check-input" type="checkbox" id="showRaw" @bind="showRawSystemValues" />
+    <label class="form-check-label" for="showRaw">Mostrar valores crudos del sistema (diagnóstico)</label>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert alert-info">@message</div>
+}
+
+@if (comparisonResults?.Any() == true)
+{
+    <h5>Resultados</h5>
+    <table class="table table-sm table-striped">
+        <thead>
+            <tr>
+                <th>Hoja</th>
+                <th>CodigoUsuario</th>
+                <th>CodigoFactura (Excel)</th>
+                <th>Med. Anterior (Excel)</th>
+                <th>Med. Anterior (Sistema)</th>
+                <th>Med. Actual (Excel)</th>
+                <th>Med. Actual (Sistema)</th>
+                <th>Consumo (Excel)</th>
+                <th>Consumo (Sistema)</th>
+                <th>ValorPeriodo (Excel)</th>
+                <th>ValorPeriodo (Sistema)</th>
+                <th>Deuda Viene(Excel)</th>
+                <th>Deuda Viene(Sistema)</th>
+                <th>Recaudo (Excel)</th>
+                <th>Recaudo (Sistema)</th>
+                    <th>DeudaPasa (Excel)</th>
+                    <th>DeudaPasa (Sistema)</th>
+                            <th>IdFactura (Sistema)</th>
+                    <th>MatchInfo</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in comparisonResults)
+            {
+                <tr>
+                    <td>@r.SheetName</td>
+                    <td>@r.CodigoUsuario</td>
+                    <td>@r.CodigoFacturaExcel</td>
+                    <td>@(r.MedicionAnteriorExcel?.ToString() ?? "-")</td>
+                    <td>@(r.MedicionAnteriorSistema?.ToString() ?? "-")</td>
+                    <td>@(r.MedicionActualExcel?.ToString() ?? "-")</td>
+                    <td>@(r.MedicionActualSistema?.ToString() ?? "-")</td>
+                    <td>@(r.ConsumoExcel?.ToString() ?? "-")</td>
+                    <td>@(r.ConsumoSistema?.ToString() ?? "-")</td>
+                    <td>@(r.ValorPeriodoExcel?.ToString("F0") ?? "-")</td>
+                    <td>@(r.ValorPeriodoSistema?.ToString("F0") ?? "-")</td>
+                    <td>@(r.DeudaExcel?.ToString("F0") ?? "-")</td>
+                    <td>@(r.DeudaSistema?.ToString("F0") ?? "-")</td>
+                    <td>@(r.RecaudoExcel?.ToString("F0") ?? "-")</td>
+                    <td>@(r.RecaudoSistema?.ToString("F0") ?? "-")</td>
+                    <td>@(r.DeudaPasaExcel?.ToString("F0") ?? "-")</td>
+                    <td>@(r.DeudaPasaSistema?.ToString("F0") ?? "-")</td>
+                            <td>@(r.IdfacturaSistema ?? "-")</td>
+                            <td>@(r.MatchInfo ?? "-")</td>
+                    <td>
+                        @if (r.Status == "Diferencias encontradas")
+                        {
+                            <button class="btn btn-sm btn-primary me-1" @onclick="() => UpdateRowAsync(r)" disabled="@(string.IsNullOrEmpty(r.IdfacturaSistema))">ACTUALIZA BD</button>
+                        }
+                        @r.Status
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private int selectedYear = DateTime.Now.Year;
+    private string selectedPredioId;
+    private List<Predio> predios = new();
+    private string message;
+    private byte[] uploadedFileBytes;
+    private string uploadedFileName;
+
+    private List<ComparisonResult> comparisonResults = new();
+    private bool showRawSystemValues = false;
+
+    private readonly string[] sheetNames = new[] { "ENE-FEB", "MAR-ABR", "MAY-JUN", "JUL-AGO", "SEP-OCT", "NOV-DIC" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        predios = await context.Predios.Where(p => p.Activo == true).OrderBy(p => p.CodigoUsuario).ToListAsync();
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        message = null;
+        comparisonResults.Clear();
+
+        var file = e.File;
+        if (file == null)
+        {
+            message = "No se seleccionó archivo.";
+            return;
+        }
+
+        try
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize: 30 * 1024 * 1024);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            uploadedFileBytes = ms.ToArray();
+            uploadedFileName = file.Name;
+
+            ExcelPackage.License.SetNonCommercialOrganization("Acueducto Comunitario");
+
+            // Si ya está seleccionado un predio, procesar automáticamente
+            if (!string.IsNullOrEmpty(selectedPredioId))
+            {
+                await ProcessStoredFile();
+            }
+            else
+            {
+                message = $"Archivo cargado: {uploadedFileName}. Seleccione predio para procesar.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error leyendo el archivo: {ex.Message}";
+        }
+    }
+
+    private async Task OnPredioChanged(ChangeEventArgs e)
+    {
+        selectedPredioId = e?.Value?.ToString();
+        // si ya hay un archivo cargado, procesarlo para el predio seleccionado
+        if (!string.IsNullOrEmpty(selectedPredioId) && uploadedFileBytes != null)
+        {
+            await ProcessStoredFile();
+        }
+    }
+
+    private async Task ProcessStoredFile()
+    {
+        if (uploadedFileBytes == null)
+        {
+            message = "No hay archivo cargado.";
+            return;
+        }
+        if (string.IsNullOrEmpty(selectedPredioId))
+        {
+            message = "Seleccione un predio antes de procesar.";
+            return;
+        }
+
+        message = null;
+        comparisonResults.Clear();
+
+        try
+        {
+            using var package = new ExcelPackage(new MemoryStream(uploadedFileBytes));
+
+            using var context = DbFactory.CreateDbContext();
+            var predio = await context.Predios.FindAsync(selectedPredioId);
+            if (predio == null)
+            {
+                message = "Predio no encontrado en el sistema.";
+                return;
+            }
+
+            foreach (var sheetName in sheetNames)
+            {
+                var worksheet = package.Workbook.Worksheets[sheetName];
+                if (worksheet == null)
+                {
+                    comparisonResults.Add(new ComparisonResult
+                    {
+                        SheetName = sheetName,
+                        CodigoUsuario = predio.CodigoUsuario,
+                        Status = "Hoja no encontrada en Excel"
+                    });
+                    continue;
+                }
+
+                int startRow = 6;
+                int lastRow = worksheet.Dimension?.End.Row ?? startRow;
+                bool foundRow = false;
+
+                for (int row = startRow; row <= lastRow; row++)
+                {
+                    var codigoUsuario = worksheet.Cells[row, 5].Text?.Trim();
+                    if (string.IsNullOrWhiteSpace(codigoUsuario))
+                        continue;
+
+                    if (codigoUsuario != predio.CodigoUsuario)
+                        continue;
+
+                    foundRow = true;
+
+                    // Prefer reading numeric value from the cell.Value (preserves underlying precision).
+                    double? TryGetCellNumber(ExcelRange cell)
+                    {
+                        if (cell == null) return null;
+                        var val = cell.Value;
+                        if (val == null) return null;
+
+                        // Handle numeric types directly
+                        if (val is double d) return d;
+                        if (val is float f) return (double)f;
+                        if (val is decimal dec) return (double)dec;
+                        if (val is int i) return i;
+                        if (val is long l) return l;
+                        if (val is short s) return s;
+
+                        // Fallback to parsing the displayed text
+                        var input = cell.Text;
+                        if (string.IsNullOrWhiteSpace(input)) return null;
+                        var stext = input.Trim().Replace("$", "").Replace(" ", "");
+                        double v;
+                        var styles = System.Globalization.NumberStyles.Number | System.Globalization.NumberStyles.AllowCurrencySymbol;
+                        var cultures = new[] {
+                            System.Globalization.CultureInfo.GetCultureInfo("es-CO"),
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            System.Globalization.CultureInfo.CurrentCulture
+                        };
+                        foreach (var c in cultures)
+                        {
+                            if (double.TryParse(stext, styles, c, out v))
+                                return v;
+                        }
+
+                        if (stext.Contains('.') && stext.Contains(','))
+                        {
+                            var t = stext.Replace(".", "").Replace(",", ".");
+                            if (double.TryParse(t, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out v))
+                                return v;
+                        }
+
+                        var dotCount = stext.Count(ch => ch == '.');
+                        if (dotCount > 1)
+                        {
+                            var t = stext.Replace(".", "");
+                            if (double.TryParse(t, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out v))
+                                return v;
+                        }
+
+                        if (stext.Contains(',') && !stext.Contains('.'))
+                        {
+                            var t = stext.Replace(",", ".");
+                            if (double.TryParse(t, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out v))
+                                return v;
+                        }
+
+                        return null;
+                    }
+
+                    var medicionAnterior = TryGetCellNumber(worksheet.Cells[row, 11]);
+                    var medicionActual = TryGetCellNumber(worksheet.Cells[row, 12]);
+                    double? consumoCalculado = null;
+                    if (medicionActual.HasValue && medicionAnterior.HasValue)
+                    {
+                        consumoCalculado = medicionActual.Value - medicionAnterior.Value;
+                    }
+
+                    var valorPeriodo = TryGetCellNumber(worksheet.Cells[row, 22]);
+                    var deudaExcel = TryGetCellNumber(worksheet.Cells[row, 23]);
+                    var recaudoExcel = TryGetCellNumber(worksheet.Cells[row, 24]);
+                    var deudaPasaExcel = TryGetCellNumber(worksheet.Cells[row, 25]);
+                    var codigoFacturaExcel = worksheet.Cells[row, 1].Text;
+
+                    // Robust lookup: load facturas for predio ordered by FechaHoraFacturacion at the database level
+                    // to ensure deterministic ordering across environments. Further filtering by periodo/year
+                    // will be applied in-memory but the initial ordering comes from the DB.
+                    var facturasPredio = await context.Facturacions
+                        .Include(f => f.IdplanillaNavigation).ThenInclude(p => p.IdperiodoNavigation)
+                        .Where(f => f.Idpredio == predio.Idpredio && f.IdplanillaNavigation != null && f.IdplanillaNavigation.FechaHoraFacturacion != null)
+                        .OrderByDescending(f => f.IdplanillaNavigation.FechaHoraFacturacion)
+                        .ToListAsync();
+
+                    static string NormalizePeriodo(string s)
+                    {
+                        if (string.IsNullOrWhiteSpace(s)) return string.Empty;
+                        // Keep only letters to ignore year digits (e.g. "NOV-DIC 2025" -> "NOVDIC")
+                        var arr = s.Where(char.IsLetter).ToArray();
+                        return new string(arr).ToUpperInvariant();
+                    }
+
+                    var target = NormalizePeriodo(sheetName);
+
+                    // First resolve Periodo by DescripcionCorta to get the canonical Idperiodo
+                    var upperDesc = sheetName?.ToUpper();
+                    var periodo = await context.Periodos
+                        .FirstOrDefaultAsync(p => p.DescripcionCorta != null && p.DescripcionCorta.Trim().ToUpper() == upperDesc);
+
+                    List<Facturacion> candidateListByPeriodo;
+                    if (periodo != null)
+                    {
+                        // take facturas that belong to the same Idperiodo
+                        candidateListByPeriodo = facturasPredio
+                            .Where(f => f.IdplanillaNavigation != null && f.IdplanillaNavigation.Idperiodo == periodo.Idperiodo)
+                            .ToList();
+                    }
+                    else
+                    {
+                        // fallback: match by normalized DescripcionCorta as before
+                        candidateListByPeriodo = facturasPredio
+                            .Where(f => NormalizePeriodo(f.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionCorta) == target)
+                            .ToList();
+                    }
+
+                    // Restrict candidates to the requested year. For NOV-DIC allow next-year dated invoices
+                    // (they are stored with a January date but represent NOV-DIC of the previous year).
+                    var allowedYears = new List<int> { selectedYear };
+                    if (target == "NOVDIC" || (periodo != null && (periodo.DescripcionCorta ?? string.Empty).Trim().ToUpper().Contains("NOV")))
+                    {
+                        allowedYears.Add(selectedYear + 1);
+                    }
+
+                    candidateListByPeriodo = candidateListByPeriodo
+                        .Where(f => f.IdplanillaNavigation?.FechaHoraFacturacion != null
+                                    && allowedYears.Contains(f.IdplanillaNavigation.FechaHoraFacturacion.Value.Year))
+                        .ToList();
+
+                    // Order candidates by FechaHoraFacturacion descending (prefer latest)
+                    var candidateListOrdered = candidateListByPeriodo
+                        .OrderByDescending(f => f.IdplanillaNavigation?.FechaHoraFacturacion ?? DateTime.MinValue)
+                        .ToList();
+
+                    // Select invoices with stricter rules:
+                    // - For normal periods: only Year == selectedYear
+                    // - For NOV-DIC: prefer invoices in Nov/Dec of selectedYear; if none, accept an invoice in Jan of selectedYear+1
+                    // This prevents treating a factura dated in January of the same selectedYear as NOV-DIC.
+                    var isNovDic = target == "NOVDIC" || sheetName == "NOV-DIC" || (periodo != null && (periodo.DescripcionCorta ?? string.Empty).Trim().ToUpper().Contains("NOV"));
+
+                    Facturacion sistemaFact = null;
+                    if (isNovDic)
+                    {
+                        // Prefer Nov/Dec of the selected year
+                        sistemaFact = candidateListOrdered
+                            .FirstOrDefault(f => f.IdplanillaNavigation?.FechaHoraFacturacion != null
+                                                 && f.IdplanillaNavigation.FechaHoraFacturacion.Value.Year == selectedYear
+                                                 && (f.IdplanillaNavigation.FechaHoraFacturacion.Value.Month == 11 || f.IdplanillaNavigation.FechaHoraFacturacion.Value.Month == 12));
+
+                        if (sistemaFact == null)
+                        {
+                            // Then accept January of the next year only
+                            sistemaFact = candidateListOrdered
+                                .FirstOrDefault(f => f.IdplanillaNavigation?.FechaHoraFacturacion != null
+                                                     && f.IdplanillaNavigation.FechaHoraFacturacion.Value.Year == selectedYear + 1
+                                                     && f.IdplanillaNavigation.FechaHoraFacturacion.Value.Month == 1);
+                        }
+                    }
+                    else
+                    {
+                        sistemaFact = candidateListOrdered
+                            .FirstOrDefault(f => f.IdplanillaNavigation?.FechaHoraFacturacion != null
+                                                 && f.IdplanillaNavigation.FechaHoraFacturacion.Value.Year == selectedYear);
+                    }
+
+                    var result = new ComparisonResult
+                    {
+                        SheetName = sheetName,
+                        CodigoUsuario = codigoUsuario,
+                        CodigoFacturaExcel = codigoFacturaExcel,
+                        MedicionAnteriorExcel = medicionAnterior,
+                        MedicionActualExcel = medicionActual,
+                        ConsumoExcel = consumoCalculado,
+                        DeudaExcel = deudaExcel,
+                        RecaudoExcel = recaudoExcel,
+                        DeudaPasaExcel = deudaPasaExcel,
+                        ValorPeriodoExcel = valorPeriodo
+                    };
+
+                    if (sistemaFact == null)
+                    {
+                        result.Status = "No existe en sistema para ese periodo/año";
+                    }
+                    else
+                    {
+                        // Prepare values for diagnostics. Actual MatchInfo will include only the differing fields
+                        var matchPeriodo = sistemaFact.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionCorta;
+                        var matchYear = sistemaFact.IdplanillaNavigation?.FechaHoraFacturacion?.Year;
+                        var planillaId = sistemaFact.IdplanillaNavigation?.Idplanilla;
+                        var fecha = sistemaFact.IdplanillaNavigation?.FechaHoraFacturacion?.ToString("yyyy-MM-dd");
+
+                        // Expose the facturacion id used for matching (Idfactura)
+                        result.IdfacturaSistema = sistemaFact.Idfactura;
+
+                        // Para NOV-DIC queremos formar el código de factura del sistema con el formato:
+                        // "YY-12-<numero>" donde YY son los dos últimos dígitos del año seleccionado
+                        // y <numero> es la parte numérica final del código de factura del sistema.
+                        if (sheetName == "NOV-DIC")
+                        {
+                            try
+                            {
+                                var original = sistemaFact.CodigoFactura ?? string.Empty;
+                                // extraer la última secuencia de dígitos del código de factura
+                                var m = System.Text.RegularExpressions.Regex.Match(original, "(\\d+)$");
+                                var numero = m.Success ? m.Value : original;
+                                var yy = (selectedYear % 100).ToString("D2");
+                                result.CodigoFacturaSistema = $"{yy}-12-{numero}";
+                            }
+                            catch
+                            {
+                                result.CodigoFacturaSistema = sistemaFact.CodigoFactura;
+                            }
+                        }
+                        else
+                        {
+                            result.CodigoFacturaSistema = sistemaFact.CodigoFactura;
+                        }
+                        result.MedicionAnteriorSistema = sistemaFact.MedicionAnterior;
+                        result.MedicionActualSistema = sistemaFact.MedicionActual;
+                        result.ConsumoSistema = sistemaFact.ConsumoM3;
+                        result.RecaudoSistema = sistemaFact.RecaudoPeriodoTotal;
+                        result.ValorPeriodoSistema = sistemaFact.ValorPeriodo;
+
+                        // Adjust system monetary values if there is a scale mismatch with Excel values
+                        double? AdjustSystemMoney(double? sysVal, double? excelVal)
+                        {
+                            if (!sysVal.HasValue || !excelVal.HasValue || excelVal.Value == 0)
+                                return sysVal;
+                            var ratio = sysVal.Value / excelVal.Value;
+                            // If ratio is very large, check if it's approximately a power-of-ten scale (100, 1000, 10000)
+                            var candidates = new[] { 100.0, 1000.0, 10000.0 };
+                            foreach (var c in candidates)
+                            {
+                                // relative closeness threshold 5%
+                                if (Math.Abs(ratio - c) / c < 0.05)
+                                {
+                                    // system value is larger than Excel by ~c -> divide to normalize
+                                    return sysVal.Value / c;
+                                }
+                                // handle the opposite case: system value is smaller than Excel by ~c (ratio ~= 1/c)
+                                var inv = 1.0 / c;
+                                if (Math.Abs(ratio - inv) / inv < 0.05)
+                                {
+                                    // system value is smaller by factor c -> multiply to normalize
+                                    return sysVal.Value * c;
+                                }
+                            }
+                            return sysVal;
+                        }
+
+                        // apply normalization for monetary fields used in comparisons
+                        result.ValorPeriodoSistema = AdjustSystemMoney(result.ValorPeriodoSistema, result.ValorPeriodoExcel);
+                        // Capture raw system values before normalization for diagnostics
+                        var rawValorPeriodoSistema = result.ValorPeriodoSistema;
+                        var rawRecaudoSistema = result.RecaudoSistema;
+
+                        result.ValorPeriodoSistema = AdjustSystemMoney(result.ValorPeriodoSistema, result.ValorPeriodoExcel);
+                        result.RecaudoSistema = AdjustSystemMoney(result.RecaudoSistema, result.RecaudoExcel);
+
+                        // Prepare diagnostic map for production: store raw->adjusted info when normalization happened
+                        var isProd = System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")?.Equals("Production", StringComparison.OrdinalIgnoreCase) == true;
+                        var normInfo = new Dictionary<string, string>();
+                        if (isProd)
+                        {
+                            if (rawValorPeriodoSistema.HasValue && result.ValorPeriodoSistema.HasValue && Math.Abs(rawValorPeriodoSistema.Value - result.ValorPeriodoSistema.Value) > 0.0001)
+                            {
+                                var ratio = rawValorPeriodoSistema.Value / (result.ValorPeriodoSistema.Value == 0 ? 1 : result.ValorPeriodoSistema.Value);
+                                normInfo["ValorPeriodo"] = $"raw:{rawValorPeriodoSistema.Value} -> adj:{result.ValorPeriodoSistema.Value} (ratio:{ratio:F2})";
+                            }
+                            if (rawRecaudoSistema.HasValue && result.RecaudoSistema.HasValue && Math.Abs(rawRecaudoSistema.Value - result.RecaudoSistema.Value) > 0.0001)
+                            {
+                                var ratio = rawRecaudoSistema.Value / (result.RecaudoSistema.Value == 0 ? 1 : result.RecaudoSistema.Value);
+                                normInfo["Recaudo"] = $"raw:{rawRecaudoSistema.Value} -> adj:{result.RecaudoSistema.Value} (ratio:{ratio:F2})";
+                            }
+                        }
+
+                        // Manejo especial: si la factura del sistema está fechada en el siguiente año
+                        // y la hoja es NOV-DIC, entonces la deuda anterior del sistema debe interpretarse
+                        // como "DeudaPasa" (se arrastra al siguiente periodo ENE-FEB)
+                        var factYear = sistemaFact.IdplanillaNavigation?.FechaHoraFacturacion?.Year;
+                        if (factYear.HasValue && factYear.Value != selectedYear)
+                        {
+                            // Si la factura corresponde al año siguiente y estamos comparando NOV-DIC,
+                            // tomar DeudaAnterior como DeudaPasaSistema
+                            if (sheetName == "NOV-DIC" && factYear.Value == selectedYear + 1)
+                            {
+                                // For a Jan (next year) factura interpreted as NOV-DIC:
+                                // - DeudaAnterior on that factura is the "Deuda Viene" value (what the system shows as coming into that invoice).
+                                // - DeudaPasa may be explicitly stored; prefer it for DeudaPasaSistema when present, otherwise use DeudaAnterior.
+                                var deudaAnteriorJan = sistemaFact.DeudaAnterior;
+                                var deudaPasaJan = sistemaFact.DeudaPasa.HasValue && sistemaFact.DeudaPasa.Value != 0
+                                    ? sistemaFact.DeudaPasa
+                                    : sistemaFact.DeudaAnterior;
+
+                                // capture raw
+                                var rawDeudaPasaSistemaJan = deudaPasaJan;
+                                var rawDeudaSistemaJan = deudaAnteriorJan;
+
+                                result.RawDeudaPasaSistema = rawDeudaPasaSistemaJan;
+                                result.RawDeudaSistema = rawDeudaSistemaJan;
+
+                                result.DeudaPasaSistema = deudaPasaJan;
+                                result.DeudaSistema = deudaAnteriorJan;
+
+                                // Normalize debt scales against Excel values (some environments store cents or multiply)
+                                result.DeudaPasaSistema = AdjustSystemMoney(result.DeudaPasaSistema, result.DeudaPasaExcel);
+                                result.DeudaSistema = AdjustSystemMoney(result.DeudaSistema, result.DeudaExcel);
+
+                                if (isProd)
+                                {
+                                    if (rawDeudaPasaSistemaJan.HasValue && result.DeudaPasaSistema.HasValue && Math.Abs(rawDeudaPasaSistemaJan.Value - result.DeudaPasaSistema.Value) > 0.0001)
+                                    {
+                                        var ratio = rawDeudaPasaSistemaJan.Value / (result.DeudaPasaSistema.Value == 0 ? 1 : result.DeudaPasaSistema.Value);
+                                        normInfo["DeudaPasa"] = $"raw:{rawDeudaPasaSistemaJan.Value} -> adj:{result.DeudaPasaSistema.Value} (ratio:{ratio:F2})";
+                                    }
+                                    if (rawDeudaSistemaJan.HasValue && result.DeudaSistema.HasValue && Math.Abs(rawDeudaSistemaJan.Value - result.DeudaSistema.Value) > 0.0001)
+                                    {
+                                        var ratio = rawDeudaSistemaJan.Value / (result.DeudaSistema.Value == 0 ? 1 : result.DeudaSistema.Value);
+                                        normInfo["DeudaViene"] = $"raw:{rawDeudaSistemaJan.Value} -> adj:{result.DeudaSistema.Value} (ratio:{ratio:F2})";
+                                    }
+                                }
+
+                                // Note for diagnostics
+                                // we'll include a note in MatchInfo below if we list differences
+                            }
+                            else
+                            {
+                                // otros desajustes temporales: asignar DeudaAnterior al campo DeudaSistema
+                                result.DeudaSistema = sistemaFact.DeudaAnterior;
+                            }
+                        }
+                        else
+                        {
+                            result.DeudaSistema = sistemaFact.DeudaAnterior;
+                            var rawDeudaSistemaTmp = result.DeudaSistema;
+                            result.DeudaSistema = AdjustSystemMoney(result.DeudaSistema, result.DeudaExcel);
+                            if (isProd && rawDeudaSistemaTmp.HasValue && result.DeudaSistema.HasValue && Math.Abs(rawDeudaSistemaTmp.Value - result.DeudaSistema.Value) > 0.0001)
+                            {
+                                var ratio = rawDeudaSistemaTmp.Value / (result.DeudaSistema.Value == 0 ? 1 : result.DeudaSistema.Value);
+                                normInfo["DeudaViene"] = $"raw:{rawDeudaSistemaTmp.Value} -> adj:{result.DeudaSistema.Value} (ratio:{ratio:F2})";
+                            }
+                            result.DeudaPasaSistema = sistemaFact.DeudaPasa;
+                        }
+
+                        // Nota: no usar registros ENE-FEB como fuente para NOV-DIC. Si existe una factura de NOV-DIC
+                        // cuyo `FechaHoraFacturacion` está en enero del año siguiente, esa factura ya fue seleccionada
+                        // arriba como `sistemaFact` y se interpreta como NOV-DIC del `selectedYear`. No realizar más
+                        // búsquedas en ENE-FEB ni sobrescribir campos del sistema con ENE-FEB.
+
+                        // Build MatchInfo showing only differing values
+                        var diffs = new List<string>();
+                        // MedicionAnterior
+                        if (result.MedicionAnteriorExcel.HasValue && result.MedicionAnteriorSistema.HasValue)
+                        {
+                            if (Math.Abs(result.MedicionAnteriorExcel.Value - result.MedicionAnteriorSistema.Value) > 0.01)
+                                diffs.Add($"MedAnt: Excel={result.MedicionAnteriorExcel.Value} / Sistema={result.MedicionAnteriorSistema.Value}");
+                        }
+                        // MedicionActual
+                        if (result.MedicionActualExcel.HasValue && result.MedicionActualSistema.HasValue)
+                        {
+                            if (Math.Abs(result.MedicionActualExcel.Value - result.MedicionActualSistema.Value) > 0.01)
+                                diffs.Add($"MedAct: Excel={result.MedicionActualExcel.Value} / Sistema={result.MedicionActualSistema.Value}");
+                        }
+                        // Consumo
+                        if (result.ConsumoExcel.HasValue && result.ConsumoSistema.HasValue)
+                        {
+                            if (Math.Abs(result.ConsumoExcel.Value - result.ConsumoSistema.Value) > 0.01)
+                                diffs.Add($"Consumo: Excel={result.ConsumoExcel.Value} / Sistema={result.ConsumoSistema.Value}");
+                        }
+                        // ValorPeriodo
+                        if (result.ValorPeriodoExcel.HasValue && result.ValorPeriodoSistema.HasValue)
+                        {
+                            if (Math.Abs(result.ValorPeriodoExcel.Value - result.ValorPeriodoSistema.Value) > 0.5)
+                                diffs.Add($"ValorPeriodo: Excel={result.ValorPeriodoExcel.Value:F0} / Sistema={result.ValorPeriodoSistema.Value:F0}");
+                        }
+                        // Recaudo
+                        if (result.RecaudoExcel.HasValue && result.RecaudoSistema.HasValue)
+                        {
+                            if (Math.Abs(result.RecaudoExcel.Value - result.RecaudoSistema.Value) > 0.5)
+                                diffs.Add($"Recaudo: Excel={result.RecaudoExcel.Value:F0} / Sistema={result.RecaudoSistema.Value:F0}");
+                        }
+                        // Deuda (viene)
+                        if (result.DeudaExcel.HasValue && result.DeudaSistema.HasValue)
+                        {
+                            if (Math.Abs(result.DeudaExcel.Value - result.DeudaSistema.Value) > 0.5)
+                                diffs.Add($"DeudaViene: Excel={result.DeudaExcel.Value:F0} / Sistema={result.DeudaSistema.Value:F0}");
+                        }
+                        // DeudaPasa
+                        if (result.DeudaPasaExcel.HasValue && result.DeudaPasaSistema.HasValue)
+                        {
+                            if (Math.Abs(result.DeudaPasaExcel.Value - result.DeudaPasaSistema.Value) > 0.5)
+                                diffs.Add($"DeudaPasa: Excel={result.DeudaPasaExcel.Value:F0} / Sistema={result.DeudaPasaSistema.Value:F0}");
+                        }
+
+                        // If there are differences, list only the differing fields; otherwise leave empty
+                        if (diffs.Any())
+                        {
+                            var noteParts = new List<string>();
+                            if (sheetName == "NOV-DIC" && factYear.HasValue && factYear.Value == selectedYear + 1)
+                            {
+                                noteParts.Add("Nota: deuda tomada de factura de enero (año siguiente) interpretada como DeudaPasa");
+                            }
+                            if (isProd && normInfo.Any())
+                            {
+                                noteParts.Add("Norm:" + string.Join(", ", normInfo.Select(kv => kv.Key + "=" + kv.Value)));
+                            }
+                            var extraNote = noteParts.Any() ? " | " + string.Join(" | ", noteParts) : string.Empty;
+                            result.MatchInfo = string.Join(" ; ", diffs) + extraNote;
+                        }
+                        else
+                        {
+                            result.MatchInfo = string.Empty;
+                        }
+
+                        bool diff = false;
+                        if (result.MedicionActualExcel.HasValue && result.MedicionActualSistema.HasValue)
+                        {
+                            if (Math.Abs(result.MedicionActualExcel.Value - result.MedicionActualSistema.Value) > 0.01)
+                                diff = true;
+                        }
+                        if (result.ConsumoExcel.HasValue && result.ConsumoSistema.HasValue)
+                        {
+                            if (Math.Abs(result.ConsumoExcel.Value - result.ConsumoSistema.Value) > 0.01)
+                                diff = true;
+                        }
+                        if (result.ValorPeriodoExcel.HasValue && result.ValorPeriodoSistema.HasValue)
+                        {
+                            if (Math.Abs(result.ValorPeriodoExcel.Value - result.ValorPeriodoSistema.Value) > 0.5)
+                                diff = true;
+                        }
+                        if (result.RecaudoExcel.HasValue && result.RecaudoSistema.HasValue)
+                        {
+                            if (Math.Abs(result.RecaudoExcel.Value - result.RecaudoSistema.Value) > 0.5)
+                                diff = true;
+                        }
+                        // Comparar Deuda (DeudaAnterior) con DeudaSistema si está presente
+                        if (result.DeudaExcel.HasValue && result.DeudaSistema.HasValue)
+                        {
+                            if (Math.Abs(result.DeudaExcel.Value - result.DeudaSistema.Value) > 0.5)
+                                diff = true;
+                        }
+                        // Comparar DeudaPasa: si la planilla indica deuda que pasa compararla contra DeudaPasaSistema
+                        if (result.DeudaPasaExcel.HasValue && result.DeudaPasaSistema.HasValue)
+                        {
+                            if (Math.Abs(result.DeudaPasaExcel.Value - result.DeudaPasaSistema.Value) > 0.5)
+                                diff = true;
+                        }
+
+                        result.Status = diff ? "Diferencias encontradas" : "Igual";
+                    }
+
+                    comparisonResults.Add(result);
+                }
+
+                if (!foundRow)
+                {
+                    comparisonResults.Add(new ComparisonResult
+                    {
+                        SheetName = sheetName,
+                        CodigoUsuario = predio.CodigoUsuario,
+                        Status = "No hay fila para este predio en la hoja"
+                    });
+                }
+            }
+
+            message = "Comparación completada.";
+        }
+        catch (Exception ex)
+        {
+            message = $"Error procesando Excel: {ex.Message}";
+        }
+    }
+
+    private void ClearUploadedFile()
+    {
+        uploadedFileBytes = null;
+        uploadedFileName = null;
+        comparisonResults.Clear();
+        message = "Archivo limpiado.";
+    }
+
+    private async Task UpdateRowAsync(ComparisonResult row)
+    {
+        if (row == null || string.IsNullOrEmpty(row.IdfacturaSistema))
+            return;
+
+        try
+        {
+            using var context = DbFactory.CreateDbContext();
+            var fact = await context.Facturacions
+                .Include(f => f.IdplanillaNavigation)
+                .FirstOrDefaultAsync(f => f.Idfactura == row.IdfacturaSistema);
+            if (fact == null)
+            {
+                message = "Factura no encontrada en base de datos.";
+                return;
+            }
+
+            var updated = false;
+            // Update only differing numeric fields. Accept getter for current system value because
+            // entity properties cannot be passed by ref.
+            void UpdateIfDiff(double? excelVal, Func<double?> getSys, Action<double?> assign)
+            {
+                if (!excelVal.HasValue)
+                    return;
+                // comparison tolerant
+                var sysValCopy = getSys();
+                if (!sysValCopy.HasValue || Math.Abs(excelVal.Value - sysValCopy.Value) > 0.5)
+                {
+                    assign(excelVal.Value);
+                    updated = true;
+                }
+            }
+
+            UpdateIfDiff(row.MedicionAnteriorExcel, () => fact.MedicionAnterior, v => fact.MedicionAnterior = v);
+            UpdateIfDiff(row.MedicionActualExcel, () => fact.MedicionActual, v => fact.MedicionActual = v);
+            UpdateIfDiff(row.ConsumoExcel, () => fact.ConsumoM3, v => fact.ConsumoM3 = v);
+            UpdateIfDiff(row.ValorPeriodoExcel, () => fact.ValorPeriodo, v => fact.ValorPeriodo = v);
+            UpdateIfDiff(row.DeudaExcel, () => fact.DeudaAnterior, v => fact.DeudaAnterior = v);
+            UpdateIfDiff(row.DeudaPasaExcel, () => fact.DeudaPasa, v => fact.DeudaPasa = v);
+            UpdateIfDiff(row.RecaudoExcel, () => fact.RecaudoPeriodoTotal, v => fact.RecaudoPeriodoTotal = v);
+
+            if (updated)
+            {
+                await context.SaveChangesAsync();
+                message = $"Factura {row.IdfacturaSistema} actualizada.";
+                // re-run processing to refresh view
+                await ProcessStoredFile();
+            }
+            else
+            {
+                message = "No hay cambios reales para actualizar.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error actualizando BD: {ex.Message}";
+        }
+    }
+
+    private class ComparisonResult
+    {
+        public string SheetName { get; set; }
+        public string CodigoUsuario { get; set; }
+        public string CodigoFacturaExcel { get; set; }
+        public string CodigoFacturaSistema { get; set; }
+        public string MatchInfo { get; set; }
+        public double? MedicionActualExcel { get; set; }
+        public double? MedicionAnteriorExcel { get; set; }
+        public double? MedicionActualSistema { get; set; }
+        public double? MedicionAnteriorSistema { get; set; }
+        public double? ConsumoExcel { get; set; }
+        public double? ConsumoSistema { get; set; }
+        public double? RecaudoExcel { get; set; }
+        public double? RecaudoSistema { get; set; }
+        public double? DeudaExcel { get; set; }
+        public double? DeudaSistema { get; set; }
+        public double? DeudaPasaExcel { get; set; }
+        public double? DeudaPasaSistema { get; set; }
+        public double? ValorPeriodoExcel { get; set; }
+        public double? ValorPeriodoSistema { get; set; }
+        // raw system values (before any normalization) for diagnostics
+        public double? RawValorPeriodoSistema { get; set; }
+        public double? RawDeudaSistema { get; set; }
+        public double? RawDeudaPasaSistema { get; set; }
+        public double? RawRecaudoSistema { get; set; }
+        public string IdfacturaSistema { get; set; }
+        public string Status { get; set; }
+    }
+}

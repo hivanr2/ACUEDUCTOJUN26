@@ -1,0 +1,99 @@
+﻿@page "/personals/edit"
+@using Microsoft.EntityFrameworkCore
+@using ACUEDUCTO.Models
+@inject IDbContextFactory<ACUEDUCTO.Models.AcueductoContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit</PageTitle>
+
+<h1>Edit</h1>
+
+<h2>Personal</h2>
+<hr />
+@if (Personal is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-4">
+            <EditForm method="post" Model="Personal" OnValidSubmit="UpdatePersonal" FormName="edit" Enhance>
+                <DataAnnotationsValidator />
+                <ValidationSummary role="alert"/>
+                <input type="hidden" name="Personal.IdPersonal" value="@Personal.IdPersonal" />
+                <div class="mb-3">
+                    <label for="nombre" class="form-label">Nombre:</label>
+                    <InputText id="nombre" @bind-Value="Personal.Nombre" class="form-control" />
+                    <ValidationMessage For="() => Personal.Nombre" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="cargo" class="form-label">Cargo:</label>
+                    <InputText id="cargo" @bind-Value="Personal.Cargo" class="form-control" />
+                    <ValidationMessage For="() => Personal.Cargo" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="usuario" class="form-label">Usuario:</label>
+                    <InputText id="usuario" @bind-Value="Personal.Usuario" class="form-control" />
+                    <ValidationMessage For="() => Personal.Usuario" class="text-danger" />
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<div>
+    <a href="/personals">Back to List</a>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private int IdPersonal { get; set; }
+
+    [SupplyParameterFromForm]
+    private Personal? Personal { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+        Personal ??= await context.Personals.FirstOrDefaultAsync(m => m.IdPersonal == IdPersonal);
+
+        if (Personal is null)
+        {
+            NavigationManager.NavigateTo("notfound");
+        }
+    }
+
+    // To protect from overposting attacks, enable the specific properties you want to bind to.
+    // For more information, see https://learn.microsoft.com/aspnet/core/blazor/forms/#mitigate-overposting-attacks.
+    private async Task UpdatePersonal()
+    {
+        using var context = DbFactory.CreateDbContext();
+        context.Attach(Personal!).State = EntityState.Modified;
+
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (!PersonalExists(Personal!.IdPersonal))
+            {
+                NavigationManager.NavigateTo("notfound");
+            }
+            else
+            {
+                throw;
+            }
+        }
+
+        NavigationManager.NavigateTo("/personals");
+    }
+
+    private bool PersonalExists(int idpersonal)
+    {
+        using var context = DbFactory.CreateDbContext();
+        return context.Personals.Any(e => e.IdPersonal == idpersonal);
+    }
+}

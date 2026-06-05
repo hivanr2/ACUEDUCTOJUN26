@@ -1,0 +1,328 @@
+@page "/desperdicio-home"
+@using ACUEDUCTO.Models
+@using ACUEDUCTO.COMPARTIR.DTO
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<AcueductoContext> DbFactory
+@rendermode InteractiveServer
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h6 class="card-title">Alertas de desperdicio (Home)</h6>
+        <p class="small text-muted">Lista los bimestres cuyo consumo supera el promedio histórico del predio (misma lógica que en detalle del predio).</p>
+
+        <div class="mb-2">
+            <span class="badge bg-danger">@((predioAlerts?.Count) ?? 0)</span>
+            <small class="text-muted ms-2">de @totalPrediosCount predios</small>
+        </div>
+        <div class="mb-2">
+            <button class="btn btn-sm btn-outline-secondary" @onclick="ToggleDebug">@((showDebug) ? "Ocultar debug" : "Mostrar debug")</button>
+        </div>
+        @if (showDebug)
+        {
+            <div class="small text-muted mb-2">
+                <div>Debug:</div>
+                <ul class="mb-0">
+                    @foreach (var d in debugMessages.Take(200))
+                    {
+                        <li>@d</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        @if (isLoading)
+        {
+            <div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">cargando...</span></div>
+        }
+        else if (predioAlerts == null || !predioAlerts.Any())
+        {
+            <div class="text-muted">No se detectaron bimestres por encima del promedio.</div>
+        }
+        else
+        {
+            <div class="list-group">
+                @foreach (var p in predioAlerts)
+                {
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="fw-semibold h5">@p.PredioNombre <a class="ms-2 small" href="/predios/details?Idpredio=@p.PredioId" target="_blank" rel="noopener noreferrer">Ver detalle</a></div>
+                                <div class="small text-muted">Consumo promedio: @p.Promedio.ToString("0.##") m³</div>
+                            </div>
+                            <div class="small text-end">
+                                <div class="text-danger fw-semibold">@p.AboveCount @(" bimestre(s) arriba")</div>
+                            </div>
+                        </div>
+
+                        <div class="mt-2">
+                            <PredioAboveBimestres Items="p.AboveBimestres" />
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private bool isLoading = true;
+    private int totalPrediosCount = 0;
+    private List<PredioAlert> predioAlerts = new();
+    // Diagnostic messages to help find why predios are excluded
+    private List<string> debugMessages = new();
+    private bool showDebug = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private void ToggleDebug()
+    {
+        showDebug = !showDebug;
+    }
+
+    // Public accessor to obtain the summary (count of alerts, total predios)
+    public async Task<(int Count, int Total)> GetSummaryAsync()
+    {
+        if (isLoading)
+        {
+            await LoadAsync();
+        }
+        return (predioAlerts?.Count ?? 0, totalPrediosCount);
+    }
+
+    private static string BimestreLabelFromDate(DateTime dt)
+    {
+        // Registration/facturacion dates are recorded in the month AFTER the bimestre,
+        // so shift one month back when deriving the bimestre label from a date.
+        var labels = new[] { "ENE-FEB", "MAR-ABR", "MAY-JUN", "JUL-AGO", "SEP-OCT", "NOV-DIC" };
+        var adjusted = dt.AddMonths(-1);
+        int idx = (adjusted.Month - 1) / 2;
+        idx = Math.Clamp(idx, 0, labels.Length - 1);
+        return labels[idx];
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+
+            // Determine the expected previous bimestre label based on server date (same for ALL predios)
+            static string GetPreviousBimestreLabel(DateTime now)
+            {
+                var labels = new[] { "ENE-FEB", "MAR-ABR", "MAY-JUN", "JUL-AGO", "SEP-OCT", "NOV-DIC" };
+                int bIndex = (now.Month - 1) / 2; // 0..5
+                int prev = (bIndex - 1 + labels.Length) % labels.Length;
+                return labels[prev];
+            }
+
+            var now = DateTime.Now;
+            var expectedPrevPeriodo = GetPreviousBimestreLabel(now);
+            // compute expected previous periodo index and year to ensure label+year match
+            int currentIndex = (now.Month - 1) / 2;
+            int prevIndex = (currentIndex - 1 + 6) % 6;
+            // if prevIndex wrapped to previous calendar year (e.g., currentIndex == 0 and prevIndex == 5)
+            int expectedPrevYear = prevIndex > currentIndex ? now.Year - 1 : now.Year;
+
+            var predios = await db.Predios
+                .Include(p => p.Facturacions)
+                    .ThenInclude(f => f.IdplanillaNavigation)
+                .ToListAsync();
+
+            totalPrediosCount = predios.Count;
+            var list = new List<PredioAlert>();
+            foreach (var pred in predios)
+            {
+                var facturacion = await db.Facturacions
+                    .Where(f => f.Idpredio == pred.Idpredio)
+                    .Include(f => f.IdplanillaNavigation)
+                        .ThenInclude(p => p.IdperiodoNavigation)
+                    .OrderBy(f => f.IdplanillaNavigation!.FechaHoraFacturacion)
+                    .ToListAsync();
+
+                if (facturacion == null || facturacion.Count == 0)
+                {
+                    debugMessages.Add($"{pred.Idpredio}: sin facturacion");
+                    continue;
+                }
+
+                // processed counter removed; validate each predio individually
+
+                // Removed a broad scan for the expected previous periodo.
+                // We'll verify that the immediate previous record (the first shown previous bimestre)
+                // matches the expected previous bimestre (label + year) after building the recent timeline.
+
+                // helper to normalize date between FechaHoraFacturacion and FechaHoraRegistroConsumo
+                static DateTime? GetFecha(Facturacion f) => f.IdplanillaNavigation?.FechaHoraFacturacion ?? f.IdplanillaNavigation?.FechaHoraRegistroConsumo;
+
+                // Build a recent timeline (most recent first) including one extra so we can inspect the bimestre
+                // immediately previous to the current. Use normalized date and include only entries with a date.
+                var timelineDesc = facturacion
+                    .Where(f => GetFecha(f) != null)
+                    .OrderByDescending(f => GetFecha(f))
+                    .Take(DesperdicioConfig.Window + 1)
+                    .ToList();
+
+                if (timelineDesc.Count <= 1)
+                {
+                    debugMessages.Add($"{pred.Idpredio}: timelineDesc.Count={timelineDesc.Count}");
+                    continue;
+                }
+
+                // Now compute the consumos window (last N positive consumos) as in Predio Details
+                var consumos = facturacion
+                    .Where(f => f.ConsumoM3.HasValue && f.ConsumoM3 > 0 && (f.IdplanillaNavigation?.FechaHoraFacturacion ?? f.IdplanillaNavigation?.FechaHoraRegistroConsumo) != null)
+                    .OrderByDescending(f => (f.IdplanillaNavigation!.FechaHoraFacturacion ?? f.IdplanillaNavigation!.FechaHoraRegistroConsumo))
+                    .Take(DesperdicioConfig.Window)
+                    .OrderBy(f => (f.IdplanillaNavigation!.FechaHoraFacturacion ?? f.IdplanillaNavigation!.FechaHoraRegistroConsumo))
+                    .ToList();
+
+                if (consumos.Count == 0)
+                {
+                    debugMessages.Add($"{pred.Idpredio}: consumos.Count=0");
+                    continue;
+                }
+
+                var promedio = consumos.Average(f => f.ConsumoM3 ?? 0.0);
+                // Use rounded average to 1 decimal for comparison (parity with other views)
+                var promedioRedondeado = Math.Round(promedio, 1);
+                // Apply a 2 m3 tolerance: only consider consumos that exceed the rounded average by at least 2 m3
+                var umbral = promedioRedondeado + 2.0;
+
+                // Enforce: the bimestre inmediatamente anterior al actual (timelineDesc[1])
+                // debe tener consumo positivo y además cumplir el umbral. Si no, excluir el predio.
+                // Find the most recent previous record with a positive consumo within the timeline
+                // (skip the most recent/current record at index 0). Many predios have immediate zeros
+                // so using the first non-zero previous consumo is more robust.
+                var immediatePrev = timelineDesc.Skip(1).FirstOrDefault(f => (f.ConsumoM3 ?? 0.0) > 0.0);
+                if (immediatePrev == null)
+                {
+                    debugMessages.Add($"{pred.Idpredio}: no previous non-zero consumo in window (timelineDesc.Count={timelineDesc.Count})");
+                    continue;
+                }
+
+                var immediateConsumo = immediatePrev.ConsumoM3 ?? 0.0;
+                if (immediateConsumo <= 0.0)
+                {
+                    debugMessages.Add($"{pred.Idpredio}: immediateConsumo={immediateConsumo}");
+                    continue;
+                }
+
+                if (immediateConsumo < umbral)
+                {
+                    debugMessages.Add($"{pred.Idpredio}: immediateConsumo {immediateConsumo} < umbral {umbral}");
+                    continue;
+                }
+
+                // Verify that the immediate previous bimestre (the first record shown) matches the
+                // expected previous periodo label and year. If it doesn't, skip this predio.
+                if (!string.IsNullOrWhiteSpace(expectedPrevPeriodo))
+                {
+                    var prevFechaCheck = GetFecha(immediatePrev) ?? DateTime.MinValue;
+                    var prevPeriodoLabel = immediatePrev.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionCorta
+                                            ?? BimestreLabelFromDate(prevFechaCheck);
+                    var prevYearCheck = prevFechaCheck == DateTime.MinValue ? 0 : prevFechaCheck.Year;
+                    if (!string.Equals(prevPeriodoLabel ?? string.Empty, expectedPrevPeriodo, StringComparison.InvariantCultureIgnoreCase)
+                        || prevYearCheck != expectedPrevYear)
+                    {
+                        // The first shown previous record is not the expected previous bimestre -> skip
+                        continue;
+                    }
+                }
+
+                // Build AboveBimestres candidates using threshold: consumo >= umbral
+                var aboveCandidates = consumos
+                    .Where(f => (f.ConsumoM3 ?? 0.0) >= umbral)
+                    .OrderByDescending(f => f.IdplanillaNavigation!.FechaHoraRegistroConsumo)
+                    .Select(f => new AboveBimestreInfo
+                    {
+                        Periodo = f.IdplanillaNavigation?.IdperiodoNavigation?.DescripcionCorta ?? f.IdplanillaNavigation?.Descripcion,
+                        Fecha = f.IdplanillaNavigation?.FechaHoraRegistroConsumo,
+                        Consumo = f.ConsumoM3 ?? 0.0
+                    })
+                    .ToList();
+
+                // Count consecutive above starting from the most recent previous non-zero record and going backwards
+                // Build a list of distinct bimestres from the timeline (most recent first), grouping by label+year via an overall index
+                var timelineOrdered = timelineDesc.OrderByDescending(f => GetFecha(f)).ToList();
+                var bimestreEntries = timelineOrdered
+                    .Select(f => {
+                        var fecha = GetFecha(f) ?? DateTime.MinValue;
+                        var bIndex = fecha == DateTime.MinValue ? 0 : (fecha.Month - 1) / 2;
+                        var year = fecha == DateTime.MinValue ? 0 : fecha.Year;
+                        var overall = year * 6 + bIndex;
+                        return new { Fact = f, Fecha = fecha, Consumo = (f.ConsumoM3 ?? 0.0), BIndex = bIndex, Year = year, Overall = overall };
+                    })
+                    // preserve order and remove duplicates by overall (first occurrence kept)
+                    .GroupBy(x => x.Overall)
+                    .Select(g => g.First())
+                    // ensure entries are ordered from most-recent to oldest (overall descending)
+                    .OrderByDescending(x => x.Overall)
+                    .ToList();
+
+                // compute overall for the immediate previous bimestre (start point)
+                var prevFecha = GetFecha(immediatePrev) ?? DateTime.MinValue;
+                var prevBIndex = prevFecha == DateTime.MinValue ? 0 : (prevFecha.Month - 1) / 2;
+                var prevYear = prevFecha == DateTime.MinValue ? 0 : prevFecha.Year;
+                var prevOverall = prevYear * 6 + prevBIndex;
+
+                int startIdx = bimestreEntries.FindIndex(x => x.Overall == prevOverall && x.Consumo > 0.0);
+                var consecutiveList = new List<AboveBimestreInfo>();
+                if (startIdx >= 0)
+                {
+                    for (int k = 0; ; k++)
+                    {
+                        int idx = startIdx + k;
+                        if (idx >= bimestreEntries.Count) break;
+                        var entry = bimestreEntries[idx];
+                        var expectedOverall = prevOverall - k;
+                        // must be calendar-consecutive (no gaps)
+                        if (entry.Overall != expectedOverall) break;
+                        if (entry.Consumo > 0.0 && entry.Consumo >= umbral)
+                        {
+                            var periodoLabel = BimestreLabelFromDate(entry.Fecha);
+                            consecutiveList.Add(new AboveBimestreInfo { Periodo = periodoLabel, Fecha = entry.Fecha, Consumo = entry.Consumo });
+                        }
+                        else break;
+                    }
+                }
+
+                // Only include predio when there is at least one consecutive above bimestre starting from the previous non-zero
+                if (consecutiveList.Count > 0)
+                {
+                    list.Add(new PredioAlert
+                    {
+                        PredioId = pred.Idpredio,
+                        PredioNombre = string.IsNullOrWhiteSpace(pred.ApellidosNombresUsuario) ? pred.CodigoUsuario ?? pred.Idpredio : pred.ApellidosNombresUsuario,
+                        Promedio = promedio,
+                        AboveBimestres = consecutiveList,
+                        AboveCount = consecutiveList.Count
+                    });
+                }
+            }
+
+            predioAlerts = list.OrderByDescending(p => p.AboveCount).Take(50).ToList();
+        }
+        catch
+        {
+            predioAlerts = new List<PredioAlert>();
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private class PredioAlert
+    {
+        public string PredioId { get; set; } = string.Empty;
+        public string PredioNombre { get; set; } = string.Empty;
+        public double Promedio { get; set; }
+        public int AboveCount { get; set; }
+        public List<AboveBimestreInfo> AboveBimestres { get; set; } = new List<AboveBimestreInfo>();
+    }
+}

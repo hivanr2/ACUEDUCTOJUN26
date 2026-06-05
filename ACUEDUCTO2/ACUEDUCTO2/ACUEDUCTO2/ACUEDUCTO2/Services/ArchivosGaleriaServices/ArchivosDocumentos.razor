@@ -1,0 +1,582 @@
+@using System.IO
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@* RenderMode not required for this component; remove to ensure it renders in all Blazor hosting models *@
+@using ACUEDUCTO2.Share.Models
+
+@inject IWebHostEnvironment Env
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ACUEDUCTO2.Data.SeguridadService SeguridadService
+
+
+
+@namespace ACUEDUCTO2.Services.ArchivosGaleriaServices
+@* No render mode specified to allow component to render in the app hosting model *@
+@inherits Microsoft.AspNetCore.Components.ComponentBase
+
+@if (Show)
+{
+    <div class="card shadow-sm mt-3">
+        <div class="card-header">
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 flex-wrap overflow-auto">
+                <div class="d-flex align-items-center gap-2 min-w-0">
+                    <strong>Archivos</strong>
+                    <span class="text-muted text-truncate" style="max-width: 60vw;">@FolderLabel</span>
+                    <span class="badge bg-secondary">@archivos.Count</span>
+                </div>
+                <div class="d-flex align-items-center flex-wrap gap-2">
+                    <div class="me-0 mb-2 mb-sm-0">
+                        <InputFile id="archivoInput" OnChange="OnFilesSelected" Multiple="@(string.IsNullOrWhiteSpace(RequestedFileName))" accept=".jpg,.jpeg,.png,.gif,.bmp,.webp,.mp4,.webm,.ogg,.mov,.avi,.mkv,.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.odt,.ods,.odp,.txt,.zip" />
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="TriggerFilePicker">Elegir archivo</button>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(RequestedFileName))
+                        {
+                            <div class="form-text">Se solicita el archivo: <strong>@RequestedFileName</strong>. Al subir se guardará con ese nombre (no se puede modificar).</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="mb-2">
+                <div class="alert alert-secondary small">Componente <strong>ArchivosDocumentos</strong> cargado. Carpeta: <code>@FolderLabel</code> | Solicitado: <code>@(RequestedFileName ?? "(ninguno)")</code></div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(RequestedFileName))
+            {
+                var requestedPresent = archivos.Any(a => string.Equals(a.FileName, RequestedFileName, StringComparison.OrdinalIgnoreCase));
+                if (!requestedPresent)
+                {
+                    <div class="alert alert-warning d-flex flex-column gap-2">
+                        <div>
+                            El archivo solicitado <strong>@RequestedFileName</strong> no se encuentra en esta carpeta.
+                        </div>
+                        <div>
+                            Use el control "Elegir archivo" o el botón <strong>CARGAR</strong> para seleccionar el archivo y luego subirlo. El archivo se guardará con el nombre solicitado (se usará la parte del nombre solicitado y la extensión del archivo subido).
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-primary" @onclick="TriggerFilePickerForRequested">CARGAR</button>
+                        </div>
+                    </div>
+                }
+            }
+            @if (documentosRequeridos?.Count > 0)
+            {
+                <div class="mb-3">
+                    <h6>Documentos requeridos</h6>
+                    <ul class="list-group">
+                        @foreach (var doc in documentosRequeridos)
+                        {
+                            var present = DocumentIsPresent(doc);
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div class="text-truncate">@doc</div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <a class="btn btn-sm btn-link" href="/ArchivosDocumentos/@Uri.EscapeDataString(doc)">Ver/Subir</a>
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input" type="checkbox" checked="@(present)" disabled />
+                                    </div>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+            @if (archivos.Count == 0)
+            {
+                <div class="alert alert-info">No hay archivos.</div>
+                <div class="small text-muted mt-2">
+                    <div>Carpeta examinada: <code>@lastFolderPath</code></div>
+                    <div>Existe: @(lastFolderExists ? "sí" : "no")</div>
+                    <div>CarpetaBase: <code>@CarpetaBase</code></div>
+                    <div>FolderName: <code>@FolderName</code></div>
+                </div>
+            }
+            else
+            {
+                <div class="mb-2 d-flex flex-wrap gap-2 align-items-center">
+                    <select class="form-select w-auto" @onchange="OnSelectChange" value="@currentIndex">
+                        @for (int i = 0; i < archivos.Count; i++)
+                        {
+                            <option value="@i">@archivos[i].FileName</option>
+                        }
+                    </select>
+                    <a class="btn btn-sm btn-outline-primary" href="@archivos[currentIndex].Url" target="_blank">Abrir</a>
+                    <a class="btn btn-sm btn-outline-secondary" href="@archivos[currentIndex].Url" download="@archivos[currentIndex].FileName">Descargar</a>
+                </div>
+
+                <div class="text-center">
+                    @if (archivos[currentIndex].IsImage)
+                    {
+                        <img src="@archivos[currentIndex].Url" class="img-fluid border" style="max-height: 65vh;" />
+                    }
+                    else if (archivos[currentIndex].IsVideo)
+                    {
+                        <video class="w-100 border" style="max-height: 65vh;" controls>
+                            <source src="@archivos[currentIndex].Url" type="@archivos[currentIndex].ContentType" />
+                        </video>
+                    }
+                    else if (archivos[currentIndex].IsDoc)
+                    {
+                        if (Path.GetExtension(archivos[currentIndex].FileName).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <iframe src="@archivos[currentIndex].Url" class="w-100 border" style="height:65vh;"></iframe>
+                        }
+                        else
+                        {
+                            <div class="alert alert-secondary d-inline-flex flex-column align-items-center" role="alert">
+                                <div class="fw-semibold">@archivos[currentIndex].FileName</div>
+                                <small class="text-muted">Vista previa no disponible. Use Abrir o Descargar.</small>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning">Tipo de archivo no soportado: @archivos[currentIndex].FileName</div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    // Parámetros
+    [Parameter] public bool Show { get; set; } = true;
+    [Parameter] public string? RequestedFileName { get; set; }
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? CodigoUsuario { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? CodigoInventario { get; set; }
+    [Parameter] public string CarpetaBase { get; set; } = "documentos"; // bajo wwwroot
+    [Parameter] public EventCallback OnClosed { get; set; }
+
+    private List<FileItem> archivos = new();
+    private int currentIndex = 0;
+    private string BaseHref => Nav.BaseUri.TrimEnd('/');
+    private string ToAssetUrl(string relative) => $"{BaseHref}/{relative.TrimStart('/')}";
+    private string FolderLabel => string.IsNullOrWhiteSpace(FolderName) ? "(Sin carpeta)" : ToAssetUrl($"{CarpetaBase}/{FolderName}");
+    private string FolderName => !string.IsNullOrWhiteSpace(CodigoUsuario) ? CodigoUsuario!.Trim() : (CodigoInventario ?? string.Empty);
+
+    private const long MaxFileSize = 1024L * 1024L * 200L; // 200MB
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Show) return;
+
+        // If no specific CodigoUsuario/CodigoInventario was supplied, try to default to the authenticated user id
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                // Prefer an explicit codigoUsuario claim when available (so folder is codigoUsuario)
+                var codigoUsuarioClaim = user.FindFirst("codigoUsuario")?.Value
+                                         ?? user.FindFirst("CodigoUsuario")?.Value
+                                         ?? user.FindFirst("usuario")?.Value
+                                         ?? user.FindFirst("user_id")?.Value;
+
+                var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+                if (string.IsNullOrWhiteSpace(CodigoUsuario) && string.IsNullOrWhiteSpace(CodigoInventario))
+                {
+                    var chosen = !string.IsNullOrWhiteSpace(codigoUsuarioClaim) ? codigoUsuarioClaim : userId;
+                    if (!string.IsNullOrWhiteSpace(chosen))
+                    {
+                        // sanitize chosen value to a valid folder name
+                        var safe = string.Join("_", chosen.Trim().Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+                        CodigoUsuario = safe;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // ignore auth errors; keep any provided values
+        }
+
+        // Create folders and load files after ensuring folder selection
+        EnsureFolder();
+        LoadFiles();
+        await LoadMenuDocumentsAsync();
+
+        // If a specific file was requested, try to locate it and show it
+        if (!string.IsNullOrWhiteSpace(RequestedFileName))
+        {
+            // RequestedFileName comes from route and is URL-decoded by Blazor
+            var requested = RequestedFileName!.Trim();
+            // Try to find exact match among loaded files
+            var idx = archivos.FindIndex(a => string.Equals(a.FileName, requested, StringComparison.OrdinalIgnoreCase));
+            if (idx >= 0)
+            {
+                currentIndex = idx;
+            }
+            else
+            {
+                // Not found: keep currentIndex at 0 so upload area can be used
+                currentIndex = 0;
+            }
+        }
+    }
+
+    private void EnsureFolder()
+    {
+        var root = Env.WebRootPath;
+        if (string.IsNullOrEmpty(root)) return;
+        var basePath = Path.Combine(root, CarpetaBase);
+        Directory.CreateDirectory(basePath);
+        if (!string.IsNullOrWhiteSpace(FolderName))
+        {
+            var p = Path.Combine(basePath, FolderName);
+            Directory.CreateDirectory(p);
+            lastFolderPath = p;
+            lastFolderExists = Directory.Exists(p);
+        }
+        else
+        {
+            lastFolderPath = basePath;
+            lastFolderExists = Directory.Exists(basePath);
+        }
+    }
+
+    private void LoadFiles()
+    {
+        archivos.Clear();
+        var root = Env.WebRootPath;
+        if (string.IsNullOrEmpty(root)) return;
+        // If FolderName is empty, list files directly under the base carpeta
+        var folderPath = string.IsNullOrWhiteSpace(FolderName)
+            ? Path.Combine(root, CarpetaBase)
+            : Path.Combine(root, CarpetaBase, FolderName);
+        if (!Directory.Exists(folderPath)) return;
+
+        var files = Directory.GetFiles(folderPath)
+            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var p in files)
+        {
+            var fileName = Path.GetFileName(p);
+            var ext = Path.GetExtension(p).ToLowerInvariant();
+            var relativePath = string.IsNullOrWhiteSpace(FolderName)
+                ? $"{CarpetaBase}/{fileName}"
+                : $"{CarpetaBase}/{FolderName}/{fileName}";
+
+            archivos.Add(new FileItem
+            {
+                FileName = fileName,
+                PhysicalPath = p,
+                Url = ToAssetUrl(relativePath),
+                IsImage = ImageExts.Contains(ext),
+                IsVideo = VideoExts.Contains(ext),
+                IsDoc = DocExts.Contains(ext),
+                ContentType = MimeFor(ext)
+            });
+        }
+
+        if (currentIndex >= archivos.Count)
+            currentIndex = Math.Max(0, archivos.Count - 1);
+    }
+
+    private static string MimeFor(string ext) => ext switch
+    {
+        ".mp4" => "video/mp4",
+        ".webm" => "video/webm",
+        ".ogg" => "video/ogg",
+        ".mov" => "video/quicktime",
+        ".avi" => "video/x-msvideo",
+        ".mkv" => "video/x-matroska",
+        ".pdf" => "application/pdf",
+        ".doc" => "application/msword",
+        ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".xls" => "application/vnd.ms-excel",
+        ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ".ppt" => "application/vnd.ms-powerpoint",
+        ".pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ".csv" => "text/csv",
+        ".odt" => "application/vnd.oasis.opendocument.text",
+        ".ods" => "application/vnd.oasis.opendocument.spreadsheet",
+        ".odp" => "application/vnd.oasis.opendocument.presentation",
+        ".txt" => "text/plain",
+        _ => "application/octet-stream"
+    };
+
+    private async Task OnFilesSelected(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            filesUploaded = 0;
+            EnsureFolder();
+            var root = Env.WebRootPath;
+            if (string.IsNullOrEmpty(root)) return;
+
+            // Save into the folder if specified, otherwise use the base CarpetaBase
+            var folderPath = string.IsNullOrWhiteSpace(FolderName)
+                ? Path.Combine(root, CarpetaBase)
+                : Path.Combine(root, CarpetaBase, FolderName);
+            Directory.CreateDirectory(folderPath);
+
+            // If a specific file was requested via URL, save the uploaded file using that fixed name
+            if (!string.IsNullOrWhiteSpace(RequestedFileName))
+            {
+                var requested = RequestedFileName!.Trim();
+                var first = e.GetMultipleFiles().FirstOrDefault();
+                if (first != null)
+                {
+                    var ext = Path.GetExtension(first.Name).ToLowerInvariant();
+                    // Reject dangerous executable/script extensions even if allowed elsewhere
+                    if (DangerousExts.Contains(ext) || !AllAllowedExts.Contains(ext))
+                    {
+                        await JS.InvokeVoidAsync("alert", "Tipo de archivo no permitido para el documento solicitado.");
+                    }
+                    else
+                    {
+                        var requestedExt = Path.GetExtension(requested);
+                        var finalName = string.IsNullOrWhiteSpace(requestedExt) ? requested + ext : requested;
+                        var safeName = string.Join("_", finalName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+                        var path = Path.Combine(folderPath, safeName);
+
+                        await using var stream = first.OpenReadStream(MaxFileSize);
+                        await using var fs = File.Create(path);
+                        await stream.CopyToAsync(fs);
+                        filesUploaded++;
+                        await JS.InvokeVoidAsync("alert", $"Archivo subido: {safeName}");
+
+                        // Refresh internal state so required documents list updates and reflect the new file
+                        LoadFiles();
+                        // select the newly uploaded file if present
+                        var idxNew = archivos.FindIndex(a => string.Equals(a.FileName, safeName, StringComparison.OrdinalIgnoreCase));
+                        if (idxNew >= 0) currentIndex = idxNew;
+                        pickerOpened = false;
+                        StateHasChanged();
+                        return;
+                    }
+                }
+                else
+                {
+                    await JS.InvokeVoidAsync("alert", "No se seleccionó ningún archivo para subir.");
+                }
+            }
+            else
+            {
+                foreach (var file in e.GetMultipleFiles())
+                {
+                    var ext = Path.GetExtension(file.Name).ToLowerInvariant();
+                    if (DangerousExts.Contains(ext) || !AllAllowedExts.Contains(ext))
+                        continue;
+
+                    var safeName = string.Join("_", file.Name.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+                    var path = Path.Combine(folderPath, safeName);
+
+                    await using var stream = file.OpenReadStream(MaxFileSize);
+                    await using var fs = File.Create(path);
+                    await stream.CopyToAsync(fs);
+                    filesUploaded++;
+                }
+                if (filesUploaded > 0)
+                {
+                    await JS.InvokeVoidAsync("alert", $"{filesUploaded} archivo(s) subido(s) correctamente.");
+                    // Refresh internal list and UI
+                    LoadFiles();
+                    // keep last uploaded selected when possible
+                    StateHasChanged();
+                }
+            }
+
+            LoadFiles();
+            // If a requested file exists now, select it
+            if (!string.IsNullOrWhiteSpace(RequestedFileName))
+            {
+                var requested = RequestedFileName!.Trim();
+                var idx = archivos.FindIndex(a => string.Equals(a.FileName, requested, StringComparison.OrdinalIgnoreCase));
+                if (idx >= 0)
+                    currentIndex = idx;
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error al subir archivo: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteCurrent()
+    {
+        if (archivos.Count == 0) return;
+        var current = archivos[currentIndex];
+        var ok = await JS.InvokeAsync<bool>("confirm", $"¿Desea eliminar '{current.FileName}'?");
+        if (!ok) return;
+
+        try
+        {
+            if (File.Exists(current.PhysicalPath))
+            {
+                File.Delete(current.PhysicalPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"No se pudo eliminar: {ex.Message}");
+        }
+        finally
+        {
+            LoadFiles();
+            StateHasChanged();
+        }
+    }
+
+    private void Prev()
+    {
+        if (archivos.Count == 0) return;
+        currentIndex = (currentIndex - 1 + archivos.Count) % archivos.Count;
+    }
+
+    private void Next()
+    {
+        if (archivos.Count == 0) return;
+        currentIndex = (currentIndex + 1) % archivos.Count;
+    }
+
+    private void OnSelectChange(ChangeEventArgs e)
+    {
+        if (int.TryParse(Convert.ToString(e.Value), out var idx))
+        {
+            if (idx >= 0 && idx < archivos.Count)
+                currentIndex = idx;
+        }
+    }
+
+    private async Task Close()
+    {
+        if (OnClosed.HasDelegate)
+        {
+            await OnClosed.InvokeAsync();
+        }
+    }
+
+    private async Task TriggerFilePicker()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("eval", "document.getElementById('archivoInput').click();");
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private static readonly HashSet<string> ImageExts = new([ ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" ]);
+    private static readonly HashSet<string> VideoExts = new([ ".mp4", ".webm", ".ogg", ".mov", ".avi", ".mkv" ]);
+    private static readonly HashSet<string> DocExts = new([ ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".ppt", ".pptx", ".odt", ".ods", ".odp", ".txt", ".zip" ]);
+    private static readonly HashSet<string> AllAllowedExts = new(ImageExts.Concat(VideoExts).Concat(DocExts));
+    // Dangerous extensions that should never be uploaded
+    private static readonly HashSet<string> DangerousExts = new([ ".exe", ".com", ".bat", ".cmd", ".sh", ".ps1", ".msi", ".dll", ".scr", ".pif", ".jar", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh" ]);
+
+    // Document list derived from the menu under "Información" (paths starting with /ArchivosDocumentos/)
+    private List<string> documentosRequeridos = new();
+    private string lastFolderPath = string.Empty;
+    private bool lastFolderExists = false;
+    private int filesUploaded = 0;
+    private bool pickerOpened = false;
+
+    private async Task LoadMenuDocumentsAsync()
+    {
+        try
+        {
+            // Try to load menu items and extract those whose URL starts with /ArchivosDocumentos/
+            // This assumes SeguridadService.ObtenerMenuPorObjetoAsync returns process definitions with Nombre and maybe a Url
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            if (user.Identity?.IsAuthenticated != true) return;
+
+            var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(userId)) return;
+
+            var menu = await SeguridadService.ObtenerMenuPorObjetoAsync(userId);
+            if (menu == null) return;
+
+            documentosRequeridos.Clear();
+            foreach (var obj in menu)
+            {
+                foreach (var proc in obj.Value)
+                {
+                    // If the menu group is "Documento" treat each process Nombre as a required document name
+                    if (!string.IsNullOrWhiteSpace(obj.Key) && obj.Key.Equals("Documento", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var name = proc.Nombre?.Trim();
+                        if (!string.IsNullOrWhiteSpace(name) && !documentosRequeridos.Contains(name, StringComparer.OrdinalIgnoreCase))
+                            documentosRequeridos.Add(name);
+                        continue;
+                    }
+
+                    // Also support explicit menu entries that contain a direct /ArchivosDocumentos/ path
+                    if (proc.Nombre != null && proc.Nombre.StartsWith("/ArchivosDocumentos/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var part = proc.Nombre.Substring("/ArchivosDocumentos/".Length);
+                        if (!string.IsNullOrWhiteSpace(part) && !documentosRequeridos.Contains(part, StringComparer.OrdinalIgnoreCase))
+                            documentosRequeridos.Add(part);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // ignore errors loading menu
+        }
+
+        // Fallback: if nothing was found from the user's menu, load document names from the catalog
+        if (documentosRequeridos.Count == 0)
+        {
+            try
+            {
+                var docs = ProcesosCatalogo.ObtenerPorObjeto("Documento");
+                foreach (var d in docs)
+                {
+                    var name = d.Nombre?.Trim();
+                    if (!string.IsNullOrWhiteSpace(name) && !documentosRequeridos.Contains(name, StringComparer.OrdinalIgnoreCase))
+                        documentosRequeridos.Add(name!);
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+    }
+
+    private sealed class FileItem
+    {
+        public string FileName { get; set; } = string.Empty;
+        public string PhysicalPath { get; set; } = string.Empty;
+        public string Url { get; set; } = string.Empty;
+        public bool IsImage { get; set; }
+        public bool IsVideo { get; set; }
+        public bool IsDoc { get; set; }
+        public string ContentType { get; set; } = "application/octet-stream";
+    }
+
+    private bool DocumentIsPresent(string docName)
+    {
+        if (string.IsNullOrWhiteSpace(docName)) return false;
+        // If the docName has an extension, check exact file name match first
+        var name = docName.Trim();
+        var ext = Path.GetExtension(name);
+        if (!string.IsNullOrWhiteSpace(ext))
+        {
+            return archivos.Any(a => string.Equals(a.FileName, name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Otherwise check by filename without extension
+        var baseName = Path.GetFileNameWithoutExtension(name);
+        return archivos.Any(a => string.Equals(Path.GetFileNameWithoutExtension(a.FileName), baseName, StringComparison.OrdinalIgnoreCase));
+    }
+}
