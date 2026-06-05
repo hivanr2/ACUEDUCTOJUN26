@@ -193,11 +193,12 @@
                     @if (planilla is not null)
                     {
                         <div class="d-flex align-items-center gap-2">
-                            @if (planilla.FechaHoraFacturacion.HasValue && planilla.FechaHoraFacturacion.Value > DateTime.Now)
+                            @if (planilla.FechaHoraFacturacion.HasValue && planilla.FechaHoraFacturacion.Value > DateTime.Now
+                                && ((facturaRows != null && facturaRows.Any()) || (planilla.Facturacions != null && planilla.Facturacions.Any())))
                             {
                                 <button type="button" class="btn btn-danger btn-sm" @onclick="ConfirmDeleteFacturacionsAsync" disabled="@isDeleting">BORRAR REGISTROS FACTURACIÓN</button>
                             }
-                            <span class="badge bg-secondary">@planilla.Facturacions?.Count() registros</span>
+                    <span class="badge bg-secondary">@(facturaRows?.Count ?? planilla.Facturacions?.Count() ?? 0) registros</span>
                         </div>
                     }
                 </div>
@@ -206,7 +207,11 @@
                 {
                     <div class="text-muted">Llamando...</div>
                 }
-                else if (planilla.Facturacions == null || !planilla.Facturacions.Any())
+                else if (isLoadingFacturaciones)
+                {
+                    <div class="d-flex align-items-center gap-2 text-muted"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Cargando registros de facturación...</div>
+                }
+                else if ((facturaRows == null || !facturaRows.Any()) && (planilla.Facturacions == null || !planilla.Facturacions.Any()))
                 {
                     <div class="text-muted"><em>No hay registros de facturación.</em></div>
                 }
@@ -240,31 +245,34 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (var factura in planilla.Facturacions)
+                                @if (facturaRows != null && facturaRows.Any())
                                 {
-                                    <tr>
-                                        <td>@factura.CodigoFactura</td>
-                                        <td>@factura.IdpredioNavigation.ApellidosNombresUsuario</td>
-                                        <td>@factura.CodigoUsuario</td>
-                                        <td>@factura.MedicionAnterior?.ToString()</td>
-                                        <td>@factura.MedicionActual?.ToString()</td>
-                                        <td>@factura.ConsumoM3?.ToString()</td>
-                                        <td>@factura.ValorConsumo?.ToString("C0")</td>
-                                        <td>@factura.CargoFijo?.ToString("C0")</td>
-                                        <td>@(factura.PorcentajeSobreTasa?.ToString())%</td>
-                                        <td>@factura.ValorSobreTasa?.ToString("C0")</td>
-                                        <td>@(factura.PorcentajeMora?.ToString())%</td>
-                                        <td>@factura.ValorMora?.ToString("C0")</td>
-                                        <td>@(factura.PorcentajeSubsidio?.ToString())%</td>
-                                        <td>@factura.ValorSubsidio?.ToString("C0")</td>
-                                        <td>@factura.OtrosValores?.ToString("C0")</td>
-                                        <td>@factura.ValorPeriodo?.ToString("C0")</td>
-                                        <td>@factura.DeudaAnterior?.ToString("C0")</td>
-                                        <td>@factura.RecaudoPeriodoTotal?.ToString("C0")</td>
-                                        <td>@factura.DeudaPasa?.ToString("C0")</td>
-                                        <td>@factura.NotasFactura</td>
-                                        <td>@factura.NotasRecaudo</td>
-                                    </tr>
+                                    foreach (var factura in facturaRows)
+                                    {
+                                        <tr>
+                                            <td>@factura.CodigoFactura</td>
+                                            <td>@factura.PredioNombre</td>
+                                            <td>@factura.CodigoUsuario</td>
+                                            <td>@factura.MedicionAnterior?.ToString()</td>
+                                            <td>@factura.MedicionActual?.ToString()</td>
+                                            <td>@factura.ConsumoM3?.ToString()</td>
+                                            <td>@factura.ValorConsumo?.ToString("C0")</td>
+                                            <td>@factura.CargoFijo?.ToString("C0")</td>
+                                            <td>@(factura.PorcentajeSobreTasa?.ToString())%</td>
+                                            <td>@factura.ValorSobreTasa?.ToString("C0")</td>
+                                            <td>@(factura.PorcentajeMora?.ToString())%</td>
+                                            <td>@factura.ValorMora?.ToString("C0")</td>
+                                            <td>@(factura.PorcentajeSubsidio?.ToString())%</td>
+                                            <td>@factura.ValorSubsidio?.ToString("C0")</td>
+                                            <td>@factura.OtrosValores?.ToString("C0")</td>
+                                            <td>@factura.ValorPeriodo?.ToString("C0")</td>
+                                            <td>@factura.DeudaAnterior?.ToString("C0")</td>
+                                            <td>@factura.RecaudoPeriodoTotal?.ToString("C0")</td>
+                                            <td>@factura.DeudaPasa?.ToString("C0")</td>
+                                            <td>@factura.NotasFactura</td>
+                                            <td>@factura.NotasRecaudo</td>
+                                        </tr>
+                                    }
                                 }
                             </tbody>
                         </table>
@@ -323,18 +331,51 @@
     private int blockingCount = 0;
     private string modalTitle = "Confirmar borrado";
     private string modalMessage = string.Empty;
+    private bool isLoadingFacturaciones = false;
+    private List<FacturaRow> facturaRows = new();
+
+    private sealed class FacturaRow
+    {
+        public string Idfactura { get; set; }
+        public string CodigoFactura { get; set; }
+        public string PredioNombre { get; set; }
+        public string CodigoUsuario { get; set; }
+        public double? MedicionAnterior { get; set; }
+        public double? MedicionActual { get; set; }
+        public double? ConsumoM3 { get; set; }
+        public double? ValorConsumo { get; set; }
+        public double? CargoFijo { get; set; }
+        public double? PorcentajeSobreTasa { get; set; }
+        public double? ValorSobreTasa { get; set; }
+        public double? PorcentajeMora { get; set; }
+        public double? ValorMora { get; set; }
+        public double? PorcentajeSubsidio { get; set; }
+        public double? ValorSubsidio { get; set; }
+        public double? OtrosValores { get; set; }
+        public double? ValorPeriodo { get; set; }
+        public double? DeudaAnterior { get; set; }
+        public double? RecaudoPeriodoTotal { get; set; }
+        public double? DeudaPasa { get; set; }
+        public string NotasFactura { get; set; }
+        public string NotasRecaudo { get; set; }
+    }
 
     [SupplyParameterFromQuery]
     private string Idplanilla { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
+        // Load planilla without eager-loading all navigation children to make initial load faster
         using var context = DbFactory.CreateDbContext();
         planilla = await context.Planillas
-            .Include(p => p.Facturacions.OrderBy(p => p.IdpredioNavigation.ApellidosNombresUsuario))
-            .ThenInclude(c => c.IdpredioNavigation)
-            .Include(f => f.IdperiodoNavigation)
+            .Include(p => p.IdperiodoNavigation)
             .FirstOrDefaultAsync(m => m.Idplanilla == Idplanilla);
+
+        if (planilla != null)
+        {
+            // Start loading facturaciones in background (Blazor-friendly async) so we can update UI when ready
+            _ = LoadFacturacionesAsync(planilla.Idplanilla);
+        }
 
         if (planilla is null)
         {
@@ -343,7 +384,89 @@
         }
 
         // Recalcular totales y actualizar si hay diferencias
-        await RecalcularYActualizarSiNecesarioAsync();
+        // Run recalculation in background so the page renders quickly and doesn't block the circuit
+        _ = RecalcularYActualizarSiNecesarioAsync();
+    }
+
+    private async Task LoadFacturacionesAsync(string idplanilla)
+    {
+        try
+        {
+            isLoadingFacturaciones = true;
+            await InvokeAsync(StateHasChanged);
+
+            await using var ctx2 = DbFactory.CreateDbContext();
+            // Use projection to avoid loading full navigation objects and reduce query time
+            var facts = await ctx2.Facturacions
+                .Where(f => f.Idplanilla == idplanilla)
+                .Select(f => new FacturaRow
+                {
+                    Idfactura = f.Idfactura,
+                    CodigoFactura = f.CodigoFactura,
+                    PredioNombre = f.IdpredioNavigation!.ApellidosNombresUsuario,
+                    CodigoUsuario = f.CodigoUsuario ?? string.Empty,
+                    MedicionAnterior = f.MedicionAnterior,
+                    MedicionActual = f.MedicionActual,
+                    ConsumoM3 = f.ConsumoM3,
+                    ValorConsumo = f.ValorConsumo,
+                    CargoFijo = f.CargoFijo,
+                    PorcentajeSobreTasa = f.PorcentajeSobreTasa,
+                    ValorSobreTasa = f.ValorSobreTasa,
+                    PorcentajeMora = f.PorcentajeMora,
+                    ValorMora = f.ValorMora,
+                    PorcentajeSubsidio = f.PorcentajeSubsidio,
+                    ValorSubsidio = f.ValorSubsidio,
+                    OtrosValores = f.OtrosValores,
+                    ValorPeriodo = f.ValorPeriodo,
+                    DeudaAnterior = f.DeudaAnterior,
+                    RecaudoPeriodoTotal = f.RecaudoPeriodoTotal,
+                    DeudaPasa = f.DeudaPasa,
+                    NotasFactura = f.NotasFactura ?? string.Empty,
+                    NotasRecaudo = f.NotasRecaudo ?? string.Empty
+                })
+                .OrderBy(r => r.PredioNombre)
+                .ToListAsync();
+
+            if (planilla != null && planilla.Idplanilla == idplanilla)
+            {
+                facturaRows = facts;
+                // also set count for badge
+                planilla.Facturacions = new List<Facturacion>();
+                planilla.TotalPredios = facturaRows.Count;
+
+                // Check for blocking recibos/ingresos tied to these facturas and hide delete button if any exist
+                try
+                {
+                    var facturaIds = facturaRows.Select(r => r.Idfactura).Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
+                    if (facturaIds.Any())
+                    {
+                        var recaudosCount = await ctx2.Recaudos.CountAsync(r => r.Idfactura != null && facturaIds.Contains(r.Idfactura));
+                        var ingresosCount = await ctx2.Ingresos.CountAsync(i => i.Idfactura != null && facturaIds.Contains(i.Idfactura));
+                        blockingCount = recaudosCount + ingresosCount;
+                        hasBlockingRecords = blockingCount > 0;
+
+                        if (hasBlockingRecords)
+                        {
+                            modalTitle = "EXISTEN REGISTROS DE CONSUMOS O RECIBOS DE CAJA PARA ÉSTA PLANILLA";
+                            modalMessage = "NO SE PUEDEN BORRAR ESTOS REGISTROS";
+                        }
+                    }
+                }
+                catch
+                {
+                    // ignore blocking check errors
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading facturaciones: {ex.Message}");
+        }
+        finally
+        {
+            isLoadingFacturaciones = false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private static double Sum(IEnumerable<double?> source) => source.Sum(v => v ?? 0);
@@ -419,8 +542,16 @@
             return;
         }
 
-        // gather factura ids for this planilla
-        var facturaIds = planilla.Facturacions?.Select(f => f.Idfactura).Where(id => !string.IsNullOrWhiteSpace(id)).ToList() ?? new List<string>();
+        // gather factura ids for this planilla - prefer lightweight projection if available
+        var facturaIds = new List<string>();
+        if (facturaRows != null && facturaRows.Any())
+        {
+            facturaIds = facturaRows.Select(f => f.Idfactura).Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
+        }
+        else
+        {
+            facturaIds = planilla.Facturacions?.Select(f => f.Idfactura).Where(id => !string.IsNullOrWhiteSpace(id)).ToList() ?? new List<string>();
+        }
 
         // default no blocking
         hasBlockingRecords = false;
@@ -494,9 +625,11 @@
 
         await ctx.SaveChangesAsync();
         isDeleting = false;
+        // update UI state
         mensajeActualizaciones = $"Se borraron {facturas.Count} registros de facturación.";
-        // reload planilla in UI
+        // clear both the EF collection and the lightweight projection so UI reflects deletion immediately
         planilla.Facturacions = new List<Facturacion>();
+        facturaRows = new List<FacturaRow>();
         planilla.TotalPredios = 0;
         planilla.CantidadConsumoM3total = 0;
         planilla.ValorTotalConsumoM3 = 0;
@@ -506,6 +639,7 @@
         planilla.ValorTotalOtros = 0;
         planilla.ValorTotalPlanilla = 0;
         planilla.ValorTotalRecaudo = 0;
+        isLoadingFacturaciones = false;
 
         await InvokeAsync(StateHasChanged);
     }

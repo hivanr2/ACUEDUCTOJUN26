@@ -179,11 +179,34 @@
         using var context = DbFactory.CreateDbContext();
         var fechaActual = DateTime.Now;
 
+        // Try to pick the planilla that corresponds to the current bimestre (pair of months).
+        // Determine the start and end month for the current bimestre (e.g., May-June)
+        int month = fechaActual.Month;
+        int startMonth = (month % 2 == 1) ? month : month - 1; // odd month starts the bimestre
+        int endMonth = startMonth + 1;
+
+        var culture = new CultureInfo("es-CO");
+        var startMonthName = culture.DateTimeFormat.GetMonthName(startMonth);
+        var endMonthName = culture.DateTimeFormat.GetMonthName(endMonth);
+
+        // Try to find a planilla whose periodo description contains either month name (DescripcionLarga)
         planillaActual = await context.Planillas
             .Include(p => p.IdperiodoNavigation)
-            .Where(p => p.FechaHoraRegistroConsumo.HasValue && p.FechaHoraRegistroConsumo <= fechaActual)
+            .Where(p => p.IdperiodoNavigation != null &&
+                        (EF.Functions.Like(p.IdperiodoNavigation.DescripcionLarga, "%" + startMonthName + "%") ||
+                         EF.Functions.Like(p.IdperiodoNavigation.DescripcionLarga, "%" + endMonthName + "%")))
             .OrderByDescending(p => p.FechaHoraRegistroConsumo)
             .FirstOrDefaultAsync();
+
+        // Fallback: if no planilla matched the periodo description, keep the previous behavior
+        if (planillaActual == null)
+        {
+            planillaActual = await context.Planillas
+                .Include(p => p.IdperiodoNavigation)
+                .Where(p => p.FechaHoraRegistroConsumo.HasValue && p.FechaHoraRegistroConsumo <= fechaActual)
+                .OrderByDescending(p => p.FechaHoraRegistroConsumo)
+                .FirstOrDefaultAsync();
+        }
     }
 
     private async Task BuscarFactura()

@@ -22,136 +22,155 @@
 @inject IServiceProvider ServiceProvider
 
 <style>
- .bg-green-white { background-color: #28a745 !important; color: #fff !important; }
- .progress-thin { height:6px; }
- .progress-container { min-width:160px; }
- .table-container { max-height:70vh; overflow: auto; }
- .fixed-header thead th, .fixed-header thead td { position: sticky; top:0; background-color: var(--bs-light); z-index:5; }
+    .bg-green-white {
+        background-color: #28a745 !important;
+        color: #fff !important;
+    }
+
+    .progress-thin {
+        height: 6px;
+    }
+
+    .progress-container {
+        min-width: 160px;
+    }
+
+    .table-container {
+        max-height: 70vh;
+        overflow: auto;
+    }
+
+    .fixed-header thead th, .fixed-header thead td {
+        position: sticky;
+        top: 0;
+        background-color: var(--bs-light);
+        z-index: 5;
+    }
 </style>
 
 <div class="container-fluid py-2 py-md-3">
- <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
- <div class="d-flex align-items-center gap-2">
- @if (@id_planilla_anterior != "No disponible")
- {
- <a class="btn btn-outline-secondary btn-sm" href="/planillas/facturacioncomponent?id=@id_planilla_anterior&codigo=@Uri.EscapeDataString(filtroCodigoUsuario)&predio=@Uri.EscapeDataString(filtroNombrePredio)" target="_self" title="Anterior">
- <i class="bi bi-arrow-left"></i>
- </a>
- }
- <h3 class="h5 mb-0">FACTURACIÓN :: @str_planilla</h3>
- @if(@id_planilla_siguiente != "No disponible")
- {
- <a class="btn btn-outline-secondary btn-sm" href="/planillas/facturacioncomponent?id=@id_planilla_siguiente&codigo=@Uri.EscapeDataString(filtroCodigoUsuario)&predio=@Uri.EscapeDataString(filtroNombrePredio)" target="_self" title="Siguiente">
- <i class="bi bi-arrow-right"></i>
- </a>
- }
- </div>
- <div class="text-nowrap">
- <span class="badge bg-primary-subtle text-primary border">Periodo: <strong>@str_periodo_largo</strong></span>
- </div>
- </div>
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div class="d-flex align-items-center gap-2">
+            @if (@id_planilla_anterior != "No disponible")
+            {
+                <a class="btn btn-outline-secondary btn-sm" href="/planillas/facturacioncomponent?id=@id_planilla_anterior&codigo=@Uri.EscapeDataString(filtroCodigoUsuario)&predio=@Uri.EscapeDataString(filtroNombrePredio)" target="_self" title="Anterior">
+                    <i class="bi bi-arrow-left"></i>
+                </a>
+            }
+            <h3 class="h5 mb-0">FACTURACIÓN :: @str_planilla</h3>
+            @if (@id_planilla_siguiente != "No disponible")
+            {
+                <a class="btn btn-outline-secondary btn-sm" href="/planillas/facturacioncomponent?id=@id_planilla_siguiente&codigo=@Uri.EscapeDataString(filtroCodigoUsuario)&predio=@Uri.EscapeDataString(filtroNombrePredio)" target="_self" title="Siguiente">
+                    <i class="bi bi-arrow-right"></i>
+                </a>
+            }
+        </div>
+        <div class="text-nowrap">
+            <span class="badge bg-primary-subtle text-primary border">Periodo: <strong>@str_periodo_largo</strong></span>
+        </div>
+    </div>
 
- @if (facturacion != null && facturacion.Count >0)
- {
- <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
- <button class="btn btn-outline-danger btn-sm" @onclick="PrintTextOnlyVersion">
- <i class="bi bi-printer"></i> Impresión formato
- </button>
- <label for="excelInput" class="btn btn-outline-success btn-sm">
- <i class="bi bi-upload"></i> Cargar Excel Respaldo
- </label>
-                    <div class="form-check form-switch">
-                        <input type="checkbox" id="editarFactura" class="form-check-input" @bind="editarFactura" />
-                        <label for="editarFactura" class="form-check-label">EDITAR</label>
-                    </div>
- @if (isCurrentBimestre)
- {
- <button class="btn btn-outline-info btn-sm" @onclick="VerificarSaldosTotales" title="Actualiza Saldos siguientes bimestres por Predio">
- <i class="bi bi-check-circle"></i> Actualiza Saldos Totales por Predio
- </button>
- <button class="btn btn-outline-info btn-sm" @onclick="NavigateToAsistencia" title="Listado de Usuarios para Asistencia de Reuniones">
- <i class="bi bi-list-check"></i> Listado Asistencia
- </button>
- <button class="btn btn-outline-info btn-sm" @onclick="NavigateToActualizacion" title="Listado de Actualización de Datos">
- <i class="bi bi-pencil-square"></i> Listado Actualización datos
- </button>
- }
- <div class="input-group input-group-sm" style="width: 180px;">
- <input id="filtroNombrePredio" class="form-control" placeholder="Filtrar predio" @bind="filtroNombrePredio" @bind:event="oninput" @bind:after="OnFiltroNombrePredioChanged" />
- <button class="btn btn-outline-secondary" type="button" @onclick="ClearFiltroNombrePredio" title="Limpiar filtro">×</button>
- </div>
- <div class="input-group input-group-sm" style="width: 140px;">
- <input id="filtroCodigoUsuario" class="form-control" placeholder="Filtrar código" @bind="filtroCodigoUsuario" @bind:event="oninput" @bind:after="OnFiltroCodigoUsuarioChanged" />
- <button class="btn btn-outline-secondary" type="button" @onclick="ClearFiltroCodigoUsuario" title="Limpiar filtro">×</button>
- </div>
- </div>
- <InputFile id="excelInput" OnChange="HandleFileSelected" class="d-none" />
- }
+    @if (facturacion != null && facturacion.Count > 0)
+    {
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <button class="btn btn-outline-danger btn-sm" @onclick="PrintTextOnlyVersion">
+                <i class="bi bi-printer"></i> Impresión formato
+            </button>
+            <label for="excelInput" class="btn btn-outline-success btn-sm">
+                <i class="bi bi-upload"></i> Cargar Excel Respaldo
+            </label>
+            <div class="form-check form-switch">
+                <input type="checkbox" id="editarFactura" class="form-check-input" @bind="editarFactura" />
+                <label for="editarFactura" class="form-check-label">EDITAR</label>
+            </div>
+            @if (isCurrentBimestre)
+            {
+                <button class="btn btn-outline-info btn-sm" @onclick="VerificarSaldosTotales" title="Actualiza Saldos siguientes bimestres por Predio">
+                    <i class="bi bi-check-circle"></i> Actualiza Saldos Totales por Predio
+                </button>
+                <button class="btn btn-outline-info btn-sm" @onclick="NavigateToAsistencia" title="Listado de Usuarios para Asistencia de Reuniones">
+                    <i class="bi bi-list-check"></i> Listado Asistencia
+                </button>
+                <button class="btn btn-outline-info btn-sm" @onclick="NavigateToActualizacion" title="Listado de Actualización de Datos">
+                    <i class="bi bi-pencil-square"></i> Listado Actualización datos
+                </button>
+            }
+            <div class="input-group input-group-sm" style="width: 180px;">
+                <input id="filtroNombrePredio" class="form-control" placeholder="Filtrar predio" @bind="filtroNombrePredio" @bind:event="oninput" @bind:after="OnFiltroNombrePredioChanged" />
+                <button class="btn btn-outline-secondary" type="button" @onclick="ClearFiltroNombrePredio" title="Limpiar filtro">×</button>
+            </div>
+            <div class="input-group input-group-sm" style="width: 140px;">
+                <input id="filtroCodigoUsuario" class="form-control" placeholder="Filtrar código" @bind="filtroCodigoUsuario" @bind:event="oninput" @bind:after="OnFiltroCodigoUsuarioChanged" />
+                <button class="btn btn-outline-secondary" type="button" @onclick="ClearFiltroCodigoUsuario" title="Limpiar filtro">×</button>
+            </div>
+        </div>
+        <InputFile id="excelInput" OnChange="HandleFileSelected" class="d-none" />
+    }
 
- @if(mostrar)
- {
- <div class="alert alert-info py-2 mb-2 d-flex flex-wrap gap-2 align-items-center">
- <div>
- <strong>Fecha Toma de Consumos:</strong>
- <span>@(FechaTomaConsumoPlanilla.HasValue ? FechaTomaConsumoPlanilla.Value.ToString("D", new CultureInfo("es-CO")) : "")</span>
- </div>
- <div>
- <strong>Ultimo día de Pago:</strong>
- <span>@(FechaUltimoPagoPlanilla.HasValue ? FechaUltimoPagoPlanilla.Value.ToString("D", new CultureInfo("es-CO")) : "")</span>
- </div>
- <div>
- <strong>Fecha de Suspensión:</strong>
- <span>@(FechaSuspensionPlanilla.HasValue ? FechaSuspensionPlanilla.Value.ToString("D", new CultureInfo("es-CO")) : "")</span>
- </div>
- <div class="ms-auto">
- <a class="btn btn-outline-primary btn-sm" href="/planillas/edit?idplanilla=@id" target="_blank" title="Editar planilla">
- <i class="bi bi-pencil-square"></i> Edita
- </a>
- </div>
- </div>
- }
+    @if (mostrar)
+    {
+        <div class="alert alert-info py-2 mb-2 d-flex flex-wrap gap-2 align-items-center">
+            <div>
+                <strong>Fecha Toma de Consumos:</strong>
+                <span>@(FechaTomaConsumoPlanilla.HasValue ? FechaTomaConsumoPlanilla.Value.ToString("D", new CultureInfo("es-CO")) : "")</span>
+            </div>
+            <div>
+                <strong>Ultimo día de Pago:</strong>
+                <span>@(FechaUltimoPagoPlanilla.HasValue ? FechaUltimoPagoPlanilla.Value.ToString("D", new CultureInfo("es-CO")) : "")</span>
+            </div>
+            <div>
+                <strong>Fecha de Suspensión:</strong>
+                <span>@(FechaSuspensionPlanilla.HasValue ? FechaSuspensionPlanilla.Value.ToString("D", new CultureInfo("es-CO")) : "")</span>
+            </div>
+            <div class="ms-auto">
+                <a class="btn btn-outline-primary btn-sm" href="/planillas/edit?idplanilla=@id" target="_blank" title="Editar planilla">
+                    <i class="bi bi-pencil-square"></i> Edita
+                </a>
+            </div>
+        </div>
+    }
 
- @if (facturacion == null)
- {
- <div>Cargando...</div>
- }
- else
- {
- if (facturacion.Count >0)
- {
- if (!string.IsNullOrWhiteSpace(facturacion.FirstOrDefault()?.CodigoFactura))
- {
- HayFacturas = true;
- }
- <div class="table-container table-responsive">
- <table class="table table-sm table-hover table-striped align-middle fixed-header">
- <thead class="table-light">
- <tr>
- <th scope="col">It</th>
- <th scope="col">Factura</th>
- @foreach (var header in new[] { "Predio", "Codigo", "Medición Anterior", "Medición Actual",
+    @if (facturacion == null)
+    {
+        <div>Cargando...</div>
+    }
+    else
+    {
+        if (facturacion.Count > 0)
+        {
+            if (!string.IsNullOrWhiteSpace(facturacion.FirstOrDefault()?.CodigoFactura))
+            {
+                HayFacturas = true;
+            }
+            <div class="table-container table-responsive">
+                <table class="table table-sm table-hover table-striped align-middle fixed-header">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">It</th>
+                            <th scope="col">Factura</th>
+                            @foreach (var header in new[] { "Predio", "Codigo", "Medición Anterior", "Medición Actual",
  "ConsumoM3", "Valor Consumo", "Cargo Fijo", "Porcentaje SobreTasa",
  "Valor SobreTasa", "Porcentaje Mora", "Valor Mora",
  "Porcentaje Subsidio", "Valor Subsidio", "Otros Valores",
  "Valor Periodo", "Deuda Anterior", "Recaudo Bimestre",
  "Deuda Pasa" })
- {
- <th scope="col">@header</th>
- }
- @if (editarObservaciones)
- {
- <th scope="col">Observaciones Predio</th>
- }
- <th scope="col">Notas Factura</th>
- <th scope="col">Notas Recaudo</th>
- </tr>
- </thead>
- <tbody>
- @for (int i =0; i < facturacion.Count; i++)
- {
- var factura = facturacion[i];
- <tr>
- <td>@(i +1)</td>
+                            {
+                                <th scope="col">@header</th>
+                            }
+                            @if (editarObservaciones)
+                            {
+                                <th scope="col">Observaciones Predio</th>
+                            }
+                            <th scope="col">Notas Factura</th>
+                            <th scope="col">Notas Recaudo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < facturacion.Count; i++)
+                        {
+                            var factura = facturacion[i];
+                            <tr>
+                                <td>@(i + 1)</td>
                                 <td class="text-center">
                                     <div class="fw-semibold">@factura.CodigoFactura</div>
                                     @if (HayFacturas)
@@ -166,7 +185,7 @@
                                             {
                                                 <a class="btn btn-outline-primary" title="Ver Factura" href="@GetPdfUrl(factura)" target="_blank">F</a>
                                             }
- 
+
                                             @if ((i == 1 || facturacion.Count == 1) && editarFactura)
                                             {
                                                 <button class="btn btn-outline-primary" title="Crear Recibo (modo edición)" @onclick="() => VerReciboSmart(factura)">
@@ -175,7 +194,7 @@
                                             }
                                             else
                                             {
-                                                <button class="btn btn-outline-primary" title="Ver Recibo" @onclick="() =>  VerReciboSmart(factura)">
+                                                <button class="btn btn-outline-primary" title="Ver Recibo" @onclick="() => VerReciboSmart(factura)">
                                                     R
                                                 </button>
 
@@ -187,122 +206,122 @@
                                         </div>
                                     }
                                 </td>
-                <td>
-                    @factura.IdpredioNavigation.ApellidosNombresUsuario -
-                    <a href="/predios/details?idpredio=@factura.Idpredio" target="_blank">Ver</a>
-                    - <a href="/predio/historicoconsumos?idpredio=@factura.Idpredio" target="_blank" title="Ver facturas (Fs)">Fs</a>
-                </td>
- <td>
-    @if ((factura.ConsumoM3 ?? 0) == 0)
-       {
-        // Si no hay consumo, al hacer clic en el código aplicar el filtro en esta misma página de Facturación
-        <a href="/planillas/facturacioncomponent?id=@id&codigo=@Uri.EscapeDataString(factura.CodigoUsuario ?? string.Empty)&focus=@factura.Idfactura" class="text-decoration-underline" title="Filtrar por código en Facturación">@factura.CodigoUsuario</a>
-    }
-   else
-   {
-       // Si ya existe consumo, el enlace del código sigue filtrando en esta página de Facturación
-       <a href="/planillas/facturacioncomponent?id=@id&codigo=@Uri.EscapeDataString(factura.CodigoUsuario ?? string.Empty)&focus=@factura.Idfactura" class="text-decoration-underline" title="Filtrar por código en Facturación">@factura.CodigoUsuario</a>
-   }
- </td>
- <td>@factura.MedicionAnterior</td>
- <td class="bg-green-white">
-    @if ((factura.ConsumoM3 ?? 0) == 0)
-        {
-            <a href="/planillas/consumoscomponent?id=@id&codigo=@Uri.EscapeDataString(factura.CodigoUsuario ?? string.Empty)&focus=@factura.Idfactura" class="text-decoration-underline text-white" title="Ir a Consumos (toma de datos)">@factura.MedicionActual</a>
+                                <td>
+                                    @factura.IdpredioNavigation.ApellidosNombresUsuario -
+                                    <a href="/predios/details?idpredio=@factura.Idpredio" target="_blank">Ver</a>
+                                    - <a href="/predio/historicoconsumos?idpredio=@factura.Idpredio" target="_blank" title="Ver facturas (Fs)">Fs</a>
+                                </td>
+                                <td>
+                                    @if ((factura.ConsumoM3 ?? 0) == 0)
+                                    {
+                                        // Si no hay consumo, al hacer clic en el código aplicar el filtro en esta misma página de Facturación
+                                        <a href="/planillas/facturacioncomponent?id=@id&codigo=@Uri.EscapeDataString(factura.CodigoUsuario ?? string.Empty)&focus=@factura.Idfactura" class="text-decoration-underline" title="Filtrar por código en Facturación">@factura.CodigoUsuario</a>
+                                    }
+                                    else
+                                    {
+                                        // Si ya existe consumo, el enlace del código sigue filtrando en esta página de Facturación
+                                        <a href="/planillas/facturacioncomponent?id=@id&codigo=@Uri.EscapeDataString(factura.CodigoUsuario ?? string.Empty)&focus=@factura.Idfactura" class="text-decoration-underline" title="Filtrar por código en Facturación">@factura.CodigoUsuario</a>
+                                    }
+                                </td>
+                                <td>@factura.MedicionAnterior</td>
+                                <td class="bg-green-white">
+                                    @if ((factura.ConsumoM3 ?? 0) == 0)
+                                    {
+                                        <a href="/planillas/consumoscomponent?id=@id&codigo=@Uri.EscapeDataString(factura.CodigoUsuario ?? string.Empty)&focus=@factura.Idfactura" class="text-decoration-underline text-white" title="Ir a Consumos (toma de datos)">@factura.MedicionActual</a>
+                                    }
+                                    else if ((factura.MedicionActual ?? 0) > (factura.MedicionAnterior ?? 0))
+                                    {
+                                        // Si hay lectura mayor al anterior, permitir ver consumos filtrados pero sin activar toma de datos
+                                        <a href="/planillas/consumoscomponent?id=@id&codigo=@Uri.EscapeDataString(factura.CodigoUsuario ?? string.Empty)&focus=@factura.Idfactura" class="text-decoration-underline text-white" title="Ver Consumos (solo lectura)">@factura.MedicionActual</a>
+                                    }
+                                    else
+                                    {
+                                        @factura.MedicionActual
+                                    }
+                                </td>
+                                <td class="text-center">@factura.ConsumoM3</td>
+                                <td class="text-center">@FormatCurrency(factura.ValorConsumo)</td>
+                                <td class="text-center">@FormatCurrency(factura.CargoFijo)</td>
+                                <td class="text-center">@factura.PorcentajeSobreTasa</td>
+                                <td class="text-center">@FormatCurrency(factura.ValorSobreTasa)</td>
+                                <td class="text-center">@factura.PorcentajeMora</td>
+                                <td class="text-center">@FormatCurrency(factura.ValorMora)</td>
+                                <td class="text-center">@factura.PorcentajeSubsidio</td>
+                                <td class="text-center">@FormatCurrency(factura.ValorSubsidio)</td>
+                                <td class="bg-green-white">@FormatCurrency(factura.OtrosValores)</td>
+                                <td class="text-center">@FormatCurrency(factura.ValorPeriodo)</td>
+                                <td class="text-center">@FormatCurrency(factura.DeudaAnterior)</td>
+                                <td class="bg-green-white">
+                                    @{
+                                        var recaudoVal = factura.RecaudoPeriodoTotal ?? 0;
+                                        var deudaPrev = factura.DeudaAnterior ?? 0;
+                                        var codigoEsc = Uri.EscapeDataString(factura.CodigoUsuario ?? string.Empty);
+                                    }
+                                    @* Si no hay recaudo o es menor a la deuda, abrir en modo edición (parametro 'codigo') *@
+                                    @if (recaudoVal == 0 || recaudoVal < deudaPrev)
+                                    {
+                                        <a class="text-decoration-underline" style="color: white;" href="/planillas/recaudocomponent?id=@id&codigo=@codigoEsc">
+                                            @FormatCurrency(factura.RecaudoPeriodoTotal)
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        @* Si ya existe recaudo y no falta por pagar, abrir la vista de recaudo en solo lectura filtrada por usuario (param 'usuario') *@
+                                        <a class="text-decoration-underline" style="color: white;" href="/planillas/recaudocomponent?id=@id&usuario=@codigoEsc">
+                                            @FormatCurrency(factura.RecaudoPeriodoTotal)
+                                        </a>
+                                    }
+                                </td>
+                                <td class="text-center">@FormatCurrency(factura.DeudaPasa)</td>
+                                @if (editarObservaciones)
+                                {
+                                    <td>
+                                        <div class="small text-muted">@factura.IdpredioNavigation.Observaciones</div>
+                                        <textarea class="form-control form-control-sm mt-1" value="@factura.IdpredioNavigation.Observaciones" @onchange="async (e) => await OnObservacionesPredioChanged(factura, e)" tabindex="@((i * 1000) + 4)"></textarea>
+                                    </td>
+                                }
+                                <td><div class="small">@factura.NotasFactura</div></td>
+                                <td><div class="small">@factura.NotasRecaudo</div></td>
+                            </tr>
+                        }
+                        <tr class="table-secondary fw-semibold">
+                            <td class="text-end" colspan="7">Total Consumo M3: @FormatCurrency(totalConsumoM3)</td>
+                            <td colspan="8">Promedio: <strong>@totalpromedio m3</strong></td>
+                            <td class="text-center">@totalOtrosValores.ToString("C0")</td>
+                            <td class="text-center">@totalValorPeriodo.ToString("C0")</td>
+                            <td class="text-center">@totalDeudaAnterior.ToString("C0")</td>
+                            <td class="text-center">@totalRecaudoPeriodoTotal.ToString("C0")</td>
+                            <td class="text-center">@totalDeudaPasa.ToString("C0")</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         }
-    else if ((factura.MedicionActual ?? 0) > (factura.MedicionAnterior ?? 0))
-    {
-        // Si hay lectura mayor al anterior, permitir ver consumos filtrados pero sin activar toma de datos
-        <a href="/planillas/consumoscomponent?id=@id&codigo=@Uri.EscapeDataString(factura.CodigoUsuario ?? string.Empty)&focus=@factura.Idfactura" class="text-decoration-underline text-white" title="Ver Consumos (solo lectura)">@factura.MedicionActual</a>
+        else
+        {
+            <div>Se crea facturación según Planilla por cada Predio Existente</div>
+            @if (str_planilla != null)
+            {
+                <ExcelPlanillaComponent IdPlanilla="@id" />
+            }
+            <button class="btn btn-danger" @onclick="ConfirmarFacturacion" disabled="@(isProcessing || facturacionConfirmada)">Estoy seguro</button>
+        }
     }
-    else
-    {
-        @factura.MedicionActual
-    }
- </td>
- <td class="text-center">@factura.ConsumoM3</td>
- <td class="text-center">@FormatCurrency(factura.ValorConsumo)</td>
- <td class="text-center">@FormatCurrency(factura.CargoFijo)</td>
- <td class="text-center">@factura.PorcentajeSobreTasa</td>
- <td class="text-center">@FormatCurrency(factura.ValorSobreTasa)</td>
- <td class="text-center">@factura.PorcentajeMora</td>
- <td class="text-center">@FormatCurrency(factura.ValorMora)</td>
- <td class="text-center">@factura.PorcentajeSubsidio</td>
- <td class="text-center">@FormatCurrency(factura.ValorSubsidio)</td>
- <td class="bg-green-white">@FormatCurrency(factura.OtrosValores)</td>
- <td class="text-center">@FormatCurrency(factura.ValorPeriodo)</td>
- <td class="text-center">@FormatCurrency(factura.DeudaAnterior)</td>
- <td class="bg-green-white">
-     @{ 
-         var recaudoVal = factura.RecaudoPeriodoTotal ?? 0; 
-         var deudaPrev = factura.DeudaAnterior ?? 0; 
-         var codigoEsc = Uri.EscapeDataString(factura.CodigoUsuario ?? string.Empty);
-     }
-     @* Si no hay recaudo o es menor a la deuda, abrir en modo edición (parametro 'codigo') *@
-     @if (recaudoVal == 0 || recaudoVal < deudaPrev)
-     {
-         <a class="text-decoration-underline" style="color: white;" href="/planillas/recaudocomponent?id=@id&codigo=@codigoEsc">
-             @FormatCurrency(factura.RecaudoPeriodoTotal)
-         </a>
-     }
-     else
-     {
-         @* Si ya existe recaudo y no falta por pagar, abrir la vista de recaudo en solo lectura filtrada por usuario (param 'usuario') *@
-         <a class="text-decoration-underline" style="color: white;" href="/planillas/recaudocomponent?id=@id&usuario=@codigoEsc">
-             @FormatCurrency(factura.RecaudoPeriodoTotal)
-         </a>
-     }
- </td>
- <td class="text-center">@FormatCurrency(factura.DeudaPasa)</td>
- @if (editarObservaciones)
- {
- <td>
- <div class="small text-muted">@factura.IdpredioNavigation.Observaciones</div>
- <textarea class="form-control form-control-sm mt-1" value="@factura.IdpredioNavigation.Observaciones" @onchange="async (e) => await OnObservacionesPredioChanged(factura, e)" tabindex="@((i *1000) +4)"></textarea>
- </td>
- }
- <td><div class="small">@factura.NotasFactura</div></td>
- <td><div class="small">@factura.NotasRecaudo</div></td>
- </tr>
- }
- <tr class="table-secondary fw-semibold">
- <td class="text-end" colspan="7">Total Consumo M3: @FormatCurrency(totalConsumoM3)</td>
- <td colspan="8">Promedio: <strong>@totalpromedio m3</strong></td>
- <td class="text-center">@totalOtrosValores.ToString("C0")</td>
- <td class="text-center">@totalValorPeriodo.ToString("C0")</td>
- <td class="text-center">@totalDeudaAnterior.ToString("C0")</td>
- <td class="text-center">@totalRecaudoPeriodoTotal.ToString("C0")</td>
- <td class="text-center">@totalDeudaPasa.ToString("C0")</td>
- <td colspan="2"></td>
- </tr>
- </tbody>
- </table>
- </div>
- }
- else
- {
- <div>Se crea facturación según Planilla por cada Predio Existente</div>
- @if(str_planilla != null)
- {
- <ExcelPlanillaComponent IdPlanilla="@id" />
- }
- <button class="btn btn-danger" @onclick="ConfirmarFacturacion" disabled="@(isProcessing || facturacionConfirmada)">Estoy seguro</button>
- }
- }
 
- @if (!string.IsNullOrEmpty(errorMessage))
- {
- <div class="alert alert-danger mt-2">@errorMessage</div>
- }
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-2">@errorMessage</div>
+    }
 </div>
 
 <script>
-function downloadFile(filename, base64) {
-    const link = document.createElement('a');
-    link.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + base64;
-    link.download = filename;
-    link.click();
-}
+    function downloadFile(filename, base64) {
+        const link = document.createElement('a');
+        link.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + base64;
+        link.download = filename;
+        link.click();
+    }
 </script>
 
 @code {
@@ -338,7 +357,7 @@ function downloadFile(filename, base64) {
     private double totalRecaudoPeriodoTotal;
     private double totalDeudaPasa;
     private int totalConsumoM3;
-    private int totalpromedio =0;
+    private int totalpromedio = 0;
 
     private bool editarObservaciones = false;
     private bool editaPlanilla = false; // bandera de edición
@@ -354,18 +373,45 @@ function downloadFile(filename, base64) {
     private string filtroCodigoUsuario = string.Empty;
     private System.Threading.CancellationTokenSource? _filtroCts;
 
+    // Guardas para evitar doble carga inicial innecesaria
+    private string? _lastLoadedId;
+    private string _lastLoadedCodigo = string.Empty;
+    private string _lastLoadedPredio = string.Empty;
+
     protected override async Task OnInitializedAsync()
     {
         filtroCodigoUsuario = codigo ?? string.Empty;
         filtroNombrePredio = predio ?? string.Empty;
         await LoadData();
+
+        // Registrar los valores con los que se hizo la carga inicial
+        _lastLoadedId = id;
+        _lastLoadedCodigo = filtroCodigoUsuario;
+        _lastLoadedPredio = filtroNombrePredio;
     }
 
     protected override async Task OnParametersSetAsync()
     {
-        filtroCodigoUsuario = codigo ?? string.Empty;
-        filtroNombrePredio = predio ?? string.Empty;
-        await LoadData();
+        var newCodigo = codigo ?? string.Empty;
+        var newPredio = predio ?? string.Empty;
+
+        // Solo recargar si alguno de los parámetros relevantes cambió
+        if (_lastLoadedId != id || _lastLoadedCodigo != newCodigo || _lastLoadedPredio != newPredio)
+        {
+            filtroCodigoUsuario = newCodigo;
+            filtroNombrePredio = newPredio;
+            await LoadData();
+
+            _lastLoadedId = id;
+            _lastLoadedCodigo = newCodigo;
+            _lastLoadedPredio = newPredio;
+        }
+        else
+        {
+            // Mantener sincronizados los filtros locales sin recargar datos
+            filtroCodigoUsuario = newCodigo;
+            filtroNombrePredio = newPredio;
+        }
     }
 
 
@@ -636,64 +682,64 @@ function downloadFile(filename, base64) {
                     finalChartUri = await BuildConsumoChartDataUri(firstPredio);
                 }
 
-         CalcularTotales();
-         // Cargar números de recibo existentes por factura
-        _reciboNumeroPorFactura.Clear();
-        var facturaIds = facturacion.Select(f => f.Idfactura).ToList();
-        var ingresos = await context.Ingresos.Where(i => facturaIds.Contains(i.Idfactura)).Select(i => new { i.Idfactura, i.Numero }).AsNoTracking().ToListAsync();
-        foreach (var ing in ingresos)
-        {
-            if (ing.Numero > 0 && !_reciboNumeroPorFactura.ContainsKey(ing.Idfactura))
-                _reciboNumeroPorFactura[ing.Idfactura] = ing.Numero;
+                CalcularTotales();
+                // Cargar números de recibo existentes por factura
+                _reciboNumeroPorFactura.Clear();
+                var facturaIds = facturacion.Select(f => f.Idfactura).ToList();
+                var ingresos = await context.Ingresos.Where(i => facturaIds.Contains(i.Idfactura)).Select(i => new { i.Idfactura, i.Numero }).AsNoTracking().ToListAsync();
+                foreach (var ing in ingresos)
+                {
+                    if (ing.Numero > 0 && !_reciboNumeroPorFactura.ContainsKey(ing.Idfactura))
+                        _reciboNumeroPorFactura[ing.Idfactura] = ing.Numero;
+                }
+
+            }
         }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error cargando datos: {ex.Message}";
+        }
+    }
 
- }
- }
- catch (Exception ex)
- {
- errorMessage = $"Error cargando datos: {ex.Message}";
- }
- }
+    private void CalcularTotales()
+    {
+        try
+        {
+            totalOtrosValores = facturacion.Sum(f => f.OtrosValores ?? 0);
+            totalValorPeriodo = facturacion.Sum(f => f.ValorPeriodo ?? 0);
+            totalDeudaAnterior = facturacion.Sum(f => f.DeudaAnterior ?? 0);
+            totalRecaudoPeriodoTotal = facturacion.Sum(f => f.RecaudoPeriodoTotal ?? 0);
+            totalDeudaPasa = facturacion.Sum(f => f.DeudaPasa ?? 0);
+            totalConsumoM3 = facturacion.Sum(f => (int)(f.ConsumoM3 ?? 0));
+            totalpromedio = facturacion.Count > 0 ? (int)Math.Round(facturacion.Average(f => f.ConsumoM3 ?? 0)) : 0;
+        }
+        catch { }
+    }
 
- private void CalcularTotales()
- {
- try
- {
- totalOtrosValores = facturacion.Sum(f => f.OtrosValores ??0);
- totalValorPeriodo = facturacion.Sum(f => f.ValorPeriodo ??0);
- totalDeudaAnterior = facturacion.Sum(f => f.DeudaAnterior ??0);
- totalRecaudoPeriodoTotal = facturacion.Sum(f => f.RecaudoPeriodoTotal ??0);
- totalDeudaPasa = facturacion.Sum(f => f.DeudaPasa ??0);
- totalConsumoM3 = facturacion.Sum(f => (int)(f.ConsumoM3 ??0));
- totalpromedio = facturacion.Count >0 ? (int)Math.Round(facturacion.Average(f => f.ConsumoM3 ??0)) :0;
- }
- catch { }
- }
-
- private async Task OnObservacionesPredioChanged(Facturacion factura, ChangeEventArgs e)
- {
- try
- {
- var nuevo = e?.Value?.ToString() ?? string.Empty;
- using var context = DbFactory.CreateDbContext();
- var predio = await context.Predios.FirstOrDefaultAsync(p => p.Idpredio == factura.Idpredio);
- if (predio != null)
- {
- predio.Observaciones = nuevo;
- context.Predios.Update(predio);
- await context.SaveChangesAsync();
- // Sincronizar en memoria
- if (factura.IdpredioNavigation != null)
- {
- factura.IdpredioNavigation.Observaciones = nuevo;
- }
- }
- }
- catch (Exception ex)
- {
- errorMessage = $"Error al actualizar observaciones: {ex.Message}";
- }
- }
+    private async Task OnObservacionesPredioChanged(Facturacion factura, ChangeEventArgs e)
+    {
+        try
+        {
+            var nuevo = e?.Value?.ToString() ?? string.Empty;
+            using var context = DbFactory.CreateDbContext();
+            var predio = await context.Predios.FirstOrDefaultAsync(p => p.Idpredio == factura.Idpredio);
+            if (predio != null)
+            {
+                predio.Observaciones = nuevo;
+                context.Predios.Update(predio);
+                await context.SaveChangesAsync();
+                // Sincronizar en memoria
+                if (factura.IdpredioNavigation != null)
+                {
+                    factura.IdpredioNavigation.Observaciones = nuevo;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al actualizar observaciones: {ex.Message}";
+        }
+    }
 
     private async Task HandleFileSelected(InputFileChangeEventArgs e)
     {
@@ -976,53 +1022,53 @@ function downloadFile(filename, base64) {
 
             var pairs = data
             .OrderBy(c => c.IdplanillaNavigation.FechaHoraFacturacion)
-            .Select(c => new { Label = c.IdplanillaNavigation.IdperiodoNavigation.DescripcionCorta, Value = (float)(c.ConsumoM3 ??0) })
+            .Select(c => new { Label = c.IdplanillaNavigation.IdperiodoNavigation.DescripcionCorta, Value = (float)(c.ConsumoM3 ?? 0) })
             .ToList();
 
             int count = Math.Max(1, pairs.Count);
-            int width = Math.Max(480, count *64);
-            int height =200; // más compacto para PDF
-            int marginLeft =40, marginRight =10, marginTop =10, marginBottom =30;
+            int width = Math.Max(480, count * 64);
+            int height = 200; // más compacto para PDF
+            int marginLeft = 40, marginRight = 10, marginTop = 10, marginBottom = 30;
             using var surface = SKSurface.Create(new SKImageInfo(width, height));
             var canvas = surface.Canvas;
             canvas.Clear(SKColors.White);
 
-            using var axisPaint = new SKPaint { Color = SKColors.Black, StrokeWidth =1, IsAntialias = true };
-            using var barPaint = new SKPaint { Color = new SKColor(33,150,243), IsAntialias = true };
-            using var textPaint = new SKPaint { Color = SKColors.Black, IsAntialias = true, TextSize =12 };
-            using var valuePaint = new SKPaint { Color = SKColors.Black, IsAntialias = true, TextSize =10 };
+            using var axisPaint = new SKPaint { Color = SKColors.Black, StrokeWidth = 1, IsAntialias = true };
+            using var barPaint = new SKPaint { Color = new SKColor(33, 150, 243), IsAntialias = true };
+            using var textPaint = new SKPaint { Color = SKColors.Black, IsAntialias = true, TextSize = 12 };
+            using var valuePaint = new SKPaint { Color = SKColors.Black, IsAntialias = true, TextSize = 10 };
 
             float x0 = marginLeft, y0 = height - marginBottom, x1 = width - marginRight, y1 = marginTop;
             canvas.DrawLine(x0, y0, x1, y0, axisPaint);
             canvas.DrawLine(x0, y0, x0, y1, axisPaint);
 
-            float max = pairs.Count >0 ? pairs.Max(p => p.Value) :1f;
-            if (max <=0) max =1;
+            float max = pairs.Count > 0 ? pairs.Max(p => p.Value) : 1f;
+            if (max <= 0) max = 1;
             float plotWidth = x1 - x0;
             float barSpace = plotWidth / count;
-            float barWidth = MathF.Min(36f, barSpace *0.6f);
+            float barWidth = MathF.Min(36f, barSpace * 0.6f);
 
-            for (int i =0; i < count; i++)
+            for (int i = 0; i < count; i++)
             {
                 var p = pairs[i];
-                float vx = x0 + (i +0.5f) * barSpace;
+                float vx = x0 + (i + 0.5f) * barSpace;
                 float bh = (p.Value / max) * (y0 - y1);
-                var rect = new SKRect(vx - barWidth /2, y0 - bh, vx + barWidth /2, y0);
+                var rect = new SKRect(vx - barWidth / 2, y0 - bh, vx + barWidth / 2, y0);
                 canvas.DrawRect(rect, barPaint);
 
                 var valStr = p.Value.ToString("0");
                 var valBounds = new SKRect();
                 valuePaint.MeasureText(valStr, ref valBounds);
-                canvas.DrawText(valStr, vx - valBounds.Width /2, rect.Top -4, valuePaint);
+                canvas.DrawText(valStr, vx - valBounds.Width / 2, rect.Top - 4, valuePaint);
 
                 var lbl = p.Label ?? string.Empty;
                 var tb = new SKRect();
                 textPaint.MeasureText(lbl, ref tb);
-                canvas.DrawText(lbl, vx - tb.Width /2, y0 + tb.Height +4, textPaint);
+                canvas.DrawText(lbl, vx - tb.Width / 2, y0 + tb.Height + 4, textPaint);
             }
 
             using var img = surface.Snapshot();
-            using var dataPng = img.Encode(SKEncodedImageFormat.Png,90);
+            using var dataPng = img.Encode(SKEncodedImageFormat.Png, 90);
             using var ms = new MemoryStream();
             dataPng.SaveTo(ms);
             var b64 = Convert.ToBase64String(ms.ToArray());
@@ -1247,8 +1293,8 @@ function downloadFile(filename, base64) {
         return anteriorPlanilla?.IdperiodoNavigation?.DescripcionCorta;
     }
 
- private async Task VerificarSaldosTotales()
- {
+    private async Task VerificarSaldosTotales()
+    {
         try
         {
             using var context = DbFactory.CreateDbContext();
