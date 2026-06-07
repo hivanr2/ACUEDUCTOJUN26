@@ -621,25 +621,62 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!chartRendered && predio is not null)
-        {
-            using var context = DbFactory.CreateDbContext();
-            consumosPorPeriodo = await context.Facturacions
-                .Where(c => c.Idpredio == Idpredio)
-                .OrderBy(c => c.IdplanillaNavigation.FechaHoraFacturacion)
-                .Include(f => f.IdplanillaNavigation)
-                .ThenInclude(p => p.IdperiodoNavigation)
-                .GroupBy(f => f.IdplanillaNavigation.Descripcion)
-                .Select(g => new ConsumoPorPeriodo
-                {
-                    Periodo = g.Key,
-                    TotalConsumoM3 = g.Sum(f => f.ConsumoM3 ?? 0)
-                })
-                .Take(MaxPeriodos)
-                .ToListAsync();
+        // Ensure we have predio before attempting to load or render the chart
+        if (predio is null) return;
 
-            await JS.InvokeVoidAsync("renderConsumoChart", consumosPorPeriodo);
-            chartRendered = true;
+        // Load data only once (or if it wasn't loaded for some reason)
+        if (consumosPorPeriodo == null || consumosPorPeriodo.Count == 0)
+        {
+                try
+                {
+                    using var context = DbFactory.CreateDbContext();
+                    // Group by period id and description, compute the most recent Fecha within each group,
+                    // then order groups by that Fecha descending (newest first) and take up to MaxPeriodos
+                    consumosPorPeriodo = await context.Facturacions
+                        .Where(c => c.Idpredio == Idpredio && (c.ConsumoM3 ?? 0) > 0 && c.IdplanillaNavigation != null)
+                        .Include(f => f.IdplanillaNavigation)
+                        .ThenInclude(p => p.IdperiodoNavigation)
+                        .GroupBy(f => new
+                        {
+                            PeriodoId = f.IdplanillaNavigation.Idperiodo,
+                            Descripcion = f.IdplanillaNavigation.Descripcion
+                        })
+                        .Select(g => new ConsumoPorPeriodo
+                        {
+                            Periodo = g.Key.Descripcion,
+                            Fecha = g.Max(f => f.IdplanillaNavigation.FechaHoraFacturacion),
+                            TotalConsumoM3 = g.Sum(f => f.ConsumoM3 ?? 0)
+                        })
+                        .OrderByDescending(x => x.Fecha)
+                        .Take(MaxPeriodos)
+                        .ToListAsync();
+                    // Ensure the result is ordered from oldest->newest so the most recent period appears last in the chart
+                    if (consumosPorPeriodo != null && consumosPorPeriodo.Count > 1)
+                    {
+                        consumosPorPeriodo = consumosPorPeriodo.OrderBy(x => x.Fecha).ToList();
+                    }
+                }
+            catch
+            {
+                // Swallow DB errors here to avoid breaking rendering; leave consumosPorPeriodo empty
+                consumosPorPeriodo = consumosPorPeriodo ?? new List<ConsumoPorPeriodo>();
+            }
+        }
+
+        // If we have data, try to render the chart. Add a tiny delay so client-side scripts (Chart.js) have time to initialize
+        if (consumosPorPeriodo != null && consumosPorPeriodo.Count > 0)
+        {
+            try
+            {
+                await Task.Delay(50);
+                await JS.InvokeVoidAsync("renderConsumoChart", consumosPorPeriodo);
+                chartRendered = true;
+            }
+            catch
+            {
+                // If JS fails (scripts not loaded yet or other issues), allow future attempts
+                chartRendered = false;
+            }
         }
     }
 
@@ -792,6 +829,7 @@ else
     public class ConsumoPorPeriodo
     {
         public string Periodo { get; set; }
+        public DateTime? Fecha { get; set; }
         public double TotalConsumoM3 { get; set; }
     }
 }

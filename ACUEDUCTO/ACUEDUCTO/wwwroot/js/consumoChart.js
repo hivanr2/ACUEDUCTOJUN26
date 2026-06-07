@@ -16,8 +16,14 @@ window.renderConsumoChart = (data, elementId) => {
     }
 
     const ctx = canvas.getContext('2d');
-    const labels = (data || []).map(d => d.periodo || d.Periodo);
-    const values = (data || []).map(d => d.totalConsumoM3 ?? d.TotalConsumoM3 ?? 0);
+    // Build entries and take last 10 bimesters that have values (non-zero / non-null)
+    const entries = (data || [])
+      .map(d => ({ label: d.periodo ?? d.Periodo, value: d.totalConsumoM3 ?? d.TotalConsumoM3 ?? 0 }))
+      .filter(e => e.value != null && e.value !== 0);
+    // If no filtered entries, fall back to using all provided data so chart isn't empty
+    const lastEntries = entries.length ? entries.slice(-10) : (data || []).map(d => ({ label: d.periodo ?? d.Periodo, value: d.totalConsumoM3 ?? d.TotalConsumoM3 ?? 0 }));
+    const labels = lastEntries.map(e => e.label);
+    const values = lastEntries.map(e => e.value);
 
     // Fallback simple sin Chart.js
     if (!window.Chart) {
