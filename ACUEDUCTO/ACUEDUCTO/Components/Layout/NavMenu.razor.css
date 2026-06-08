@@ -63,30 +63,36 @@
     }
 
     .nav-item ::deep .nav-link {
-        color: #d7d7d7;
-        backgroundColor: rgba(0,0,0,0.4);
+        color: #cfd8dc;
+        background-color: rgba(255, 255, 255, 0.03);
         border: none;
-        border-radius: 4px;
-        height: 3rem;
+        border-radius: 8px;
+        height: 2.8rem;
         display: flex;
         align-items: center;
-        line-height: 3rem;
         width: 100%;
+        padding: 0 1rem;
+        margin: 0.2rem 0;
+        font-weight: 500;
+        transition: all 0.2s ease;
     }
 
 .nav-item ::deep a.active {
-    background-color: rgba(255,255,255,0.37);
-    color: white;
+    background-color: #1aa8c9 !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(26, 168, 201, 0.3);
 }
 
     .nav-item ::deep .nav-link:hover {
-        backgroundColor: rgba(0,0,0,0.4);
-        color: white;
+        background-color: rgba(255, 255, 255, 0.1);
+        color: #ffffff;
+        transform: translateX(3px);
     }
 
 .nav-scrollable {
     display: none;
-    background-image: linear-gradient(180deg, #495057 0%, #062c47 70%);
+    background-image: linear-gradient(180deg, #0f2d4a 0%, #05101d 100%);
 }
 
 .navbar-toggler:checked ~ .nav-scrollable {
