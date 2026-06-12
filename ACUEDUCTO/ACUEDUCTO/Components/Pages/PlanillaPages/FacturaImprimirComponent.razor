@@ -198,6 +198,14 @@ else
 
     private List<(string Label,string Total)> TarifaDesglose = new();
 
+    // Local rounding similar to RecaudoComponent: round deuda pasa to hundreds
+    private double RedondearValorLocal(double valor)
+    {
+        int centenas = (int)(valor / 100);
+        int decenas = (int)((valor % 100) / 10);
+        return decenas <= 5 ? centenas * 100 : (centenas + 1) * 100;
+    }
+
     private sealed class ConsumoRow { public string Periodo { get; set; } = string.Empty; public double TotalConsumoM3 { get; set; } }
     private List<ConsumoRow> ConsumosHist = new();
     private double PromedioHistorico = 0.0;
@@ -240,6 +248,62 @@ else
 
             // Generar y guardar PDF inmediatamente (sin gráfico, para no bloquear)
             var tarifasList = await context.Tarifas.AsNoTracking().ToListAsync();
+            // Ajuste de mora al imprimir: si el recaudo >= deuda (deuda anterior + valor periodo sin mora) -> sin mora,
+            // si el recaudo es menor -> aplicar mora del 1.5% sobre (deuda - recaudo). Cambio en memoria solamente.
+            try
+            {
+                double deudaAnterior = factura.DeudaAnterior ?? 0;
+                // Determinar valor periodo sin contar la mora ya existente en la entidad
+                double valorPeriodoActual = factura.ValorPeriodo ?? 0;
+                //double valorMoraExistente = factura.ValorMora ?? 0;
+                //double valorPeriodoSinMora = Math.Max(0, valorPeriodoActual - valorMoraExistente);
+                // deudaAntesRecaudo = deudaAnterior;
+                double recaudo = factura.RecaudoPeriodoTotal ?? 0;
+
+                var antesValorMora = factura.ValorMora ?? 0;
+                var antesPorcMora = factura.PorcentajeMora ?? 0;
+
+                if (recaudo >= deudaAnterior)
+                {
+                    factura.ValorMora = 0;
+                    factura.PorcentajeMora = 0;
+                }
+                else
+                {
+                    double baseParaMora = deudaAnterior - recaudo;
+                    double mora = baseParaMora * 0.015; // 1.5%
+                    // Representar la mora en pesos sin decimales
+                    factura.ValorMora = RedondearValorLocal(mora);
+                    factura.PorcentajeMora = 1.5;
+                }
+                // Recalcular ValorPeriodo para que la impresión muestre el valor actualizado
+                double cargoFijo = factura.CargoFijo ?? 0;
+                double valorConsumo = factura.ValorConsumo ?? 0;
+                double valorSobre = factura.ValorSobreTasa ?? 0;
+                double valorSubsidio = factura.ValorSubsidio ?? 0;
+                double otros = factura.OtrosValores ?? 0;
+                factura.ValorPeriodo = Math.Round(cargoFijo + valorConsumo + valorSobre + (factura.ValorMora ?? 0) + valorSubsidio + otros, 0);
+
+                // Recalcular DeudaPasa con la misma lógica que en RecaudoComponent (redondeo a centenas)
+                double deudaCalculo = deudaAnterior + (factura.ValorPeriodo ?? 0) - (factura.RecaudoPeriodoTotal ?? 0);
+                factura.DeudaPasa = RedondearValorLocal(deudaCalculo);
+
+                // Persistir cambios si hubo variación en mora/porcentaje/valorperiodo/deudapasa
+                bool changed = !(Math.Abs((antesValorMora) - (factura.ValorMora ?? 0)) < 0.001 && Math.Abs((antesPorcMora) - (factura.PorcentajeMora ?? 0)) < 0.001);
+                if (changed)
+                {
+                    try
+                    {
+                        context.Update(factura);
+                        await context.SaveChangesAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger?.LogError(ex, "Error guardando cambios de mora para factura {Id}", factura.Idfactura);
+                    }
+                }
+            }
+            catch { }
             // preparar nota de consumo para el PDF si aplica
             string? consumoNote = null;
             if (isConsumoAboveAverage)
