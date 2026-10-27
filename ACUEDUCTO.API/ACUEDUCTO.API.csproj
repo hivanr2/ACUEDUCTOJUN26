@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="EPPlus" Version="8.4.1" />
+    <PackageReference Include="EPPlus" Version="8.7.2" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.11" />
 	  <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="9.0.5" />
 	  <PackageReference Include="Microsoft.AspNetCore.StaticFiles" Version="2.3.0" />
@@ -17,7 +17,7 @@
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 	  </PackageReference>
       <PackageReference Include="Tesseract" Version="5.2.0" />
-      <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+      <PackageReference Include="SixLabors.ImageSharp" Version="3.2.0" />
    <PackageReference Include="ZXing.Net" Version="0.16.9" />
   </ItemGroup>
 
